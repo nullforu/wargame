@@ -1,0 +1,217 @@
+package handlers
+
+import (
+	"encoding/json"
+	"errors"
+	"io"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"wargame/internal/http/middleware"
+	"wargame/internal/service"
+
+	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
+)
+
+type errorResponse struct {
+	Error     string                 `json:"error"`
+	Details   []service.FieldError   `json:"details,omitempty"`
+	RateLimit *service.RateLimitInfo `json:"rate_limit,omitempty"`
+}
+
+func writeError(ctx *gin.Context, err error) {
+	status, resp, headers := mapError(err)
+	for key, value := range headers {
+		ctx.Header(key, value)
+	}
+
+	if err != nil && status >= http.StatusInternalServerError {
+		attrs := make([]slog.Attr, 0, 4)
+		if ctx != nil && ctx.Request != nil {
+			attrs = append(attrs,
+				slog.String("method", ctx.Request.Method),
+				slog.String("path", ctx.Request.URL.Path),
+			)
+		}
+
+		if ctx != nil {
+			if userID := middleware.UserID(ctx); userID > 0 {
+				attrs = append(attrs, slog.Int64("user_id", userID))
+			}
+		}
+
+		anyAttrs := make([]any, 0, len(attrs))
+		for _, attr := range attrs {
+			anyAttrs = append(anyAttrs, attr)
+		}
+
+		slog.Default().Error("http handler error",
+			slog.Any("error", err),
+			slog.Group("http", anyAttrs...),
+		)
+	}
+
+	ctx.JSON(status, resp)
+}
+
+func mapError(err error) (int, errorResponse, map[string]string) {
+	status := http.StatusInternalServerError
+	resp := errorResponse{Error: "internal error"}
+
+	var ve *service.ValidationError
+	if errors.As(err, &ve) {
+		status = http.StatusBadRequest
+		resp.Error = ve.Error()
+		resp.Details = ve.Fields
+		return status, resp, nil
+	}
+
+	var rl *service.RateLimitError
+	if errors.As(err, &rl) {
+		status = http.StatusTooManyRequests
+		resp.Error = rl.Error()
+		resp.RateLimit = &rl.Info
+
+		headers := map[string]string{
+			"X-RateLimit-Limit":     strconv.Itoa(rl.Info.Limit),
+			"X-RateLimit-Remaining": strconv.Itoa(rl.Info.Remaining),
+			"X-RateLimit-Reset":     strconv.Itoa(rl.Info.ResetSeconds),
+		}
+
+		return status, resp, headers
+	}
+
+	switch {
+	case errors.Is(err, service.ErrInvalidInput):
+		status = http.StatusBadRequest
+		resp.Error = service.ErrInvalidInput.Error()
+		resp.Details = []service.FieldError{{Field: "request", Reason: "invalid"}}
+	case errors.Is(err, service.ErrInvalidCreds):
+		status = http.StatusUnauthorized
+		resp.Error = service.ErrInvalidCreds.Error()
+	case errors.Is(err, service.ErrUserBlocked):
+		status = http.StatusForbidden
+		resp.Error = service.ErrUserBlocked.Error()
+	case errors.Is(err, service.ErrUserExists):
+		status = http.StatusConflict
+		resp.Error = service.ErrUserExists.Error()
+	case errors.Is(err, service.ErrChallengeNotFound):
+		status = http.StatusNotFound
+		resp.Error = service.ErrChallengeNotFound.Error()
+	case errors.Is(err, service.ErrChallengeFileNotFound):
+		status = http.StatusNotFound
+		resp.Error = service.ErrChallengeFileNotFound.Error()
+	case errors.Is(err, service.ErrChallengeLocked):
+		status = http.StatusForbidden
+		resp.Error = service.ErrChallengeLocked.Error()
+	case errors.Is(err, service.ErrStorageUnavailable):
+		status = http.StatusServiceUnavailable
+		resp.Error = service.ErrStorageUnavailable.Error()
+	case errors.Is(err, service.ErrAlreadySolved):
+		status = http.StatusConflict
+		resp.Error = service.ErrAlreadySolved.Error()
+	case errors.Is(err, service.ErrRateLimited):
+		status = http.StatusTooManyRequests
+		resp.Error = service.ErrRateLimited.Error()
+	case errors.Is(err, service.ErrStackDisabled):
+		status = http.StatusServiceUnavailable
+		resp.Error = service.ErrStackDisabled.Error()
+	case errors.Is(err, service.ErrStackNotEnabled):
+		status = http.StatusBadRequest
+		resp.Error = service.ErrStackNotEnabled.Error()
+	case errors.Is(err, service.ErrStackLimitReached):
+		status = http.StatusConflict
+		resp.Error = service.ErrStackLimitReached.Error()
+	case errors.Is(err, service.ErrStackNotFound):
+		status = http.StatusNotFound
+		resp.Error = service.ErrStackNotFound.Error()
+	case errors.Is(err, service.ErrStackProvisionerDown):
+		status = http.StatusServiceUnavailable
+		resp.Error = service.ErrStackProvisionerDown.Error()
+	case errors.Is(err, service.ErrStackInvalidSpec):
+		status = http.StatusBadRequest
+		resp.Error = service.ErrStackInvalidSpec.Error()
+	case errors.Is(err, service.ErrNotFound):
+		status = http.StatusNotFound
+		resp.Error = "not found"
+	}
+
+	return status, resp, nil
+}
+
+func writeBindError(ctx *gin.Context, err error) {
+	fields := bindErrorDetails(err)
+	if len(fields) == 0 {
+		fields = []service.FieldError{{Field: "body", Reason: "invalid"}}
+	}
+
+	ctx.JSON(http.StatusBadRequest, errorResponse{Error: service.ErrInvalidInput.Error(), Details: fields})
+}
+
+func bindErrorDetails(err error) []service.FieldError {
+	var verrs validator.ValidationErrors
+	if errors.As(err, &verrs) {
+		fields := make([]service.FieldError, 0, len(verrs))
+		for _, fe := range verrs {
+			field := toSnakeCase(fe.Field())
+			fields = append(fields, service.FieldError{Field: field, Reason: fe.Tag()})
+		}
+
+		return fields
+	}
+
+	var ute *json.UnmarshalTypeError
+	if errors.As(err, &ute) {
+		field := strings.ToLower(ute.Field)
+		if field == "" {
+			field = "body"
+		}
+		return []service.FieldError{{Field: field, Reason: "invalid type"}}
+	}
+
+	var se *json.SyntaxError
+	if errors.As(err, &se) {
+		return []service.FieldError{{Field: "body", Reason: "invalid json"}}
+	}
+
+	if errors.Is(err, io.EOF) {
+		return []service.FieldError{{Field: "body", Reason: "empty"}}
+	}
+	return nil
+}
+
+func toSnakeCase(value string) string {
+	if value == "" {
+		return value
+	}
+
+	runes := []rune(value)
+	var b strings.Builder
+	b.Grow(len(runes) + 4)
+
+	for i, r := range runes {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				prev := runes[i-1]
+				nextLower := i+1 < len(runes) && runes[i+1] >= 'a' && runes[i+1] <= 'z'
+				prevLower := prev >= 'a' && prev <= 'z'
+				prevDigit := prev >= '0' && prev <= '9'
+
+				if prevLower || prevDigit || nextLower {
+					b.WriteByte('_')
+				}
+			}
+
+			b.WriteRune(r + ('a' - 'A'))
+
+			continue
+		}
+
+		b.WriteRune(r)
+	}
+
+	return b.String()
+}

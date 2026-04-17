@@ -1,0 +1,229 @@
+package repo
+
+import (
+	"context"
+
+	"wargame/internal/models"
+
+	"github.com/uptrace/bun"
+)
+
+type SubmissionRepo struct {
+	db *bun.DB
+}
+
+func NewSubmissionRepo(db *bun.DB) *SubmissionRepo {
+	return &SubmissionRepo{db: db}
+}
+
+func (r *SubmissionRepo) ListAll(ctx context.Context) ([]models.Submission, error) {
+	rows := make([]models.Submission, 0)
+	if err := r.db.NewSelect().
+		Model(&rows).
+		OrderExpr("submitted_at DESC, id DESC").
+		Scan(ctx); err != nil {
+		return nil, wrapError("submissionRepo.ListAll", err)
+	}
+
+	return rows, nil
+}
+
+func (r *SubmissionRepo) Create(ctx context.Context, sub *models.Submission) error {
+	if _, err := r.db.NewInsert().Model(sub).Exec(ctx); err != nil {
+		return wrapError("submissionRepo.Create", err)
+	}
+
+	return nil
+}
+
+func (r *SubmissionRepo) lockTeamScope(ctx context.Context, db bun.IDB, userID int64) (int64, int64, error) {
+	var teamID int64
+	if err := db.NewSelect().
+		TableExpr("users AS u").
+		ColumnExpr("u.team_id").
+		Where("u.id = ?", userID).
+		For("UPDATE").
+		Scan(ctx, &teamID); err != nil {
+		return teamID, 0, err
+	}
+
+	var divisionID int64
+	if err := db.NewSelect().
+		TableExpr("teams AS t").
+		ColumnExpr("t.division_id").
+		Where("t.id = ?", teamID).
+		For("UPDATE").
+		Scan(ctx, &divisionID); err != nil {
+		return teamID, 0, err
+	}
+
+	return teamID, divisionID, nil
+}
+
+func (r *SubmissionRepo) lockChallengeScope(ctx context.Context, db bun.IDB, challengeID int64) error {
+	var lockedID int64
+	if err := db.NewSelect().
+		TableExpr("challenges AS c").
+		ColumnExpr("c.id").
+		Where("c.id = ?", challengeID).
+		For("UPDATE").
+		Scan(ctx, &lockedID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *SubmissionRepo) correctSubmissionCount(
+	ctx context.Context,
+	db bun.IDB,
+	challengeID int64,
+	teamID int64,
+) (int, error) {
+	return db.NewSelect().
+		TableExpr("submissions AS s").
+		Join("JOIN users AS u ON u.id = s.user_id").
+		Where("s.correct = true").
+		Where("s.challenge_id = ?", challengeID).
+		Where("u.team_id = ?", teamID).
+		Count(ctx)
+}
+
+func (r *SubmissionRepo) correctSubmissionCountForChallenge(
+	ctx context.Context,
+	db bun.IDB,
+	challengeID int64,
+	divisionID int64,
+) (int, error) {
+	return db.NewSelect().
+		TableExpr("submissions AS s").
+		Join("JOIN users AS u ON u.id = s.user_id").
+		Join("JOIN teams AS t ON t.id = u.team_id").
+		Where("s.correct = true").
+		Where("u.role NOT IN (?)", bun.In([]string{models.BlockedRole, models.AdminRole})).
+		Where("s.challenge_id = ?", challengeID).
+		Where("t.division_id = ?", divisionID).
+		Count(ctx)
+}
+
+func (r *SubmissionRepo) solvedChallengesQuery(db bun.IDB) *bun.SelectQuery {
+	return db.NewSelect().
+		TableExpr("submissions AS s").
+		ColumnExpr("s.challenge_id AS challenge_id").
+		ColumnExpr("c.title AS title").
+		ColumnExpr("c.points AS points").
+		ColumnExpr("MIN(s.submitted_at) AS solved_at").
+		Join("JOIN challenges AS c ON c.id = s.challenge_id").
+		Join("JOIN users AS u ON u.id = s.user_id").
+		Where("s.correct = true")
+}
+
+func (r *SubmissionRepo) CreateCorrectIfNotSolvedByTeam(ctx context.Context, sub *models.Submission) (bool, error) {
+	if !sub.Correct {
+		if err := r.Create(ctx, sub); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam begin", err)
+	}
+
+	teamID, divisionID, err := r.lockTeamScope(ctx, tx, sub.UserID)
+	if err != nil {
+		_ = tx.Rollback()
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam lock user", err)
+	}
+
+	if err := r.lockChallengeScope(ctx, tx, sub.ChallengeID); err != nil {
+		_ = tx.Rollback()
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam lock challenge", err)
+	}
+
+	count, err := r.correctSubmissionCount(ctx, tx, sub.ChallengeID, teamID)
+	if err != nil {
+		_ = tx.Rollback()
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam check", err)
+	}
+
+	if count > 0 {
+		_ = tx.Rollback()
+		return false, nil
+	}
+
+	challengeCount, err := r.correctSubmissionCountForChallenge(ctx, tx, sub.ChallengeID, divisionID)
+	if err != nil {
+		_ = tx.Rollback()
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam first blood check", err)
+	}
+
+	sub.IsFirstBlood = challengeCount == 0
+
+	if _, err := tx.NewInsert().Model(sub).Exec(ctx); err != nil {
+		_ = tx.Rollback()
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam insert", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam commit", err)
+	}
+
+	return true, nil
+}
+
+func (r *SubmissionRepo) HasCorrect(ctx context.Context, userID, challengeID int64) (bool, error) {
+	count, err := r.db.NewSelect().
+		TableExpr("submissions AS s").
+		Join("JOIN users AS u ON u.id = s.user_id").
+		Join("JOIN users AS me ON me.id = ?", userID).
+		Where("s.correct = true").
+		Where("s.challenge_id = ?", challengeID).
+		Where("u.team_id = me.team_id").
+		Count(ctx)
+
+	if err != nil {
+		return false, wrapError("submissionRepo.HasCorrect", err)
+	}
+
+	return count > 0, nil
+}
+
+func (r *SubmissionRepo) SolvedChallenges(ctx context.Context, userID int64) ([]models.SolvedChallenge, error) {
+	rows := make([]models.SolvedChallenge, 0)
+
+	err := r.solvedChallengesQuery(r.db).
+		Where("u.id = ?", userID).
+		GroupExpr("s.challenge_id, c.title, c.points").
+		OrderExpr("solved_at ASC").
+		Scan(ctx, &rows)
+
+	if err != nil {
+		return nil, wrapError("submissionRepo.SolvedChallenges", err)
+	}
+
+	return rows, nil
+}
+
+func (r *SubmissionRepo) TeamSolvedChallengeIDs(ctx context.Context, userID int64) (map[int64]struct{}, error) {
+	rows := make([]int64, 0)
+
+	if err := r.db.NewSelect().
+		TableExpr("submissions AS s").
+		ColumnExpr("DISTINCT s.challenge_id").
+		Join("JOIN users AS u ON u.id = s.user_id").
+		Join("JOIN users AS me ON me.id = ?", userID).
+		Where("s.correct = true").
+		Where("u.team_id = me.team_id").
+		Scan(ctx, &rows); err != nil {
+		return nil, wrapError("submissionRepo.TeamSolvedChallengeIDs", err)
+	}
+
+	ids := make(map[int64]struct{}, len(rows))
+	for _, id := range rows {
+		ids[id] = struct{}{}
+	}
+
+	return ids, nil
+}
