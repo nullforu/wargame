@@ -14,13 +14,18 @@ comment:
   require_changes: false
 
 ignore:
+  - "frontend/**"
   - "**/*_test.go"
+  - "**/*_mock.go"
+  - "**/*.pb.go"
+  - "**/*_grpc.pb.go"
   - "**/mock/**"
   - "cmd/**"
   - "scripts/**"
   - "docs/**"
   - "assets/**"
   - "migrations/**"
+  - "internal/gen/**"
   - "**/*.sql"
   - "internal/storage/s3.go" # S3 storage is production only code. instead, we test mock storage.
   - "internal/stack/client.go" # Container Provisioner HTTP client is production only code. instead, we test mock client.
