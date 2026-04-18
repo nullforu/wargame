@@ -124,13 +124,13 @@ func TestNewAndAutoMigrate(t *testing.T) {
 	if err := db.NewSelect().Table("information_schema.tables").
 		ColumnExpr("COUNT(*)").
 		Where("table_schema = 'public'").
-		Where("table_name IN ('app_configs','users','challenges','stacks','submissions')").
+		Where("table_name IN ('users','challenges','stacks','submissions')").
 		Scan(context.Background(), &tableCount); err != nil {
 		t.Fatalf("query tables: %v", err)
 	}
 
-	if tableCount != 5 {
-		t.Fatalf("expected 5 tables, got %d", tableCount)
+	if tableCount != 4 {
+		t.Fatalf("expected 4 tables, got %d", tableCount)
 	}
 }
 

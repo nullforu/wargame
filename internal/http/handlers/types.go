@@ -8,16 +8,6 @@ import (
 	stackpkg "wargame/internal/stack"
 )
 
-type appConfigResponse struct {
-	Title             string    `json:"title"`
-	Description       string    `json:"description"`
-	HeaderTitle       string    `json:"header_title"`
-	HeaderDescription string    `json:"header_description"`
-	WargameStartAt    string    `json:"wargame_start_at"`
-	WargameEndAt      string    `json:"wargame_end_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
-}
-
 type optionalString struct {
 	Set   bool
 	Value *string
@@ -54,15 +44,6 @@ func (o *optionalInt64) UnmarshalJSON(data []byte) error {
 	}
 	o.Value = &value
 	return nil
-}
-
-type adminConfigUpdateRequest struct {
-	Title             optionalString `json:"title"`
-	Description       optionalString `json:"description"`
-	HeaderTitle       optionalString `json:"header_title"`
-	HeaderDescription optionalString `json:"header_description"`
-	WargameStartAt    optionalString `json:"wargame_start_at"`
-	WargameEndAt      optionalString `json:"wargame_end_at"`
 }
 
 type meUpdateRequest struct {
@@ -204,13 +185,8 @@ type lockedChallengeResponse struct {
 	IsLocked                  bool    `json:"is_locked"`
 }
 
-type wargameStateResponse struct {
-	WargameState string `json:"wargame_state"`
-}
-
 type challengesListResponse struct {
-	WargameState string `json:"wargame_state"`
-	Challenges   []any  `json:"challenges,omitempty"`
+	Challenges []any `json:"challenges,omitempty"`
 }
 
 type adminChallengeResponse struct {
@@ -225,9 +201,8 @@ type presignedPostResponse struct {
 }
 
 type presignedURLResponse struct {
-	URL          string    `json:"url"`
-	ExpiresAt    time.Time `json:"expires_at"`
-	WargameState string    `json:"wargame_state"`
+	URL       string    `json:"url"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 type challengeFileUploadResponse struct {
@@ -237,56 +212,6 @@ type challengeFileUploadResponse struct {
 
 type timelineResponse struct {
 	Submissions []models.TimelineSubmission `json:"submissions"`
-}
-
-type adminReportChallenge struct {
-	ID                  int64                     `json:"id"`
-	Title               string                    `json:"title"`
-	Description         string                    `json:"description"`
-	Category            string                    `json:"category"`
-	Points              int                       `json:"points"`
-	InitialPoints       int                       `json:"initial_points"`
-	MinimumPoints       int                       `json:"minimum_points"`
-	SolveCount          int                       `json:"solve_count"`
-	PreviousChallengeID *int64                    `json:"previous_challenge_id,omitempty"`
-	IsActive            bool                      `json:"is_active"`
-	FileKey             *string                   `json:"file_key,omitempty"`
-	FileName            *string                   `json:"file_name,omitempty"`
-	FileUploadedAt      *time.Time                `json:"file_uploaded_at,omitempty"`
-	StackEnabled        bool                      `json:"stack_enabled"`
-	StackTargetPorts    []stackpkg.TargetPortSpec `json:"stack_target_ports"`
-	StackPodSpec        *string                   `json:"stack_pod_spec,omitempty"`
-	CreatedAt           time.Time                 `json:"created_at"`
-}
-
-type adminReportUser struct {
-	ID            int64      `json:"id"`
-	Email         string     `json:"email"`
-	Username      string     `json:"username"`
-	Role          string     `json:"role"`
-	BlockedReason *string    `json:"blocked_reason,omitempty"`
-	BlockedAt     *time.Time `json:"blocked_at,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-}
-
-type adminReportSubmission struct {
-	ID           int64     `json:"id"`
-	UserID       int64     `json:"user_id"`
-	ChallengeID  int64     `json:"challenge_id"`
-	Correct      bool      `json:"correct"`
-	IsFirstBlood bool      `json:"is_first_blood"`
-	SubmittedAt  time.Time `json:"submitted_at"`
-}
-
-type adminReportResponse struct {
-	Challenges  []adminReportChallenge     `json:"challenges"`
-	Users       []adminReportUser          `json:"users"`
-	Stacks      []models.Stack             `json:"stacks"`
-	Submissions []adminReportSubmission    `json:"submissions"`
-	AppConfig   []models.AppConfig         `json:"app_config"`
-	Timeline    timelineResponse           `json:"timeline"`
-	Leaderboard models.LeaderboardResponse `json:"leaderboard"`
 }
 
 type stackResponse struct {
@@ -301,12 +226,10 @@ type stackResponse struct {
 	CreatedByUserID   int64                  `json:"created_by_user_id"`
 	CreatedByUsername string                 `json:"created_by_username"`
 	ChallengeTitle    string                 `json:"challenge_title"`
-	WargameState      string                 `json:"-"`
 }
 
 type stacksListResponse struct {
-	WargameState string          `json:"wargame_state"`
-	Stacks       []stackResponse `json:"stacks,omitempty"`
+	Stacks []stackResponse `json:"stacks,omitempty"`
 }
 
 type adminStackResponse struct {
@@ -326,24 +249,12 @@ type adminStacksListResponse struct {
 	Stacks []adminStackResponse `json:"stacks,omitempty"`
 }
 
-func newStackResponse(stack *models.Stack, wargameState string) stackResponse {
-	return stackResponse{StackID: stack.StackID, ChallengeID: stack.ChallengeID, Status: stack.Status, NodePublicIP: stack.NodePublicIP, Ports: []stackpkg.PortMapping(stack.Ports), TTLExpiresAt: stack.TTLExpiresAt, CreatedAt: stack.CreatedAt.UTC(), UpdatedAt: stack.UpdatedAt.UTC(), CreatedByUserID: stack.UserID, CreatedByUsername: stack.Username, ChallengeTitle: stack.ChallengeTitle, WargameState: wargameState}
+func newStackResponse(stack *models.Stack) stackResponse {
+	return stackResponse{StackID: stack.StackID, ChallengeID: stack.ChallengeID, Status: stack.Status, NodePublicIP: stack.NodePublicIP, Ports: []stackpkg.PortMapping(stack.Ports), TTLExpiresAt: stack.TTLExpiresAt, CreatedAt: stack.CreatedAt.UTC(), UpdatedAt: stack.UpdatedAt.UTC(), CreatedByUserID: stack.UserID, CreatedByUsername: stack.Username, ChallengeTitle: stack.ChallengeTitle}
 }
 
 func newAdminStackResponse(stack models.AdminStackSummary) adminStackResponse {
 	return adminStackResponse{StackID: stack.StackID, TTLExpiresAt: timePtrUTC(stack.TTLExpiresAt), CreatedAt: stack.CreatedAt.UTC(), UpdatedAt: stack.UpdatedAt.UTC(), UserID: stack.UserID, Username: stack.Username, Email: stack.Email, ChallengeID: stack.ChallengeID, ChallengeTitle: stack.ChallengeTitle, ChallengeCategory: stack.ChallengeCategory}
-}
-
-func newAdminReportChallenge(challenge models.Challenge) adminReportChallenge {
-	return adminReportChallenge{ID: challenge.ID, Title: challenge.Title, Description: challenge.Description, Category: challenge.Category, Points: challenge.Points, InitialPoints: challenge.InitialPoints, MinimumPoints: challenge.MinimumPoints, SolveCount: challenge.SolveCount, PreviousChallengeID: challenge.PreviousChallengeID, IsActive: challenge.IsActive, FileKey: challenge.FileKey, FileName: challenge.FileName, FileUploadedAt: challenge.FileUploadedAt, StackEnabled: challenge.StackEnabled, StackTargetPorts: []stackpkg.TargetPortSpec(challenge.StackTargetPorts), StackPodSpec: challenge.StackPodSpec, CreatedAt: challenge.CreatedAt.UTC()}
-}
-
-func newAdminReportUser(user models.User) adminReportUser {
-	return adminReportUser{ID: user.ID, Email: user.Email, Username: user.Username, Role: user.Role, BlockedReason: user.BlockedReason, BlockedAt: user.BlockedAt, CreatedAt: user.CreatedAt.UTC(), UpdatedAt: user.UpdatedAt.UTC()}
-}
-
-func newAdminReportSubmission(sub models.Submission) adminReportSubmission {
-	return adminReportSubmission{ID: sub.ID, UserID: sub.UserID, ChallengeID: sub.ChallengeID, Correct: sub.Correct, IsFirstBlood: sub.IsFirstBlood, SubmittedAt: sub.SubmittedAt.UTC()}
 }
 
 func timePtrUTC(value *time.Time) *time.Time {

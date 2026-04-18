@@ -16,7 +16,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, appConfigSvc *service.AppConfigService, userSvc *service.UserService, scoreSvc *service.ScoreboardService, stackSvc *service.StackService, redis *redis.Client, logger *logging.Logger, sse *realtime.SSEHub) *gin.Engine {
+func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, userSvc *service.UserService, scoreSvc *service.ScoreboardService, stackSvc *service.StackService, redis *redis.Client, logger *logging.Logger, sse *realtime.SSEHub) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -26,7 +26,7 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 	r.Use(middleware.RequestLogger(cfg.Logging, logger))
 	r.Use(middleware.CORS(cfg.AppEnv != "production", cfg.CORS.AllowedOrigins))
 
-	h := handlers.New(cfg, authSvc, wargameSvc, appConfigSvc, userSvc, scoreSvc, stackSvc, redis)
+	h := handlers.New(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, redis)
 	sseHandler := handlers.NewSSEHandler(sse)
 
 	r.GET("/healthz", func(ctx *gin.Context) { ctx.JSON(nethttp.StatusOK, gin.H{"status": "ok"}) })
@@ -34,7 +34,6 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 
 	api := r.Group("/api")
 	{
-		api.GET("/config", h.GetConfig)
 		api.POST("/auth/register", h.Register)
 		api.POST("/auth/login", h.Login)
 		api.POST("/auth/refresh", h.Refresh)
@@ -64,7 +63,6 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 
 		admin := api.Group("/admin")
 		admin.Use(middleware.Auth(cfg.JWT), middleware.RequireActiveUser(userSvc), middleware.RequireRole(models.AdminRole))
-		admin.PUT("/config", h.AdminUpdateConfig)
 		admin.POST("/challenges", h.CreateChallenge)
 		admin.GET("/challenges/:id", h.AdminGetChallenge)
 		admin.PUT("/challenges/:id", h.UpdateChallenge)
@@ -74,7 +72,6 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		admin.GET("/stacks", h.AdminListStacks)
 		admin.GET("/stacks/:stack_id", h.AdminGetStack)
 		admin.DELETE("/stacks/:stack_id", h.AdminDeleteStack)
-		admin.GET("/report", h.AdminReport)
 		admin.POST("/users/:id/block", h.AdminBlockUser)
 		admin.POST("/users/:id/unblock", h.AdminUnblockUser)
 	}

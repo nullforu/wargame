@@ -215,7 +215,6 @@ func TestLoadConfigInvalidValues(t *testing.T) {
 		{"invalid s3 force path", "S3_FORCE_PATH_STYLE", "bad-bool"},
 		{"invalid stack max scope", "STACKS_MAX_SCOPE", "org"},
 		{"invalid leaderboard cache ttl", "LEADERBOARD_CACHE_TTL", "bad-duration"},
-		{"invalid app config cache ttl", "APP_CONFIG_CACHE_TTL", "bad-duration"},
 	}
 
 	for _, tt := range tests {
@@ -615,7 +614,6 @@ func TestValidateConfigInvalidStackConfig(t *testing.T) {
 		Cache: CacheConfig{
 			TimelineTTL:    time.Minute,
 			LeaderboardTTL: time.Minute,
-			AppConfigTTL:   2 * time.Minute,
 		},
 		CORS: CORSConfig{
 			AllowedOrigins: []string{"http://localhost:3000", "https://wargame.example.com"},
@@ -678,7 +676,6 @@ func TestValidateConfigAdditionalValidation(t *testing.T) {
 		Cache: CacheConfig{
 			TimelineTTL:    time.Minute,
 			LeaderboardTTL: time.Minute,
-			AppConfigTTL:   2 * time.Minute,
 		},
 		Logging: LoggingConfig{
 			Dir:          "logs",
@@ -713,10 +710,6 @@ func TestRedact(t *testing.T) {
 		Stack: StackConfig{
 			ProvisionerAPIKey: "stack-key",
 		},
-		Bootstrap: BootstrapConfig{
-			AdminEmail:    "admin@example.com",
-			AdminPassword: "adminpass",
-		},
 	}
 
 	redacted := Redact(cfg)
@@ -745,13 +738,6 @@ func TestRedact(t *testing.T) {
 		t.Fatalf("expected stack api key redacted")
 	}
 
-	if redacted.Bootstrap.AdminEmail == cfg.Bootstrap.AdminEmail {
-		t.Fatalf("expected bootstrap admin email redacted")
-	}
-
-	if redacted.Bootstrap.AdminPassword == cfg.Bootstrap.AdminPassword {
-		t.Fatalf("expected bootstrap admin password redacted")
-	}
 }
 
 func TestRedactValueEdgeCases(t *testing.T) {
@@ -809,7 +795,6 @@ func TestFormatForLog(t *testing.T) {
 		Cache: CacheConfig{
 			TimelineTTL:    time.Minute,
 			LeaderboardTTL: time.Minute,
-			AppConfigTTL:   2 * time.Minute,
 		},
 		Logging: LoggingConfig{
 			Dir:          "logs",
@@ -834,11 +819,6 @@ func TestFormatForLog(t *testing.T) {
 			ProvisionerAPIKey:  "stack-key",
 			ProvisionerTimeout: 5 * time.Second,
 		},
-		Bootstrap: BootstrapConfig{
-			AdminUserEnabled: true,
-			AdminEmail:       "admin@example.com",
-			AdminPassword:    "adminpass",
-		},
 	}
 
 	out := FormatForLog(cfg)
@@ -853,11 +833,6 @@ func TestFormatForLog(t *testing.T) {
 
 	if db["password"].(string) == "dbpass" || redis["password"].(string) == "redispass" || jwt["secret"].(string) == "jwtsecret" || stack["provisioner_api_key"].(string) == "stack-key" {
 		t.Fatalf("expected secrets redacted")
-	}
-
-	bootstrap := out["bootstrap"].(map[string]any)
-	if bootstrap["admin_password"].(string) == "adminpass" {
-		t.Fatalf("expected bootstrap admin password redacted")
 	}
 
 	if out["app_env"] != "local" || out["http_addr"] != ":8080" {

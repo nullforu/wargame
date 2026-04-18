@@ -17,7 +17,6 @@ Response 200
 
 ```json
 {
-    "wargame_state": "active",
     "stacks": [
         {
             "stack_id": "stack-716b6384dd477b0b",
@@ -49,7 +48,6 @@ Errors:
 
 Notes:
 
-- If `wargame_state` is `not_started`, the response only includes `wargame_state`.
 - Blocked users can access this endpoint (read-only).
 
 ---
@@ -142,7 +140,6 @@ Errors:
 
 Notes:
 
-- If `wargame_state` is `not_started`, the response only includes `wargame_state`.
 - Blocked users can access this endpoint (read-only).
 
 ---
@@ -161,8 +158,7 @@ Response 200
 
 ```json
 {
-    "status": "ok",
-    "wargame_state": "active"
+    "status": "ok"
 }
 ```
 
@@ -172,6 +168,3 @@ Errors:
 - 404 `stack not found`
 - 503 `stack feature disabled` or `stack provisioner unavailable`
 
-Notes:
-
-- If `wargame_state` is `not_started`, the response only includes `wargame_state`.

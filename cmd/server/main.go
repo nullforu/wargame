@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"wargame/internal/bootstrap"
 	"wargame/internal/cache"
 	"wargame/internal/config"
 	"wargame/internal/db"
@@ -68,7 +67,6 @@ func main() {
 	challengeRepo := repo.NewChallengeRepo(database)
 	submissionRepo := repo.NewSubmissionRepo(database)
 	scoreRepo := repo.NewScoreboardRepo(database)
-	appConfigRepo := repo.NewAppConfigRepo(database)
 	stackRepo := repo.NewStackRepo(database)
 
 	var fileStore storage.ChallengeFileStore
@@ -85,7 +83,6 @@ func main() {
 	userSvc := service.NewUserService(userRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, redisClient, fileStore)
-	appConfigSvc := service.NewAppConfigService(appConfigRepo, redisClient, cfg.Cache.AppConfigTTL)
 
 	var stackClient stack.API
 	var stackClientCloser func() error
@@ -105,7 +102,6 @@ func main() {
 	}
 
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, stackClient, redisClient)
-	bootstrap.BootstrapAdmin(ctx, cfg, database, userRepo, logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -114,7 +110,7 @@ func main() {
 	leaderboardBus := realtime.NewScoreboardBus(redisClient, cfg, scoreSvc, logger, sseHub)
 	leaderboardBus.Start(ctx)
 
-	router := httpserver.NewRouter(cfg, authSvc, wargameSvc, appConfigSvc, userSvc, scoreSvc, stackSvc, redisClient, logger, sseHub)
+	router := httpserver.NewRouter(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, redisClient, logger, sseHub)
 	srv := &nethttp.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           router,

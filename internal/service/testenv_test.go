@@ -106,7 +106,6 @@ func TestMain(m *testing.M) {
 		Cache: config.CacheConfig{
 			TimelineTTL:    2 * time.Minute,
 			LeaderboardTTL: 2 * time.Minute,
-			AppConfigTTL:   2 * time.Minute,
 		},
 	}
 
@@ -219,7 +218,7 @@ func setupServiceTest(t *testing.T) serviceEnv {
 func resetServiceState(t *testing.T) {
 	t.Helper()
 
-	if _, err := serviceDB.ExecContext(context.Background(), "TRUNCATE TABLE app_configs, submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := serviceDB.ExecContext(context.Background(), "TRUNCATE TABLE submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 

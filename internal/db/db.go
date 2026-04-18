@@ -37,7 +37,6 @@ func AutoMigrate(ctx context.Context, db *bun.DB) error {
 	defer cancel()
 
 	modelsToCreate := []any{
-		(*models.AppConfig)(nil),
 		(*models.User)(nil),
 		(*models.Challenge)(nil),
 		(*models.Stack)(nil),

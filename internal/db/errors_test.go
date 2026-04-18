@@ -21,7 +21,7 @@ func TestIsUniqueViolation(t *testing.T) {
 
 	db := setupDBTest(t)
 	ctx := context.Background()
-	if _, err := db.ExecContext(ctx, "TRUNCATE TABLE submissions, stacks, challenges, users, app_configs RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := db.ExecContext(ctx, "TRUNCATE TABLE submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 

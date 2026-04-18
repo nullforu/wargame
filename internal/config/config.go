@@ -19,16 +19,15 @@ type Config struct {
 	AutoMigrate     bool
 	BcryptCost      int
 
-	DB        DBConfig
-	Redis     RedisConfig
-	JWT       JWTConfig
-	Security  SecurityConfig
-	Cache     CacheConfig
-	CORS      CORSConfig
-	Logging   LoggingConfig
-	S3        S3Config
-	Stack     StackConfig
-	Bootstrap BootstrapConfig
+	DB       DBConfig
+	Redis    RedisConfig
+	JWT      JWTConfig
+	Security SecurityConfig
+	Cache    CacheConfig
+	CORS     CORSConfig
+	Logging  LoggingConfig
+	S3       S3Config
+	Stack    StackConfig
 }
 
 type DBConfig struct {
@@ -65,7 +64,6 @@ type SecurityConfig struct {
 type CacheConfig struct {
 	TimelineTTL    time.Duration
 	LeaderboardTTL time.Duration
-	AppConfigTTL   time.Duration
 }
 
 type CORSConfig struct {
@@ -100,13 +98,6 @@ type StackConfig struct {
 	ProvisionerTimeout  time.Duration
 	CreateWindow        time.Duration
 	CreateMax           int
-}
-
-type BootstrapConfig struct {
-	AdminUserEnabled bool
-	AdminEmail       string
-	AdminPassword    string
-	AdminUsername    string
 }
 
 const defaultJWTSecret = "change-me"
@@ -195,11 +186,6 @@ func Load() (Config, error) {
 		errs = append(errs, err)
 	}
 
-	appConfigCacheTTL, err := getDuration("APP_CONFIG_CACHE_TTL", 2*time.Minute)
-	if err != nil {
-		errs = append(errs, err)
-	}
-
 	corsAllowedOrigins := parseCSV(getEnv("CORS_ALLOWED_ORIGINS", ""))
 
 	logDir := getEnv("LOG_DIR", "logs")
@@ -258,11 +244,6 @@ func Load() (Config, error) {
 		errs = append(errs, err)
 	}
 
-	bootstrapAdminUserEnabled, err := getEnvBool("BOOTSTRAP_ADMIN_USER", true)
-	if err != nil {
-		errs = append(errs, err)
-	}
-
 	cfg := Config{
 		AppEnv:          appEnv,
 		HTTPAddr:        httpAddr,
@@ -299,7 +280,6 @@ func Load() (Config, error) {
 		Cache: CacheConfig{
 			TimelineTTL:    timelineCacheTTL,
 			LeaderboardTTL: leaderboardCacheTTL,
-			AppConfigTTL:   appConfigCacheTTL,
 		},
 		CORS: CORSConfig{
 			AllowedOrigins: corsAllowedOrigins,
@@ -330,12 +310,6 @@ func Load() (Config, error) {
 			ProvisionerTimeout:  stackTimeout,
 			CreateWindow:        stackCreateWindow,
 			CreateMax:           stackCreateMax,
-		},
-		Bootstrap: BootstrapConfig{
-			AdminUserEnabled: bootstrapAdminUserEnabled,
-			AdminEmail:       getEnv("BOOTSTRAP_ADMIN_EMAIL", ""),
-			AdminPassword:    getEnv("BOOTSTRAP_ADMIN_PASSWORD", ""),
-			AdminUsername:    getEnv("BOOTSTRAP_ADMIN_USERNAME", "admin"),
 		},
 	}
 
@@ -525,8 +499,6 @@ func Redact(cfg Config) Config {
 	cfg.S3.AccessKeyID = redact(cfg.S3.AccessKeyID)
 	cfg.S3.SecretAccessKey = redact(cfg.S3.SecretAccessKey)
 	cfg.Stack.ProvisionerAPIKey = redact(cfg.Stack.ProvisionerAPIKey)
-	cfg.Bootstrap.AdminEmail = redact(cfg.Bootstrap.AdminEmail)
-	cfg.Bootstrap.AdminPassword = redact(cfg.Bootstrap.AdminPassword)
 
 	return cfg
 }
@@ -601,7 +573,6 @@ func FormatForLog(cfg Config) map[string]any {
 		"cache": map[string]any{
 			"timeline_ttl":    seconds(cfg.Cache.TimelineTTL),
 			"leaderboard_ttl": seconds(cfg.Cache.LeaderboardTTL),
-			"app_config_ttl":  seconds(cfg.Cache.AppConfigTTL),
 		},
 		"cors": map[string]any{
 			"allowed_origins": cfg.CORS.AllowedOrigins,
@@ -632,12 +603,6 @@ func FormatForLog(cfg Config) map[string]any {
 			"provisioner_timeout":   seconds(cfg.Stack.ProvisionerTimeout),
 			"create_window":         seconds(cfg.Stack.CreateWindow),
 			"create_max":            cfg.Stack.CreateMax,
-		},
-		"bootstrap": map[string]any{
-			"admin_user_enabled": cfg.Bootstrap.AdminUserEnabled,
-			"admin_username":     cfg.Bootstrap.AdminUsername,
-			"admin_email":        cfg.Bootstrap.AdminEmail,
-			"admin_password":     cfg.Bootstrap.AdminPassword,
 		},
 	}
 }

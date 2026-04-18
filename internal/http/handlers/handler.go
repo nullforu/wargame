@@ -25,15 +25,14 @@ type Handler struct {
 	cfg     config.Config
 	auth    *service.AuthService
 	wargame *service.WargameService
-	app     *service.AppConfigService
 	users   *service.UserService
 	score   *service.ScoreboardService
 	stacks  *service.StackService
 	redis   *redis.Client
 }
 
-func New(cfg config.Config, auth *service.AuthService, wargame *service.WargameService, app *service.AppConfigService, users *service.UserService, score *service.ScoreboardService, stacks *service.StackService, redis *redis.Client) *Handler {
-	return &Handler{cfg: cfg, auth: auth, wargame: wargame, app: app, users: users, score: score, stacks: stacks, redis: redis}
+func New(cfg config.Config, auth *service.AuthService, wargame *service.WargameService, users *service.UserService, score *service.ScoreboardService, stacks *service.StackService, redis *redis.Client) *Handler {
+	return &Handler{cfg: cfg, auth: auth, wargame: wargame, users: users, score: score, stacks: stacks, redis: redis}
 }
 
 func (h *Handler) respondFromCache(ctx *gin.Context, cacheKey string) bool {
@@ -123,85 +122,6 @@ func isChallengeLocked(challenge models.Challenge, solved map[int64]struct{}, us
 	return !ok
 }
 
-func (h *Handler) wargameState(ctx *gin.Context) (service.WargameState, bool) {
-	state, err := h.app.WargameState(ctx.Request.Context(), time.Now().UTC())
-	if err != nil {
-		writeError(ctx, err)
-		return service.WargameStateActive, false
-	}
-	return state, true
-}
-
-func (h *Handler) GetConfig(ctx *gin.Context) {
-	cfg, updatedAt, etag, err := h.app.Get(ctx.Request.Context())
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	if match := ctx.GetHeader("If-None-Match"); match != "" && etagMatches(match, etag) {
-		ctx.Header("ETag", etag)
-		ctx.Header("Cache-Control", "no-cache")
-		ctx.Status(http.StatusNotModified)
-		return
-	}
-
-	ctx.Header("ETag", etag)
-	ctx.Header("Cache-Control", "no-cache")
-	if !updatedAt.IsZero() {
-		ctx.Header("Last-Modified", updatedAt.UTC().Format(http.TimeFormat))
-	}
-
-	ctx.JSON(http.StatusOK, appConfigResponse{Title: cfg.Title, Description: cfg.Description, HeaderTitle: cfg.HeaderTitle, HeaderDescription: cfg.HeaderDescription, WargameStartAt: cfg.WargameStartAt, WargameEndAt: cfg.WargameEndAt, UpdatedAt: updatedAt.UTC()})
-}
-
-func etagMatches(ifNoneMatch, etag string) bool {
-	needle := normalizeETag(etag)
-	for token := range strings.SplitSeq(ifNoneMatch, ",") {
-		trimmed := strings.TrimSpace(token)
-		if trimmed == "*" {
-			return true
-		}
-		if normalizeETag(trimmed) == needle {
-			return true
-		}
-	}
-	return false
-}
-
-func normalizeETag(tag string) string {
-	tag = strings.TrimSpace(tag)
-	if after, ok := strings.CutPrefix(tag, "W/"); ok {
-		tag = strings.TrimSpace(after)
-	}
-	return strings.Trim(tag, "\"")
-}
-
-func (h *Handler) AdminUpdateConfig(ctx *gin.Context) {
-	var req adminConfigUpdateRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		writeBindError(ctx, err)
-		return
-	}
-	input := service.AppConfigUpdate{Title: appConfigInputFromOptional(req.Title), Description: appConfigInputFromOptional(req.Description), HeaderTitle: appConfigInputFromOptional(req.HeaderTitle), HeaderDescription: appConfigInputFromOptional(req.HeaderDescription), WargameStartAt: appConfigInputFromOptional(req.WargameStartAt), WargameEndAt: appConfigInputFromOptional(req.WargameEndAt)}
-	cfg, updatedAt, _, err := h.app.Update(ctx.Request.Context(), input)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-	ctx.JSON(http.StatusOK, appConfigResponse{Title: cfg.Title, Description: cfg.Description, HeaderTitle: cfg.HeaderTitle, HeaderDescription: cfg.HeaderDescription, WargameStartAt: cfg.WargameStartAt, WargameEndAt: cfg.WargameEndAt, UpdatedAt: updatedAt.UTC()})
-}
-
-func appConfigInputFromOptional(value optionalString) service.AppConfigUpdateInput {
-	if !value.Set {
-		return service.AppConfigUpdateInput{Set: false}
-	}
-	if value.Value == nil {
-		return service.AppConfigUpdateInput{Set: true, Null: true}
-	}
-	return service.AppConfigUpdateInput{Set: true, Value: *value.Value}
-}
-
 func (h *Handler) Register(ctx *gin.Context) {
 	var req registerRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -285,15 +205,6 @@ func (h *Handler) UpdateMe(ctx *gin.Context) {
 }
 
 func (h *Handler) ListChallenges(ctx *gin.Context) {
-	state, ok := h.wargameState(ctx)
-	if !ok {
-		return
-	}
-	if state == service.WargameStateNotStarted {
-		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
-		return
-	}
-
 	challenges, err := h.wargame.ListChallenges(ctx.Request.Context())
 	if err != nil {
 		writeError(ctx, err)
@@ -335,19 +246,10 @@ func (h *Handler) ListChallenges(ctx *gin.Context) {
 		resp = append(resp, newChallengeResponse(&ch))
 	}
 
-	ctx.JSON(http.StatusOK, challengesListResponse{WargameState: string(state), Challenges: resp})
+	ctx.JSON(http.StatusOK, challengesListResponse{Challenges: resp})
 }
 
 func (h *Handler) SubmitFlag(ctx *gin.Context) {
-	state, ok := h.wargameState(ctx)
-	if !ok {
-		return
-	}
-	if state != service.WargameStateActive {
-		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
-		return
-	}
-
 	challengeID, ok := parseIDParamOrError(ctx, "id")
 	if !ok {
 		return
@@ -369,20 +271,12 @@ func (h *Handler) SubmitFlag(ctx *gin.Context) {
 			_ = h.stacks.DeleteStackByUserAndChallenge(ctx.Request.Context(), middleware.UserID(ctx), challengeID)
 		}
 	}
-	ctx.JSON(http.StatusOK, gin.H{"correct": correct, "wargame_state": string(state)})
+	ctx.JSON(http.StatusOK, gin.H{"correct": correct})
 }
 
 func (h *Handler) CreateStack(ctx *gin.Context) {
 	if h.stacks == nil {
 		writeError(ctx, service.ErrStackDisabled)
-		return
-	}
-	state, ok := h.wargameState(ctx)
-	if !ok {
-		return
-	}
-	if state != service.WargameStateActive {
-		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
 		return
 	}
 	challengeID, ok := parseIDParamOrError(ctx, "id")
@@ -394,20 +288,12 @@ func (h *Handler) CreateStack(ctx *gin.Context) {
 		writeError(ctx, err)
 		return
 	}
-	ctx.JSON(http.StatusCreated, newStackResponse(stackModel, string(state)))
+	ctx.JSON(http.StatusCreated, newStackResponse(stackModel))
 }
 
 func (h *Handler) GetStack(ctx *gin.Context) {
 	if h.stacks == nil {
 		writeError(ctx, service.ErrStackDisabled)
-		return
-	}
-	state, ok := h.wargameState(ctx)
-	if !ok {
-		return
-	}
-	if state == service.WargameStateNotStarted {
-		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
 		return
 	}
 	challengeID, ok := parseIDParamOrError(ctx, "id")
@@ -419,20 +305,12 @@ func (h *Handler) GetStack(ctx *gin.Context) {
 		writeError(ctx, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, newStackResponse(stackModel, string(state)))
+	ctx.JSON(http.StatusOK, newStackResponse(stackModel))
 }
 
 func (h *Handler) DeleteStack(ctx *gin.Context) {
 	if h.stacks == nil {
 		writeError(ctx, service.ErrStackDisabled)
-		return
-	}
-	state, ok := h.wargameState(ctx)
-	if !ok {
-		return
-	}
-	if state == service.WargameStateNotStarted {
-		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
 		return
 	}
 	challengeID, ok := parseIDParamOrError(ctx, "id")
@@ -443,20 +321,12 @@ func (h *Handler) DeleteStack(ctx *gin.Context) {
 		writeError(ctx, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{"status": "ok", "wargame_state": string(state)})
+	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 func (h *Handler) ListStacks(ctx *gin.Context) {
 	if h.stacks == nil {
 		writeError(ctx, service.ErrStackDisabled)
-		return
-	}
-	state, ok := h.wargameState(ctx)
-	if !ok {
-		return
-	}
-	if state == service.WargameStateNotStarted {
-		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
 		return
 	}
 	stacks, err := h.stacks.ListUserStacks(ctx.Request.Context(), middleware.UserID(ctx))
@@ -467,9 +337,9 @@ func (h *Handler) ListStacks(ctx *gin.Context) {
 	resp := make([]stackResponse, 0, len(stacks))
 	for i := range stacks {
 		stackModel := stacks[i]
-		resp = append(resp, newStackResponse(&stackModel, string(state)))
+		resp = append(resp, newStackResponse(&stackModel))
 	}
-	ctx.JSON(http.StatusOK, stacksListResponse{WargameState: string(state), Stacks: resp})
+	ctx.JSON(http.StatusOK, stacksListResponse{Stacks: resp})
 }
 
 func (h *Handler) AdminListStacks(ctx *gin.Context) {
@@ -521,64 +391,7 @@ func (h *Handler) AdminGetStack(ctx *gin.Context) {
 		writeError(ctx, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, newStackResponse(stackModel, ""))
-}
-
-func (h *Handler) AdminReport(ctx *gin.Context) {
-	if h.stacks == nil {
-		writeError(ctx, service.ErrStackDisabled)
-		return
-	}
-	challenges, err := h.wargame.ListChallenges(ctx.Request.Context())
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-	users, err := h.users.List(ctx.Request.Context())
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-	stacks, err := h.stacks.ListAllStacks(ctx.Request.Context())
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-	submissions, err := h.wargame.ListAllSubmissions(ctx.Request.Context())
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-	appConfigs, err := h.app.GetAllRows(ctx.Request.Context())
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-	leaderboard, err := h.score.Leaderboard(ctx.Request.Context())
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-	userTimeline, err := h.score.UserTimeline(ctx.Request.Context(), nil)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	reportChallenges := make([]adminReportChallenge, 0, len(challenges))
-	for i := range challenges {
-		reportChallenges = append(reportChallenges, newAdminReportChallenge(challenges[i]))
-	}
-	reportUsers := make([]adminReportUser, 0, len(users))
-	for i := range users {
-		reportUsers = append(reportUsers, newAdminReportUser(users[i]))
-	}
-	reportSubmissions := make([]adminReportSubmission, 0, len(submissions))
-	for i := range submissions {
-		reportSubmissions = append(reportSubmissions, newAdminReportSubmission(submissions[i]))
-	}
-
-	ctx.JSON(http.StatusOK, adminReportResponse{Challenges: reportChallenges, Users: reportUsers, Stacks: stacks, Submissions: reportSubmissions, AppConfig: appConfigs, Timeline: timelineResponse{Submissions: userTimeline}, Leaderboard: leaderboard})
+	ctx.JSON(http.StatusOK, newStackResponse(stackModel))
 }
 
 func (h *Handler) CreateChallenge(ctx *gin.Context) {
@@ -721,14 +534,6 @@ func (h *Handler) RequestChallengeFileUpload(ctx *gin.Context) {
 }
 
 func (h *Handler) RequestChallengeFileDownload(ctx *gin.Context) {
-	state, ok := h.wargameState(ctx)
-	if !ok {
-		return
-	}
-	if state == service.WargameStateNotStarted {
-		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
-		return
-	}
 	challengeID, ok := parseIDParamOrError(ctx, "id")
 	if !ok {
 		return
@@ -738,7 +543,7 @@ func (h *Handler) RequestChallengeFileDownload(ctx *gin.Context) {
 		writeError(ctx, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, presignedURLResponse{URL: download.URL, ExpiresAt: download.ExpiresAt, WargameState: string(state)})
+	ctx.JSON(http.StatusOK, presignedURLResponse{URL: download.URL, ExpiresAt: download.ExpiresAt})
 }
 
 func (h *Handler) DeleteChallengeFile(ctx *gin.Context) {

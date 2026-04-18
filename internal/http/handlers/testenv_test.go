@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -32,13 +34,11 @@ type handlerEnv struct {
 	userRepo       *repo.UserRepo
 	challengeRepo  *repo.ChallengeRepo
 	submissionRepo *repo.SubmissionRepo
-	appConfigRepo  *repo.AppConfigRepo
 	stackRepo      *repo.StackRepo
 	authSvc        *service.AuthService
 	userSvc        *service.UserService
 	scoreSvc       *service.ScoreboardService
 	wargameSvc     *service.WargameService
-	appConfigSvc   *service.AppConfigService
 	stackSvc       *service.StackService
 	handler        *Handler
 }
@@ -109,7 +109,6 @@ func TestMain(m *testing.M) {
 		Cache: config.CacheConfig{
 			TimelineTTL:    2 * time.Minute,
 			LeaderboardTTL: 2 * time.Minute,
-			AppConfigTTL:   2 * time.Minute,
 		},
 		Stack: config.StackConfig{
 			Enabled:      true,
@@ -138,33 +137,6 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(code)
-}
-
-func setHandlerWargameWindow(t *testing.T, env handlerEnv, startAt, endAt *time.Time) {
-	t.Helper()
-
-	var startValue service.AppConfigUpdateInput
-	if startAt != nil {
-		value := startAt.UTC().Format(time.RFC3339)
-		startValue = service.AppConfigUpdateInput{Set: true, Value: value}
-	} else {
-		startValue = service.AppConfigUpdateInput{Set: true, Null: true}
-	}
-
-	var endValue service.AppConfigUpdateInput
-	if endAt != nil {
-		value := endAt.UTC().Format(time.RFC3339)
-		endValue = service.AppConfigUpdateInput{Set: true, Value: value}
-	} else {
-		endValue = service.AppConfigUpdateInput{Set: true, Null: true}
-	}
-
-	if _, _, _, err := env.appConfigSvc.Update(context.Background(), service.AppConfigUpdate{
-		WargameStartAt: startValue,
-		WargameEndAt:   endValue,
-	}); err != nil {
-		t.Fatalf("set wargame window: %v", err)
-	}
 }
 
 func startHandlerPostgres(ctx context.Context) (testcontainers.Container, config.DBConfig, error) {
@@ -223,19 +195,17 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 	challengeRepo := repo.NewChallengeRepo(handlerDB)
 	submissionRepo := repo.NewSubmissionRepo(handlerDB)
 	scoreRepo := repo.NewScoreboardRepo(handlerDB)
-	appConfigRepo := repo.NewAppConfigRepo(handlerDB)
 	stackRepo := repo.NewStackRepo(handlerDB)
 
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
 
-	appConfigSvc := service.NewAppConfigService(appConfigRepo, handlerRedis, handlerCfg.Cache.AppConfigTTL)
 	userSvc := service.NewUserService(userRepo)
 	authSvc := service.NewAuthService(handlerCfg, userRepo, handlerRedis)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(handlerCfg, challengeRepo, submissionRepo, handlerRedis, fileStore)
 	stackSvc := service.NewStackService(handlerCfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, handlerRedis)
 
-	handler := New(handlerCfg, authSvc, wargameSvc, appConfigSvc, userSvc, scoreSvc, stackSvc, handlerRedis)
+	handler := New(handlerCfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, handlerRedis)
 
 	env := handlerEnv{
 		cfg:            handlerCfg,
@@ -244,13 +214,11 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 		userRepo:       userRepo,
 		challengeRepo:  challengeRepo,
 		submissionRepo: submissionRepo,
-		appConfigRepo:  appConfigRepo,
 		stackRepo:      stackRepo,
 		authSvc:        authSvc,
 		userSvc:        userSvc,
 		scoreSvc:       scoreSvc,
 		wargameSvc:     wargameSvc,
-		appConfigSvc:   appConfigSvc,
 		stackSvc:       stackSvc,
 		handler:        handler,
 	}
@@ -261,7 +229,7 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 func resetHandlerState(t *testing.T) {
 	t.Helper()
 
-	if _, err := handlerDB.ExecContext(context.Background(), "TRUNCATE TABLE app_configs, submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := handlerDB.ExecContext(context.Background(), "TRUNCATE TABLE submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
@@ -344,4 +312,18 @@ func createHandlerSubmission(t *testing.T, env handlerEnv, userID, challengeID i
 	}
 
 	return sub
+}
+
+func newJSONContext(t *testing.T, method, path string, body []byte) (*gin.Context, *httptest.ResponseRecorder) {
+	t.Helper()
+
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	req := httptest.NewRequest(method, path, nil)
+	if body != nil {
+		req = httptest.NewRequest(method, path, bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+	}
+	ctx.Request = req
+	return ctx, rec
 }
