@@ -1,9 +1,177 @@
-# Stacks
+---
+title: Stacks
+nav_order: 8
+---
 
-## User APIs
-- `GET /api/stacks`
-- `GET /api/challenges/{id}/stack`
-- `POST /api/challenges/{id}/stack`
-- `DELETE /api/challenges/{id}/stack`
+## List My Stacks
 
-Stack ownership is per-user only.
+`GET /api/stacks`
+
+Headers
+
+```
+Authorization: Bearer <access_token>
+```
+
+Response 200
+
+```json
+{
+    "wargame_state": "active",
+    "stacks": [
+        {
+            "stack_id": "stack-716b6384dd477b0b",
+            "challenge_id": 12,
+            "challenge_title": "SQLi 101",
+            "status": "running",
+            "node_public_ip": "12.34.56.78",
+            "ports": [
+                {
+                    "container_port": 80,
+                    "protocol": "TCP",
+                    "node_port": 31538
+                }
+            ],
+            "ttl_expires_at": "2026-02-10T04:02:26Z",
+            "created_at": "2026-02-10T02:02:26Z",
+            "updated_at": "2026-02-10T02:07:29Z",
+            "created_by_user_id": 17,
+            "created_by_username": "alice"
+        }
+    ]
+}
+```
+
+Errors:
+
+- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 503 `stack feature disabled`
+
+Notes:
+
+- If `wargame_state` is `not_started`, the response only includes `wargame_state`.
+- Blocked users can access this endpoint (read-only).
+
+---
+
+## Create Stack For Challenge
+
+`POST /api/challenges/{id}/stack`
+
+Headers
+
+```
+Authorization: Bearer <access_token>
+```
+
+Response 201
+
+```json
+{
+    "stack_id": "stack-716b6384dd477b0b",
+    "challenge_id": 12,
+    "challenge_title": "SQLi 101",
+    "status": "creating",
+    "node_public_ip": "12.34.56.78",
+    "ports": [
+        {
+            "container_port": 80,
+            "protocol": "TCP",
+            "node_port": 31538
+        }
+    ],
+    "ttl_expires_at": "2026-02-10T04:02:26Z",
+    "created_at": "2026-02-10T02:02:26Z",
+    "updated_at": "2026-02-10T02:02:26Z",
+    "created_by_user_id": 17,
+    "created_by_username": "alice"
+}
+```
+
+Errors:
+
+- 400 `invalid input` or `stack not enabled for challenge`
+- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 403 `user blocked` or `challenge locked`
+- 404 `challenge not found`
+- 409 `stack limit reached` or `challenge already solved`
+- 429 `too many submissions`
+- 503 `stack feature disabled` or `stack provisioner unavailable`
+
+---
+
+## Get Stack For Challenge
+
+`GET /api/challenges/{id}/stack`
+
+Headers
+
+```
+Authorization: Bearer <access_token>
+```
+
+Response 200
+
+```json
+{
+    "stack_id": "stack-716b6384dd477b0b",
+    "challenge_id": 12,
+    "challenge_title": "SQLi 101",
+    "status": "running",
+    "node_public_ip": "12.34.56.78",
+    "ports": [
+        {
+            "container_port": 80,
+            "protocol": "TCP",
+            "node_port": 31538
+        }
+    ],
+    "ttl_expires_at": "2026-02-10T04:02:26Z",
+    "created_at": "2026-02-10T02:02:26Z",
+    "updated_at": "2026-02-10T02:07:29Z",
+    "created_by_user_id": 17,
+    "created_by_username": "alice"
+}
+```
+
+Errors:
+
+- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 404 `stack not found`
+- 503 `stack feature disabled` or `stack provisioner unavailable`
+
+Notes:
+
+- If `wargame_state` is `not_started`, the response only includes `wargame_state`.
+- Blocked users can access this endpoint (read-only).
+
+---
+
+## Delete Stack For Challenge
+
+`DELETE /api/challenges/{id}/stack`
+
+Headers
+
+```
+Authorization: Bearer <access_token>
+```
+
+Response 200
+
+```json
+{
+    "status": "ok",
+    "wargame_state": "active"
+}
+```
+
+Errors:
+
+- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 404 `stack not found`
+- 503 `stack feature disabled` or `stack provisioner unavailable`
+
+Notes:
+
+- If `wargame_state` is `not_started`, the response only includes `wargame_state`.

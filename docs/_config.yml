@@ -1,5 +1,5 @@
-title: WARGAME API Documentation
-description: WARGAME REST API Documentation
+title: Wargame API Documentation
+description: Wargame REST API Documentation
 remote_theme: just-the-docs/just-the-docs@v0.3.3
 plugins:
   - jekyll-feed

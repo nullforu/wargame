@@ -1,22 +1,131 @@
-# Auth
+---
+title: Auth
+nav_order: 2
+---
 
 ## Register
+
 `POST /api/auth/register`
 
-Request:
+Request
+
 ```json
 {
-  "email": "user@example.com",
-  "username": "user1",
-  "password": "secret"
+    "email": "user@example.com",
+    "username": "user1",
+    "password": "strong-password"
 }
 ```
 
+Response 201
+
+```json
+{
+    "id": 1,
+    "email": "user@example.com",
+    "username": "user1"
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 409 `user already exists`
+
+---
+
 ## Login
+
 `POST /api/auth/login`
 
-## Refresh
+Request
+
+```json
+{
+    "email": "user@example.com",
+    "password": "strong-password"
+}
+```
+
+Response 200
+
+```json
+{
+    "access_token": "<jwt>",
+    "refresh_token": "<jwt>",
+    "user": {
+        "id": 1,
+        "email": "user@example.com",
+        "username": "user1",
+        "role": "user",
+        "stack_count": 0,
+        "stack_limit": 3,
+        "blocked_reason": null,
+        "blocked_at": null
+    }
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid credentials`
+
+Notes:
+
+- `stack_count` and `stack_limit` are calculated per user.
+
+---
+
+## Refresh Token
+
 `POST /api/auth/refresh`
 
+Request
+
+```json
+{
+    "refresh_token": "<jwt>"
+}
+```
+
+Response 200
+
+```json
+{
+    "access_token": "<jwt>",
+    "refresh_token": "<jwt>"
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid credentials`
+
+---
+
 ## Logout
+
 `POST /api/auth/logout`
+
+Request
+
+```json
+{
+    "refresh_token": "<jwt>"
+}
+```
+
+Response 200
+
+```json
+{
+    "status": "ok"
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid credentials`
