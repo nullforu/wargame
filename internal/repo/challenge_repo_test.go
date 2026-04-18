@@ -69,9 +69,8 @@ func TestChallengeRepoNotFound(t *testing.T) {
 func TestChallengeRepoDynamicPointsAndSolveCounts(t *testing.T) {
 	env := setupRepoTest(t)
 
-	team := createTeam(t, env, "Alpha")
-	userTeam := createUserWithTeam(t, env, "team@example.com", "team", "pass", models.UserRole, team.ID)
-	userSolo := createUserWithNewTeam(t, env, "solo@example.com", "solo", "pass", models.UserRole)
+	user1 := createUserForTestUserScope(t, env, "usera@example.com", "usera", "pass", models.UserRole)
+	userSolo := createUserForTestUserScope(t, env, "solo@example.com", "solo", "pass", models.UserRole)
 
 	challenge := createChallenge(t, env, "Dynamic", 500, "FLAG{DYN}", true)
 	challenge.MinimumPoints = 100
@@ -82,10 +81,10 @@ func TestChallengeRepoDynamicPointsAndSolveCounts(t *testing.T) {
 	other := createChallenge(t, env, "Static", 200, "FLAG{STATIC}", true)
 
 	now := time.Now().UTC()
-	createSubmission(t, env, userTeam.ID, challenge.ID, true, now.Add(-time.Minute))
+	createSubmission(t, env, user1.ID, challenge.ID, true, now.Add(-time.Minute))
 	createSubmission(t, env, userSolo.ID, challenge.ID, true, now)
 
-	points, err := env.challengeRepo.DynamicPoints(context.Background(), nil)
+	points, err := env.challengeRepo.DynamicPoints(context.Background())
 	if err != nil {
 		t.Fatalf("DynamicPoints: %v", err)
 	}
@@ -98,7 +97,7 @@ func TestChallengeRepoDynamicPointsAndSolveCounts(t *testing.T) {
 		t.Fatalf("expected static challenge to be %d, got %d", other.Points, points[other.ID])
 	}
 
-	solveCounts, err := env.challengeRepo.SolveCounts(context.Background(), nil)
+	solveCounts, err := env.challengeRepo.SolveCounts(context.Background())
 	if err != nil {
 		t.Fatalf("SolveCounts: %v", err)
 	}
@@ -116,7 +115,7 @@ func TestChallengeRepoDynamicPointsError(t *testing.T) {
 	closedDB := newClosedRepoDB(t)
 	repo := NewChallengeRepo(closedDB)
 
-	if _, err := repo.DynamicPoints(context.Background(), nil); err == nil {
+	if _, err := repo.DynamicPoints(context.Background()); err == nil {
 		t.Fatalf("expected error from DynamicPoints")
 	}
 }

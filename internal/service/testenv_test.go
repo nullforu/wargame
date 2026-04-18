@@ -25,25 +25,19 @@ import (
 )
 
 type serviceEnv struct {
-	cfg               config.Config
-	db                *bun.DB
-	redis             *redis.Client
-	userRepo          *repo.UserRepo
-	regKeyRepo        *repo.RegistrationKeyRepo
-	divisionRepo      *repo.DivisionRepo
-	teamRepo          *repo.TeamRepo
-	challengeRepo     *repo.ChallengeRepo
-	submissionRepo    *repo.SubmissionRepo
-	scoreRepo         *repo.ScoreboardRepo
-	stackRepo         *repo.StackRepo
-	authSvc           *AuthService
-	userSvc           *UserService
-	scoreSvc          *ScoreboardService
-	wargameSvc        *WargameService
-	divisionSvc       *DivisionService
-	teamSvc           *TeamService
-	stackSvc          *StackService
-	defaultDivisionID int64
+	cfg            config.Config
+	db             *bun.DB
+	redis          *redis.Client
+	userRepo       *repo.UserRepo
+	challengeRepo  *repo.ChallengeRepo
+	submissionRepo *repo.SubmissionRepo
+	scoreRepo      *repo.ScoreboardRepo
+	stackRepo      *repo.StackRepo
+	authSvc        *AuthService
+	userSvc        *UserService
+	scoreSvc       *ScoreboardService
+	wargameSvc     *WargameService
+	stackSvc       *StackService
 }
 
 var (
@@ -190,9 +184,6 @@ func setupServiceTest(t *testing.T) serviceEnv {
 	resetServiceState(t)
 
 	userRepo := repo.NewUserRepo(serviceDB)
-	regRepo := repo.NewRegistrationKeyRepo(serviceDB)
-	divisionRepo := repo.NewDivisionRepo(serviceDB)
-	teamRepo := repo.NewTeamRepo(serviceDB)
 	challengeRepo := repo.NewChallengeRepo(serviceDB)
 	submissionRepo := repo.NewSubmissionRepo(serviceDB)
 	scoreRepo := repo.NewScoreboardRepo(serviceDB)
@@ -200,11 +191,9 @@ func setupServiceTest(t *testing.T) serviceEnv {
 
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
 
-	authSvc := NewAuthService(serviceCfg, serviceDB, userRepo, regRepo, teamRepo, serviceRedis)
-	userSvc := NewUserService(userRepo, teamRepo)
+	authSvc := NewAuthService(serviceCfg, userRepo, serviceRedis)
+	userSvc := NewUserService(userRepo)
 	scoreSvc := NewScoreboardService(scoreRepo)
-	divisionSvc := NewDivisionService(divisionRepo)
-	teamSvc := NewTeamService(teamRepo, divisionRepo)
 	wargameSvc := NewWargameService(serviceCfg, challengeRepo, submissionRepo, serviceRedis, fileStore)
 	stackSvc := NewStackService(serviceCfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, serviceRedis)
 
@@ -213,9 +202,6 @@ func setupServiceTest(t *testing.T) serviceEnv {
 		db:             serviceDB,
 		redis:          serviceRedis,
 		userRepo:       userRepo,
-		regKeyRepo:     regRepo,
-		divisionRepo:   divisionRepo,
-		teamRepo:       teamRepo,
 		challengeRepo:  challengeRepo,
 		submissionRepo: submissionRepo,
 		scoreRepo:      scoreRepo,
@@ -224,20 +210,8 @@ func setupServiceTest(t *testing.T) serviceEnv {
 		userSvc:        userSvc,
 		scoreSvc:       scoreSvc,
 		wargameSvc:     wargameSvc,
-		divisionSvc:    divisionSvc,
-		teamSvc:        teamSvc,
 		stackSvc:       stackSvc,
 	}
-
-	division := &models.Division{
-		Name:      "Default",
-		CreatedAt: time.Now().UTC(),
-	}
-	if err := divisionRepo.Create(context.Background(), division); err != nil {
-		t.Fatalf("create division: %v", err)
-	}
-
-	env.defaultDivisionID = division.ID
 
 	return env
 }
@@ -245,7 +219,7 @@ func setupServiceTest(t *testing.T) serviceEnv {
 func resetServiceState(t *testing.T) {
 	t.Helper()
 
-	if _, err := serviceDB.ExecContext(context.Background(), "TRUNCATE TABLE app_configs, submissions, registration_key_uses, registration_keys, stacks, challenges, users, teams, divisions RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := serviceDB.ExecContext(context.Background(), "TRUNCATE TABLE app_configs, submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
@@ -262,9 +236,8 @@ func skipIfServiceDisabled(t *testing.T) {
 	}
 }
 
-func createUserWithTeam(t *testing.T, env serviceEnv, email, username, password, role string, teamID int64) *models.User {
+func createUser(t *testing.T, env serviceEnv, email, username, password, role string) *models.User {
 	t.Helper()
-
 	hash, err := auth.HashPassword(password, env.cfg.BcryptCost)
 	if err != nil {
 		t.Fatalf("hash password: %v", err)
@@ -275,7 +248,6 @@ func createUserWithTeam(t *testing.T, env serviceEnv, email, username, password,
 		Username:     username,
 		PasswordHash: hash,
 		Role:         role,
-		TeamID:       teamID,
 		CreatedAt:    time.Now().UTC(),
 		UpdatedAt:    time.Now().UTC(),
 	}
@@ -285,84 +257,6 @@ func createUserWithTeam(t *testing.T, env serviceEnv, email, username, password,
 	}
 
 	return user
-}
-
-func createUserWithNewTeam(t *testing.T, env serviceEnv, email, username, password, role string) *models.User {
-	t.Helper()
-
-	team := createTeam(t, env, "team-"+username)
-	return createUserWithTeam(t, env, email, username, password, role, team.ID)
-}
-
-func createTeam(t *testing.T, env serviceEnv, name string) *models.Team {
-	t.Helper()
-
-	team := &models.Team{
-		Name:       name,
-		DivisionID: env.defaultDivisionID,
-		CreatedAt:  time.Now().UTC(),
-	}
-
-	if err := env.teamRepo.Create(context.Background(), team); err != nil {
-		t.Fatalf("create team: %v", err)
-	}
-
-	return team
-}
-
-func createDivision(t *testing.T, env serviceEnv, name string) *models.Division {
-	t.Helper()
-
-	division := &models.Division{
-		Name:      name,
-		CreatedAt: time.Now().UTC(),
-	}
-	if err := env.divisionRepo.Create(context.Background(), division); err != nil {
-		t.Fatalf("create division: %v", err)
-	}
-
-	return division
-}
-
-func createTeamInDivision(t *testing.T, env serviceEnv, name string, divisionID int64) *models.Team {
-	t.Helper()
-
-	team := &models.Team{
-		Name:       name,
-		DivisionID: divisionID,
-		CreatedAt:  time.Now().UTC(),
-	}
-	if err := env.teamRepo.Create(context.Background(), team); err != nil {
-		t.Fatalf("create team: %v", err)
-	}
-
-	return team
-}
-
-func createRegistrationKeyWithTeam(t *testing.T, env serviceEnv, code string, createdBy int64, teamID int64) *models.RegistrationKey {
-	t.Helper()
-
-	key := &models.RegistrationKey{
-		Code:      code,
-		CreatedBy: createdBy,
-		TeamID:    teamID,
-		MaxUses:   1,
-		UsedCount: 0,
-		CreatedAt: time.Now().UTC(),
-	}
-
-	if err := env.regKeyRepo.Create(context.Background(), key); err != nil {
-		t.Fatalf("create registration key: %v", err)
-	}
-
-	return key
-}
-
-func createRegistrationKey(t *testing.T, env serviceEnv, code string, createdBy int64) *models.RegistrationKey {
-	t.Helper()
-
-	team := createTeam(t, env, "reg-"+code)
-	return createRegistrationKeyWithTeam(t, env, code, createdBy, team.ID)
 }
 
 func createChallenge(t *testing.T, env serviceEnv, title string, points int, flag string, active bool) *models.Challenge {

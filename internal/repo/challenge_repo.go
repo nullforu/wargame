@@ -18,11 +18,7 @@ func NewChallengeRepo(db *bun.DB) *ChallengeRepo {
 
 func (r *ChallengeRepo) ListActive(ctx context.Context) ([]models.Challenge, error) {
 	challenges := make([]models.Challenge, 0)
-
-	if err := r.db.NewSelect().
-		Model(&challenges).
-		Order("id ASC").
-		Scan(ctx); err != nil {
+	if err := r.db.NewSelect().Model(&challenges).Order("id ASC").Scan(ctx); err != nil {
 		return nil, wrapError("challengeRepo.ListActive", err)
 	}
 
@@ -31,7 +27,6 @@ func (r *ChallengeRepo) ListActive(ctx context.Context) ([]models.Challenge, err
 
 func (r *ChallengeRepo) GetByID(ctx context.Context, id int64) (*models.Challenge, error) {
 	challenge := new(models.Challenge)
-
 	if err := r.db.NewSelect().Model(challenge).Where("id = ?", id).Scan(ctx); err != nil {
 		return nil, wrapNotFound("challengeRepo.GetByID", err)
 	}
@@ -63,8 +58,8 @@ func (r *ChallengeRepo) Delete(ctx context.Context, challenge *models.Challenge)
 	return nil
 }
 
-func (r *ChallengeRepo) DynamicPoints(ctx context.Context, divisionID *int64) (map[int64]int, error) {
-	points, err := dynamicPointsMap(ctx, r.db, divisionID)
+func (r *ChallengeRepo) DynamicPoints(ctx context.Context) (map[int64]int, error) {
+	points, err := dynamicPointsMap(ctx, r.db)
 	if err != nil {
 		return nil, wrapError("challengeRepo.DynamicPoints", err)
 	}
@@ -72,8 +67,8 @@ func (r *ChallengeRepo) DynamicPoints(ctx context.Context, divisionID *int64) (m
 	return points, nil
 }
 
-func (r *ChallengeRepo) SolveCounts(ctx context.Context, divisionID *int64) (map[int64]int, error) {
-	counts, err := challengeSolveCounts(ctx, r.db, divisionID)
+func (r *ChallengeRepo) SolveCounts(ctx context.Context) (map[int64]int, error) {
+	counts, err := challengeSolveCounts(ctx, r.db)
 	if err != nil {
 		return nil, wrapError("challengeRepo.SolveCounts", err)
 	}

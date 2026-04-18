@@ -13,11 +13,10 @@ import (
 
 type UserService struct {
 	userRepo *repo.UserRepo
-	teamRepo *repo.TeamRepo
 }
 
-func NewUserService(userRepo *repo.UserRepo, teamRepo *repo.TeamRepo) *UserService {
-	return &UserService{userRepo: userRepo, teamRepo: teamRepo}
+func NewUserService(userRepo *repo.UserRepo) *UserService {
+	return &UserService{userRepo: userRepo}
 }
 
 func (s *UserService) GetByID(ctx context.Context, id int64) (*models.User, error) {
@@ -39,35 +38,8 @@ func (s *UserService) GetByID(ctx context.Context, id int64) (*models.User, erro
 	return user, nil
 }
 
-func (s *UserService) GetDivisionID(ctx context.Context, userID int64) (int64, error) {
-	validator := newFieldValidator()
-	validator.PositiveID("user_id", userID)
-	if err := validator.Error(); err != nil {
-		return 0, err
-	}
-
-	divisionID, err := s.userRepo.GetDivisionID(ctx, userID)
-	if err != nil {
-		if errors.Is(err, repo.ErrNotFound) {
-			return 0, ErrNotFound
-		}
-
-		return 0, fmt.Errorf("user.GetDivisionID: %w", err)
-	}
-
-	return divisionID, nil
-}
-
-func (s *UserService) List(ctx context.Context, divisionID *int64) ([]models.User, error) {
-	if divisionID != nil {
-		validator := newFieldValidator()
-		validator.PositiveID("division_id", *divisionID)
-		if err := validator.Error(); err != nil {
-			return nil, err
-		}
-	}
-
-	users, err := s.userRepo.List(ctx, divisionID)
+func (s *UserService) List(ctx context.Context) ([]models.User, error) {
+	users, err := s.userRepo.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("user.List: %w", err)
 	}
@@ -90,45 +62,6 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID int64, username 
 	}
 
 	return user, nil
-}
-
-func (s *UserService) MoveUserTeam(ctx context.Context, userID, teamID int64) (*models.User, error) {
-	validator := newFieldValidator()
-	validator.PositiveID("team_id", teamID)
-	if err := validator.Error(); err != nil {
-		return nil, err
-	}
-
-	if _, err := s.teamRepo.GetByID(ctx, teamID); err != nil {
-		if errors.Is(err, repo.ErrNotFound) {
-			return nil, NewValidationError(FieldError{Field: "team_id", Reason: "invalid"})
-		}
-
-		return nil, fmt.Errorf("user.MoveUserTeam team lookup: %w", err)
-	}
-
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		if errors.Is(err, repo.ErrNotFound) {
-			return nil, ErrNotFound
-		}
-
-		return nil, fmt.Errorf("user.MoveUserTeam user lookup: %w", err)
-	}
-
-	user.TeamID = teamID
-	user.UpdatedAt = time.Now().UTC()
-
-	if err := s.userRepo.Update(ctx, user); err != nil {
-		return nil, fmt.Errorf("user.MoveUserTeam update: %w", err)
-	}
-
-	updated, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("user.MoveUserTeam reload: %w", err)
-	}
-
-	return updated, nil
 }
 
 func (s *UserService) BlockUser(ctx context.Context, userID int64, reason string) (*models.User, error) {

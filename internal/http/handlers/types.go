@@ -29,7 +29,6 @@ func (o *optionalString) UnmarshalJSON(data []byte) error {
 		o.Value = nil
 		return nil
 	}
-
 	var value string
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
@@ -49,12 +48,10 @@ func (o *optionalInt64) UnmarshalJSON(data []byte) error {
 		o.Value = nil
 		return nil
 	}
-
 	var value int64
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-
 	o.Value = &value
 	return nil
 }
@@ -73,10 +70,9 @@ type meUpdateRequest struct {
 }
 
 type registerRequest struct {
-	Email           string `json:"email" binding:"required"`
-	Username        string `json:"username" binding:"required"`
-	Password        string `json:"password" binding:"required"`
-	RegistrationKey string `json:"registration_key" binding:"required"`
+	Email    string `json:"email" binding:"required"`
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
 }
 
 type loginRequest struct {
@@ -124,26 +120,8 @@ type submitRequest struct {
 	Flag string `json:"flag" binding:"required"`
 }
 
-type createRegistrationKeysRequest struct {
-	Count   *int   `json:"count" binding:"required"`
-	TeamID  *int64 `json:"team_id" binding:"required"`
-	MaxUses *int   `json:"max_uses"`
-}
-
-type createTeamRequest struct {
-	Name       string `json:"name" binding:"required"`
-	DivisionID int64  `json:"division_id" binding:"required"`
-}
-
-type adminMoveUserTeamRequest struct {
-	TeamID int64 `json:"team_id" binding:"required"`
-}
-
 type adminBlockUserRequest struct {
 	Reason string `json:"reason" binding:"required"`
-}
-
-type adminUnblockUserRequest struct {
 }
 
 type registerResponse struct {
@@ -170,10 +148,6 @@ type userMeResponse struct {
 	Email         string     `json:"email"`
 	Username      string     `json:"username"`
 	Role          string     `json:"role"`
-	TeamID        int64      `json:"team_id"`
-	TeamName      string     `json:"team_name"`
-	DivisionID    int64      `json:"division_id"`
-	DivisionName  string     `json:"division_name"`
 	StackCount    int        `json:"stack_count"`
 	StackLimit    int        `json:"stack_limit"`
 	BlockedReason *string    `json:"blocked_reason"`
@@ -184,10 +158,6 @@ type userDetailResponse struct {
 	ID            int64      `json:"id"`
 	Username      string     `json:"username"`
 	Role          string     `json:"role"`
-	TeamID        int64      `json:"team_id"`
-	TeamName      string     `json:"team_name"`
-	DivisionID    int64      `json:"division_id"`
-	DivisionName  string     `json:"division_name"`
 	BlockedReason *string    `json:"blocked_reason"`
 	BlockedAt     *time.Time `json:"blocked_at"`
 }
@@ -197,10 +167,6 @@ type adminUserResponse struct {
 	Email         string     `json:"email"`
 	Username      string     `json:"username"`
 	Role          string     `json:"role"`
-	TeamID        int64      `json:"team_id"`
-	TeamName      string     `json:"team_name"`
-	DivisionID    int64      `json:"division_id"`
-	DivisionName  string     `json:"division_name"`
 	BlockedReason *string    `json:"blocked_reason"`
 	BlockedAt     *time.Time `json:"blocked_at"`
 }
@@ -269,23 +235,8 @@ type challengeFileUploadResponse struct {
 	Upload    presignedPostResponse `json:"upload"`
 }
 
-type teamResponse struct {
-	ID         int64     `json:"id"`
-	Name       string    `json:"name"`
-	DivisionID int64     `json:"division_id"`
-	CreatedAt  time.Time `json:"created_at"`
-}
-
-type createDivisionRequest struct {
-	Name string `json:"name" binding:"required"`
-}
-
 type timelineResponse struct {
 	Submissions []models.TimelineSubmission `json:"submissions"`
-}
-
-type teamTimelineResponse struct {
-	Submissions []models.TeamTimelineSubmission `json:"submissions"`
 }
 
 type adminReportChallenge struct {
@@ -313,10 +264,6 @@ type adminReportUser struct {
 	Email         string     `json:"email"`
 	Username      string     `json:"username"`
 	Role          string     `json:"role"`
-	TeamID        int64      `json:"team_id"`
-	TeamName      string     `json:"team_name"`
-	DivisionID    int64      `json:"division_id"`
-	DivisionName  string     `json:"division_name"`
 	BlockedReason *string    `json:"blocked_reason,omitempty"`
 	BlockedAt     *time.Time `json:"blocked_at,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
@@ -333,18 +280,13 @@ type adminReportSubmission struct {
 }
 
 type adminReportResponse struct {
-	Challenges       []adminReportChallenge          `json:"challenges"`
-	Divisions        []models.Division               `json:"divisions"`
-	Teams            []models.TeamSummary            `json:"teams"`
-	Users            []adminReportUser               `json:"users"`
-	Stacks           []models.Stack                  `json:"stacks"`
-	RegistrationKeys []models.RegistrationKeySummary `json:"registration_keys"`
-	Submissions      []adminReportSubmission         `json:"submissions"`
-	AppConfig        []models.AppConfig              `json:"app_config"`
-	Timeline         timelineResponse                `json:"timeline"`
-	TeamTimeline     teamTimelineResponse            `json:"team_timeline"`
-	Leaderboard      models.LeaderboardResponse      `json:"leaderboard"`
-	TeamLeaderboard  models.TeamLeaderboardResponse  `json:"team_leaderboard"`
+	Challenges  []adminReportChallenge     `json:"challenges"`
+	Users       []adminReportUser          `json:"users"`
+	Stacks      []models.Stack             `json:"stacks"`
+	Submissions []adminReportSubmission    `json:"submissions"`
+	AppConfig   []models.AppConfig         `json:"app_config"`
+	Timeline    timelineResponse           `json:"timeline"`
+	Leaderboard models.LeaderboardResponse `json:"leaderboard"`
 }
 
 type stackResponse struct {
@@ -375,8 +317,6 @@ type adminStackResponse struct {
 	UserID            int64      `json:"user_id"`
 	Username          string     `json:"username"`
 	Email             string     `json:"email"`
-	TeamID            int64      `json:"team_id"`
-	TeamName          string     `json:"team_name"`
 	ChallengeID       int64      `json:"challenge_id"`
 	ChallengeTitle    string     `json:"challenge_title"`
 	ChallengeCategory string     `json:"challenge_category"`
@@ -387,87 +327,23 @@ type adminStacksListResponse struct {
 }
 
 func newStackResponse(stack *models.Stack, wargameState string) stackResponse {
-	return stackResponse{
-		StackID:           stack.StackID,
-		ChallengeID:       stack.ChallengeID,
-		Status:            stack.Status,
-		NodePublicIP:      stack.NodePublicIP,
-		Ports:             []stackpkg.PortMapping(stack.Ports),
-		TTLExpiresAt:      stack.TTLExpiresAt,
-		CreatedAt:         stack.CreatedAt.UTC(),
-		UpdatedAt:         stack.UpdatedAt.UTC(),
-		CreatedByUserID:   stack.UserID,
-		CreatedByUsername: stack.Username,
-		ChallengeTitle:    stack.ChallengeTitle,
-		WargameState:      wargameState,
-	}
+	return stackResponse{StackID: stack.StackID, ChallengeID: stack.ChallengeID, Status: stack.Status, NodePublicIP: stack.NodePublicIP, Ports: []stackpkg.PortMapping(stack.Ports), TTLExpiresAt: stack.TTLExpiresAt, CreatedAt: stack.CreatedAt.UTC(), UpdatedAt: stack.UpdatedAt.UTC(), CreatedByUserID: stack.UserID, CreatedByUsername: stack.Username, ChallengeTitle: stack.ChallengeTitle, WargameState: wargameState}
 }
 
 func newAdminStackResponse(stack models.AdminStackSummary) adminStackResponse {
-	return adminStackResponse{
-		StackID:           stack.StackID,
-		TTLExpiresAt:      timePtrUTC(stack.TTLExpiresAt),
-		CreatedAt:         stack.CreatedAt.UTC(),
-		UpdatedAt:         stack.UpdatedAt.UTC(),
-		UserID:            stack.UserID,
-		Username:          stack.Username,
-		Email:             stack.Email,
-		TeamID:            stack.TeamID,
-		TeamName:          stack.TeamName,
-		ChallengeID:       stack.ChallengeID,
-		ChallengeTitle:    stack.ChallengeTitle,
-		ChallengeCategory: stack.ChallengeCategory,
-	}
+	return adminStackResponse{StackID: stack.StackID, TTLExpiresAt: timePtrUTC(stack.TTLExpiresAt), CreatedAt: stack.CreatedAt.UTC(), UpdatedAt: stack.UpdatedAt.UTC(), UserID: stack.UserID, Username: stack.Username, Email: stack.Email, ChallengeID: stack.ChallengeID, ChallengeTitle: stack.ChallengeTitle, ChallengeCategory: stack.ChallengeCategory}
 }
 
 func newAdminReportChallenge(challenge models.Challenge) adminReportChallenge {
-	return adminReportChallenge{
-		ID:                  challenge.ID,
-		Title:               challenge.Title,
-		Description:         challenge.Description,
-		Category:            challenge.Category,
-		Points:              challenge.Points,
-		InitialPoints:       challenge.InitialPoints,
-		MinimumPoints:       challenge.MinimumPoints,
-		SolveCount:          challenge.SolveCount,
-		PreviousChallengeID: challenge.PreviousChallengeID,
-		IsActive:            challenge.IsActive,
-		FileKey:             challenge.FileKey,
-		FileName:            challenge.FileName,
-		FileUploadedAt:      challenge.FileUploadedAt,
-		StackEnabled:        challenge.StackEnabled,
-		StackTargetPorts:    []stackpkg.TargetPortSpec(challenge.StackTargetPorts),
-		StackPodSpec:        challenge.StackPodSpec,
-		CreatedAt:           challenge.CreatedAt.UTC(),
-	}
+	return adminReportChallenge{ID: challenge.ID, Title: challenge.Title, Description: challenge.Description, Category: challenge.Category, Points: challenge.Points, InitialPoints: challenge.InitialPoints, MinimumPoints: challenge.MinimumPoints, SolveCount: challenge.SolveCount, PreviousChallengeID: challenge.PreviousChallengeID, IsActive: challenge.IsActive, FileKey: challenge.FileKey, FileName: challenge.FileName, FileUploadedAt: challenge.FileUploadedAt, StackEnabled: challenge.StackEnabled, StackTargetPorts: []stackpkg.TargetPortSpec(challenge.StackTargetPorts), StackPodSpec: challenge.StackPodSpec, CreatedAt: challenge.CreatedAt.UTC()}
 }
 
 func newAdminReportUser(user models.User) adminReportUser {
-	return adminReportUser{
-		ID:            user.ID,
-		Email:         user.Email,
-		Username:      user.Username,
-		Role:          user.Role,
-		TeamID:        user.TeamID,
-		TeamName:      user.TeamName,
-		DivisionID:    user.DivisionID,
-		DivisionName:  user.DivisionName,
-		BlockedReason: user.BlockedReason,
-		BlockedAt:     user.BlockedAt,
-		CreatedAt:     user.CreatedAt.UTC(),
-		UpdatedAt:     user.UpdatedAt.UTC(),
-	}
+	return adminReportUser{ID: user.ID, Email: user.Email, Username: user.Username, Role: user.Role, BlockedReason: user.BlockedReason, BlockedAt: user.BlockedAt, CreatedAt: user.CreatedAt.UTC(), UpdatedAt: user.UpdatedAt.UTC()}
 }
 
 func newAdminReportSubmission(sub models.Submission) adminReportSubmission {
-	return adminReportSubmission{
-		ID:           sub.ID,
-		UserID:       sub.UserID,
-		ChallengeID:  sub.ChallengeID,
-		Correct:      sub.Correct,
-		IsFirstBlood: sub.IsFirstBlood,
-		SubmittedAt:  sub.SubmittedAt.UTC(),
-	}
+	return adminReportSubmission{ID: sub.ID, UserID: sub.UserID, ChallengeID: sub.ChallengeID, Correct: sub.Correct, IsFirstBlood: sub.IsFirstBlood, SubmittedAt: sub.SubmittedAt.UTC()}
 }
 
 func timePtrUTC(value *time.Time) *time.Time {
@@ -479,70 +355,20 @@ func timePtrUTC(value *time.Time) *time.Time {
 }
 
 func newUserMeResponse(user *models.User, stackCount, stackLimit int) userMeResponse {
-	return userMeResponse{
-		ID:            user.ID,
-		Email:         user.Email,
-		Username:      user.Username,
-		Role:          user.Role,
-		TeamID:        user.TeamID,
-		TeamName:      user.TeamName,
-		DivisionID:    user.DivisionID,
-		DivisionName:  user.DivisionName,
-		StackCount:    stackCount,
-		StackLimit:    stackLimit,
-		BlockedReason: user.BlockedReason,
-		BlockedAt:     user.BlockedAt,
-	}
+	return userMeResponse{ID: user.ID, Email: user.Email, Username: user.Username, Role: user.Role, StackCount: stackCount, StackLimit: stackLimit, BlockedReason: user.BlockedReason, BlockedAt: user.BlockedAt}
 }
 
 func newUserDetailResponse(user *models.User) userDetailResponse {
-	return userDetailResponse{
-		ID:            user.ID,
-		Username:      user.Username,
-		Role:          user.Role,
-		TeamID:        user.TeamID,
-		TeamName:      user.TeamName,
-		DivisionID:    user.DivisionID,
-		DivisionName:  user.DivisionName,
-		BlockedReason: user.BlockedReason,
-		BlockedAt:     user.BlockedAt,
-	}
+	return userDetailResponse{ID: user.ID, Username: user.Username, Role: user.Role, BlockedReason: user.BlockedReason, BlockedAt: user.BlockedAt}
 }
 
 func newAdminUserResponse(user *models.User) adminUserResponse {
-	return adminUserResponse{
-		ID:            user.ID,
-		Email:         user.Email,
-		Username:      user.Username,
-		Role:          user.Role,
-		TeamID:        user.TeamID,
-		TeamName:      user.TeamName,
-		DivisionID:    user.DivisionID,
-		DivisionName:  user.DivisionName,
-		BlockedReason: user.BlockedReason,
-		BlockedAt:     user.BlockedAt,
-	}
+	return adminUserResponse{ID: user.ID, Email: user.Email, Username: user.Username, Role: user.Role, BlockedReason: user.BlockedReason, BlockedAt: user.BlockedAt}
 }
 
 func newChallengeResponse(challenge *models.Challenge) challengeResponse {
 	hasFile := challenge.FileKey != nil && *challenge.FileKey != ""
-	return challengeResponse{
-		ID:                  challenge.ID,
-		Title:               challenge.Title,
-		Description:         challenge.Description,
-		Category:            challenge.Category,
-		Points:              challenge.Points,
-		InitialPoints:       challenge.InitialPoints,
-		MinimumPoints:       challenge.MinimumPoints,
-		SolveCount:          challenge.SolveCount,
-		PreviousChallengeID: challenge.PreviousChallengeID,
-		IsActive:            challenge.IsActive,
-		IsLocked:            false,
-		HasFile:             hasFile,
-		FileName:            challenge.FileName,
-		StackEnabled:        challenge.StackEnabled,
-		StackTargetPorts:    []stackpkg.TargetPortSpec(challenge.StackTargetPorts),
-	}
+	return challengeResponse{ID: challenge.ID, Title: challenge.Title, Description: challenge.Description, Category: challenge.Category, Points: challenge.Points, InitialPoints: challenge.InitialPoints, MinimumPoints: challenge.MinimumPoints, SolveCount: challenge.SolveCount, PreviousChallengeID: challenge.PreviousChallengeID, IsActive: challenge.IsActive, IsLocked: false, HasFile: hasFile, FileName: challenge.FileName, StackEnabled: challenge.StackEnabled, StackTargetPorts: []stackpkg.TargetPortSpec(challenge.StackTargetPorts)}
 }
 
 func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Challenge) lockedChallengeResponse {
@@ -552,27 +378,5 @@ func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Ch
 		prevTitle = &previous.Title
 		prevCategory = &previous.Category
 	}
-	return lockedChallengeResponse{
-		ID:                        challenge.ID,
-		Title:                     challenge.Title,
-		Category:                  challenge.Category,
-		Points:                    challenge.Points,
-		InitialPoints:             challenge.InitialPoints,
-		MinimumPoints:             challenge.MinimumPoints,
-		SolveCount:                challenge.SolveCount,
-		PreviousChallengeID:       challenge.PreviousChallengeID,
-		PreviousChallengeTitle:    prevTitle,
-		PreviousChallengeCategory: prevCategory,
-		IsActive:                  challenge.IsActive,
-		IsLocked:                  true,
-	}
-}
-
-func newTeamResponse(team *models.Team) teamResponse {
-	return teamResponse{
-		ID:         team.ID,
-		Name:       team.Name,
-		DivisionID: team.DivisionID,
-		CreatedAt:  team.CreatedAt,
-	}
+	return lockedChallengeResponse{ID: challenge.ID, Title: challenge.Title, Category: challenge.Category, Points: challenge.Points, InitialPoints: challenge.InitialPoints, MinimumPoints: challenge.MinimumPoints, SolveCount: challenge.SolveCount, PreviousChallengeID: challenge.PreviousChallengeID, PreviousChallengeTitle: prevTitle, PreviousChallengeCategory: prevCategory, IsActive: challenge.IsActive, IsLocked: true}
 }

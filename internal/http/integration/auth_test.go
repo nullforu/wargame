@@ -10,13 +10,10 @@ import (
 func TestRegister(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		env := setupTest(t, testCfg)
-		admin := ensureAdminUser(t, env)
-		key := createRegistrationKey(t, env, admin.ID)
 		body := map[string]string{
-			"email":            "user@example.com",
-			"username":         "user1",
-			"password":         "strong-password",
-			"registration_key": key.Code,
+			"email":    "user@example.com",
+			"username": "user1",
+			"password": "strong-password",
 		}
 
 		rec := doRequest(t, env.router, http.MethodPost, "/api/auth/register", body, nil)
@@ -52,109 +49,24 @@ func TestRegister(t *testing.T) {
 		}
 
 		assertFieldErrors(t, resp.Details, map[string]string{
-			"email":            "required",
-			"username":         "required",
-			"password":         "required",
-			"registration_key": "required",
-		})
-	})
-
-	t.Run("invalid key format", func(t *testing.T) {
-		env := setupTest(t, testCfg)
-		body := map[string]string{
-			"email":            "user@example.com",
-			"username":         "user1",
-			"password":         "strong-password",
-			"registration_key": "abc123",
-		}
-
-		rec := doRequest(t, env.router, http.MethodPost, "/api/auth/register", body, nil)
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
-		}
-
-		var resp errorResp
-		decodeJSON(t, rec, &resp)
-
-		assertFieldErrors(t, resp.Details, map[string]string{
-			"registration_key": "invalid",
-		})
-	})
-
-	t.Run("invalid key", func(t *testing.T) {
-		env := setupTest(t, testCfg)
-		body := map[string]string{
-			"email":            "user@example.com",
-			"username":         "user1",
-			"password":         "strong-password",
-			"registration_key": "ABCDEFGHJKLMNPQ2",
-		}
-
-		rec := doRequest(t, env.router, http.MethodPost, "/api/auth/register", body, nil)
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
-		}
-
-		var resp errorResp
-		decodeJSON(t, rec, &resp)
-
-		assertFieldErrors(t, resp.Details, map[string]string{
-			"registration_key": "invalid",
-		})
-	})
-
-	t.Run("used key", func(t *testing.T) {
-		env := setupTest(t, testCfg)
-		admin := ensureAdminUser(t, env)
-		key := createRegistrationKey(t, env, admin.ID)
-		body := map[string]string{
-			"email":            "user@example.com",
-			"username":         "user1",
-			"password":         "strong-password",
-			"registration_key": key.Code,
-		}
-
-		rec := doRequest(t, env.router, http.MethodPost, "/api/auth/register", body, nil)
-		if rec.Code != http.StatusCreated {
-			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
-		}
-
-		rec = doRequest(t, env.router, http.MethodPost, "/api/auth/register", map[string]string{
-			"email":            "user2@example.com",
-			"username":         "user2",
-			"password":         "strong-password",
-			"registration_key": key.Code,
-		}, nil)
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
-		}
-
-		var resp errorResp
-		decodeJSON(t, rec, &resp)
-
-		assertFieldErrors(t, resp.Details, map[string]string{
-			"registration_key": "used",
+			"email":    "required",
+			"username": "required",
+			"password": "required",
 		})
 	})
 
 	t.Run("duplicate", func(t *testing.T) {
 		env := setupTest(t, testCfg)
-		admin := ensureAdminUser(t, env)
-		key := createRegistrationKey(t, env, admin.ID)
 		body := map[string]string{
-			"email":            "user@example.com",
-			"username":         "user1",
-			"password":         "strong-password",
-			"registration_key": key.Code,
+			"email":    "user@example.com",
+			"username": "user1",
+			"password": "strong-password",
 		}
 
 		rec := doRequest(t, env.router, http.MethodPost, "/api/auth/register", body, nil)
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 		}
-
-		secondKey := createRegistrationKey(t, env, admin.ID)
-		body["registration_key"] = secondKey.Code
 
 		rec = doRequest(t, env.router, http.MethodPost, "/api/auth/register", body, nil)
 		if rec.Code != http.StatusConflict {

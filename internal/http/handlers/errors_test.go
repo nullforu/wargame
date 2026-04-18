@@ -174,7 +174,7 @@ func TestToSnakeCase(t *testing.T) {
 		"":        "",
 		"Email":   "email",
 		"UserID":  "user_id",
-		"Team1ID": "team1_id",
+		"User1ID": "user1_id",
 		"ABC":     "abc",
 		"FieldA":  "field_a",
 	}

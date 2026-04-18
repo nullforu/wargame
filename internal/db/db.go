@@ -38,14 +38,10 @@ func AutoMigrate(ctx context.Context, db *bun.DB) error {
 
 	modelsToCreate := []any{
 		(*models.AppConfig)(nil),
-		(*models.Division)(nil),
-		(*models.Team)(nil),
 		(*models.User)(nil),
 		(*models.Challenge)(nil),
 		(*models.Stack)(nil),
 		(*models.Submission)(nil),
-		(*models.RegistrationKey)(nil),
-		(*models.RegistrationKeyUse)(nil),
 	}
 
 	if err := createTables(ctx, db, modelsToCreate); err != nil {
@@ -70,50 +66,13 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 		name  string
 		query string
 	}{
-		{
-			name:  "idx_submissions_user",
-			query: "CREATE INDEX IF NOT EXISTS idx_submissions_user ON submissions (user_id)",
-		},
-		{
-			name:  "idx_submissions_challenge",
-			query: "CREATE INDEX IF NOT EXISTS idx_submissions_challenge ON submissions (challenge_id)",
-		},
-		{
-			name:  "idx_submissions_user_challenge",
-			query: "CREATE INDEX IF NOT EXISTS idx_submissions_user_challenge ON submissions (user_id, challenge_id)",
-		},
-		{
-			name:  "idx_submissions_correct_time",
-			query: "CREATE INDEX IF NOT EXISTS idx_submissions_correct_time ON submissions (correct, submitted_at) WHERE correct = true",
-		},
-		{
-			name:  "idx_users_team_id",
-			query: "CREATE INDEX IF NOT EXISTS idx_users_team_id ON users (team_id)",
-		},
-		{
-			name:  "idx_teams_division_id",
-			query: "CREATE INDEX IF NOT EXISTS idx_teams_division_id ON teams (division_id)",
-		},
-		{
-			name:  "idx_registration_keys_team_id",
-			query: "CREATE INDEX IF NOT EXISTS idx_registration_keys_team_id ON registration_keys (team_id)",
-		},
-		{
-			name:  "idx_registration_key_uses_key_id",
-			query: "CREATE INDEX IF NOT EXISTS idx_registration_key_uses_key_id ON registration_key_uses (registration_key_id)",
-		},
-		{
-			name:  "idx_stacks_user_id",
-			query: "CREATE INDEX IF NOT EXISTS idx_stacks_user_id ON stacks (user_id)",
-		},
-		{
-			name:  "idx_stacks_user_challenge",
-			query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_stacks_user_challenge ON stacks (user_id, challenge_id)",
-		},
-		{
-			name:  "idx_stacks_stack_id",
-			query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_stacks_stack_id ON stacks (stack_id)",
-		},
+		{name: "idx_submissions_user", query: "CREATE INDEX IF NOT EXISTS idx_submissions_user ON submissions (user_id)"},
+		{name: "idx_submissions_challenge", query: "CREATE INDEX IF NOT EXISTS idx_submissions_challenge ON submissions (challenge_id)"},
+		{name: "idx_submissions_user_challenge", query: "CREATE INDEX IF NOT EXISTS idx_submissions_user_challenge ON submissions (user_id, challenge_id)"},
+		{name: "idx_submissions_correct_time", query: "CREATE INDEX IF NOT EXISTS idx_submissions_correct_time ON submissions (correct, submitted_at) WHERE correct = true"},
+		{name: "idx_stacks_user_id", query: "CREATE INDEX IF NOT EXISTS idx_stacks_user_id ON stacks (user_id)"},
+		{name: "idx_stacks_user_challenge", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_stacks_user_challenge ON stacks (user_id, challenge_id)"},
+		{name: "idx_stacks_stack_id", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_stacks_stack_id ON stacks (stack_id)"},
 	}
 
 	for _, idx := range indexes {

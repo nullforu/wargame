@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"wargame/internal/auth"
@@ -16,7 +15,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
-	"github.com/uptrace/bun"
 )
 
 const (
@@ -24,34 +22,23 @@ const (
 )
 
 type AuthService struct {
-	cfg                 config.Config
-	db                  *bun.DB
-	userRepo            *repo.UserRepo
-	registrationKeyRepo *repo.RegistrationKeyRepo
-	teamRepo            *repo.TeamRepo
-	redis               *redis.Client
+	cfg      config.Config
+	userRepo *repo.UserRepo
+	redis    *redis.Client
 }
 
-func NewAuthService(cfg config.Config, db *bun.DB, userRepo *repo.UserRepo, registrationKeyRepo *repo.RegistrationKeyRepo, teamRepo *repo.TeamRepo, redis *redis.Client) *AuthService {
-	return &AuthService{cfg: cfg, db: db, userRepo: userRepo, registrationKeyRepo: registrationKeyRepo, teamRepo: teamRepo, redis: redis}
+func NewAuthService(cfg config.Config, userRepo *repo.UserRepo, redis *redis.Client) *AuthService {
+	return &AuthService{cfg: cfg, userRepo: userRepo, redis: redis}
 }
 
-func (s *AuthService) Register(ctx context.Context, email, username, password, registrationKey, registrationIP string) (*models.User, error) {
+func (s *AuthService) Register(ctx context.Context, email, username, password string) (*models.User, error) {
 	email = normalizeEmail(email)
 	username = normalizeTrim(username)
-	registrationKey = strings.ToUpper(normalizeTrim(registrationKey))
-	registrationIP = normalizeTrim(registrationIP)
 	validator := newFieldValidator()
 	validator.Required("email", email)
 	validator.Required("username", username)
 	validator.Required("password", password)
-	validator.Required("registration_key", registrationKey)
 	validator.Email("email", email)
-
-	if registrationKey != "" && !isRegistrationCode(registrationKey) {
-		validator.fields = append(validator.fields, FieldError{Field: "registration_key", Reason: "invalid"})
-	}
-
 	if err := validator.Error(); err != nil {
 		return nil, err
 	}
@@ -70,137 +57,20 @@ func (s *AuthService) Register(ctx context.Context, email, username, password, r
 	}
 
 	now := time.Now().UTC()
-	user := &models.User{
-		Email:        email,
-		Username:     username,
-		PasswordHash: hash,
-		Role:         models.UserRole,
-		CreatedAt:    now,
-		UpdatedAt:    now,
-	}
-
-	if err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		key, err := s.registrationKeyRepo.GetByCodeForUpdate(ctx, tx, registrationKey)
-		if err != nil {
-			if errors.Is(err, repo.ErrNotFound) {
-				return NewValidationError(FieldError{Field: "registration_key", Reason: "invalid"})
-			}
-
-			return fmt.Errorf("auth.Register key lookup: %w", err)
+	user := &models.User{Email: email, Username: username, PasswordHash: hash, Role: models.UserRole, CreatedAt: now, UpdatedAt: now}
+	if err := s.userRepo.Create(ctx, user); err != nil {
+		if db.IsUniqueViolation(err) {
+			return nil, ErrUserExists
 		}
-
-		if key.UsedCount >= key.MaxUses {
-			return NewValidationError(FieldError{Field: "registration_key", Reason: "used"})
-		}
-
-		user.TeamID = key.TeamID
-
-		if _, err := tx.NewInsert().Model(user).Exec(ctx); err != nil {
-			if db.IsUniqueViolation(err) {
-				return ErrUserExists
-			}
-
-			return fmt.Errorf("auth.Register create: %w", err)
-		}
-
-		usedAt := time.Now().UTC()
-		use := models.RegistrationKeyUse{
-			RegistrationKeyID: key.ID,
-			UsedBy:            user.ID,
-			UsedByIP:          registrationIP,
-			UsedAt:            usedAt,
-		}
-
-		if _, err := tx.NewInsert().Model(&use).Exec(ctx); err != nil {
-			return fmt.Errorf("auth.Register use key: %w", err)
-		}
-
-		if _, err := tx.NewUpdate().
-			Model(key).
-			Set("used_count = used_count + 1").
-			Where("id = ?", key.ID).
-			Exec(ctx); err != nil {
-			return fmt.Errorf("auth.Register increment key usage: %w", err)
-		}
-
-		return nil
-	}); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("auth.Register create: %w", err)
 	}
 
 	return user, nil
 }
 
-func (s *AuthService) CreateRegistrationKeys(ctx context.Context, adminID int64, count int, teamID int64, maxUses int) ([]models.RegistrationKey, error) {
-	validator := newFieldValidator()
-	if count < 1 {
-		validator.fields = append(validator.fields, FieldError{Field: "count", Reason: "must be >= 1"})
-	}
-
-	validator.PositiveID("team_id", teamID)
-	if maxUses < 1 {
-		validator.fields = append(validator.fields, FieldError{Field: "max_uses", Reason: "must be >= 1"})
-	}
-
-	if err := validator.Error(); err != nil {
-		return nil, err
-	}
-
-	if _, err := s.teamRepo.GetByID(ctx, teamID); err != nil {
-		if errors.Is(err, repo.ErrNotFound) {
-			return nil, NewValidationError(FieldError{Field: "team_id", Reason: "invalid"})
-		}
-
-		return nil, fmt.Errorf("auth.CreateRegistrationKeys team lookup: %w", err)
-	}
-
-	created := make([]models.RegistrationKey, 0, count)
-	seen := make(map[string]struct{}, count)
-
-	for len(created) < count {
-		code, err := generateRegistrationCode()
-		if err != nil {
-			return nil, fmt.Errorf("auth.CreateRegistrationKeys generate: %w", err)
-		}
-		if _, ok := seen[code]; ok {
-			continue
-		}
-
-		key := models.RegistrationKey{
-			Code:      code,
-			CreatedBy: adminID,
-			TeamID:    teamID,
-			MaxUses:   maxUses,
-			CreatedAt: time.Now().UTC(),
-		}
-
-		if _, err := s.db.NewInsert().Model(&key).Exec(ctx); err != nil {
-			if db.IsUniqueViolation(err) {
-				continue
-			}
-			return nil, fmt.Errorf("auth.CreateRegistrationKeys create: %w", err)
-		}
-
-		seen[code] = struct{}{}
-		created = append(created, key)
-	}
-
-	return created, nil
-}
-
-func (s *AuthService) ListRegistrationKeys(ctx context.Context) ([]models.RegistrationKeySummary, error) {
-	rows, err := s.registrationKeyRepo.List(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("auth.ListRegistrationKeys: %w", err)
-	}
-
-	return rows, nil
-}
-
 func (s *AuthService) Login(ctx context.Context, email, password string) (string, string, *models.User, error) {
 	email = normalizeEmail(email)
 	user, err := s.userRepo.GetByEmail(ctx, email)
-
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
 			return "", "", nil, ErrInvalidCreds
@@ -267,7 +137,6 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 func (s *AuthService) issueTokens(ctx context.Context, user *models.User) (string, string, error) {
 	jti := uuid.NewString()
 	accessToken, err := auth.GenerateAccessToken(s.cfg.JWT, user.ID, user.Role)
-
 	if err != nil {
 		return "", "", fmt.Errorf("auth.issueTokens access: %w", err)
 	}
@@ -289,16 +158,10 @@ func (s *AuthService) assertRefreshValid(ctx context.Context, jti string, userID
 	if err == redis.Nil {
 		return ErrInvalidCreds
 	}
-
 	if err != nil {
 		return fmt.Errorf("auth.assertRefreshValid lookup: %w", err)
 	}
-
-	if val == "" {
-		return ErrInvalidCreds
-	}
-
-	if val != strconv.FormatInt(userID, 10) {
+	if val == "" || val != strconv.FormatInt(userID, 10) {
 		return ErrInvalidCreds
 	}
 

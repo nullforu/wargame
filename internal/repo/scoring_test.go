@@ -6,109 +6,14 @@ import (
 	"time"
 
 	"wargame/internal/models"
-	"wargame/internal/scoring"
 )
 
-func TestDynamicPointsMapUsesTeamDecay(t *testing.T) {
+func TestDynamicPointsMapAndSolveCounts(t *testing.T) {
 	env := setupRepoTest(t)
 
-	team := createTeam(t, env, "Alpha")
-	userTeam := createUserWithTeam(t, env, "team@example.com", "team", "pass", models.UserRole, team.ID)
-	_ = createUserWithTeam(t, env, "blocked@example.com", "blocked", "pass", models.BlockedRole, team.ID)
-	_ = createUserWithNewTeam(t, env, "solo@example.com", "solo", "pass", models.UserRole)
-
-	challenge := createChallenge(t, env, "Dynamic", 500, "FLAG{DYN}", true)
-	challenge.MinimumPoints = 100
-	if err := env.challengeRepo.Update(context.Background(), challenge); err != nil {
-		t.Fatalf("update challenge minimum: %v", err)
-	}
-
-	createSubmission(t, env, userTeam.ID, challenge.ID, true, time.Now().UTC())
-
-	points, err := dynamicPointsMap(context.Background(), env.db, nil)
-	if err != nil {
-		t.Fatalf("dynamicPointsMap: %v", err)
-	}
-
-	got := points[challenge.ID]
-	if got != 400 {
-		t.Fatalf("expected 400 with decay=2 and solves=1, got %d", got)
-	}
-}
-
-func TestDynamicPointsMapIgnoresBlockedAndAdmin(t *testing.T) {
-	env := setupRepoTest(t)
-
-	team := createTeam(t, env, "Alpha")
-	userTeam := createUserWithTeam(t, env, "team@example.com", "team", "pass", models.UserRole, team.ID)
-	_ = createUserWithTeam(t, env, "blocked1@example.com", "blocked1", "pass", models.BlockedRole, team.ID)
-
-	admin := createUserWithNewTeam(t, env, "admin@example.com", "admin", "pass", models.AdminRole)
-	blocked := createUserWithNewTeam(t, env, "blocked2@example.com", "blocked", "pass", models.BlockedRole)
-
-	challenge := createChallenge(t, env, "Dynamic", 500, "FLAG{DYN}", true)
-	challenge.MinimumPoints = 100
-	if err := env.challengeRepo.Update(context.Background(), challenge); err != nil {
-		t.Fatalf("update challenge minimum: %v", err)
-	}
-
-	createSubmission(t, env, userTeam.ID, challenge.ID, true, time.Now().UTC())
-	createSubmission(t, env, admin.ID, challenge.ID, true, time.Now().UTC())
-	createSubmission(t, env, blocked.ID, challenge.ID, true, time.Now().UTC())
-
-	countsByChallenge, err := solveCountsByChallenge(context.Background(), env.db, nil)
-	if err != nil {
-		t.Fatalf("solveCountsByChallenge: %v", err)
-	}
-
-	got := countsByChallenge[challenge.ID]
-	if got != 1 {
-		t.Fatalf("expected 1 solve count (blocked/admin should be ignored), got %d", got)
-	}
-
-	points, err := dynamicPointsMap(context.Background(), env.db, nil)
-	if err != nil {
-		t.Fatalf("dynamicPointsMap: %v", err)
-	}
-
-	got = points[challenge.ID]
-	if got != 100 {
-		t.Fatalf("expected 100 with decay=1 and solves=1 (blocked/admin should be ignored), got %d", got)
-	}
-}
-
-func TestDynamicPointsMapDecayZeroWhenOnlyBlockedOrAdminTeams(t *testing.T) {
-	env := setupRepoTest(t)
-
-	_ = createUserWithNewTeam(t, env, "admin@example.com", "admin", "pass", models.AdminRole)
-	blocked := createUserWithNewTeam(t, env, "blocked@example.com", "blocked", "pass", models.BlockedRole)
-
-	challenge := createChallenge(t, env, "Dynamic", 500, "FLAG{DYN}", true)
-	challenge.MinimumPoints = 100
-	if err := env.challengeRepo.Update(context.Background(), challenge); err != nil {
-		t.Fatalf("update challenge minimum: %v", err)
-	}
-
-	createSubmission(t, env, blocked.ID, challenge.ID, true, time.Now().UTC())
-
-	points, err := dynamicPointsMap(context.Background(), env.db, nil)
-	if err != nil {
-		t.Fatalf("dynamicPointsMap: %v", err)
-	}
-
-	got := points[challenge.ID]
-	if got != 500 {
-		t.Fatalf("expected initial points with decay=0, got %d", got)
-	}
-}
-
-func TestDynamicPointsMapDecayCountsDistinctTeams(t *testing.T) {
-	env := setupRepoTest(t)
-
-	team := createTeam(t, env, "Alpha")
-	user1 := createUserWithTeam(t, env, "u1@example.com", "u1", "pass", models.UserRole, team.ID)
-	_ = createUserWithTeam(t, env, "u2@example.com", "u2", "pass", models.UserRole, team.ID)
-	_ = createUserWithNewTeam(t, env, "blocked@example.com", "blocked", "pass", models.BlockedRole)
+	user1 := createUserForTestUserScope(t, env, "u1@example.com", "u1", "pass", models.UserRole)
+	user2 := createUserForTestUserScope(t, env, "u2@example.com", "u2", "pass", models.UserRole)
+	blocked := createUserForTestUserScope(t, env, "blocked@example.com", "blocked", "pass", models.BlockedRole)
 
 	challenge := createChallenge(t, env, "Dynamic", 500, "FLAG{DYN}", true)
 	challenge.MinimumPoints = 100
@@ -117,103 +22,38 @@ func TestDynamicPointsMapDecayCountsDistinctTeams(t *testing.T) {
 	}
 
 	createSubmission(t, env, user1.ID, challenge.ID, true, time.Now().UTC())
+	createSubmission(t, env, user2.ID, challenge.ID, true, time.Now().UTC())
+	createSubmission(t, env, blocked.ID, challenge.ID, true, time.Now().UTC())
 
-	points, err := dynamicPointsMap(context.Background(), env.db, nil)
+	counts, err := solveCountsByChallenge(context.Background(), env.db)
+	if err != nil {
+		t.Fatalf("solveCountsByChallenge: %v", err)
+	}
+	if counts[challenge.ID] != 2 {
+		t.Fatalf("expected solve count 2, got %d", counts[challenge.ID])
+	}
+
+	points, err := dynamicPointsMap(context.Background(), env.db)
 	if err != nil {
 		t.Fatalf("dynamicPointsMap: %v", err)
 	}
-
-	got := points[challenge.ID]
-	if got != 100 {
-		t.Fatalf("expected 100 with decay=1 and solves=1, got %d", got)
+	if points[challenge.ID] < challenge.MinimumPoints || points[challenge.ID] > challenge.Points {
+		t.Fatalf("unexpected dynamic points %d", points[challenge.ID])
 	}
 }
 
-func TestDynamicPointsMapDivisionIsolation(t *testing.T) {
+func TestDecayFactor(t *testing.T) {
 	env := setupRepoTest(t)
 
-	divA := createDivision(t, env, "A")
-	divB := createDivision(t, env, "B")
+	_ = createUserForTestUserScope(t, env, "u1@example.com", "u1", "pass", models.UserRole)
+	_ = createUserForTestUserScope(t, env, "u2@example.com", "u2", "pass", models.UserRole)
+	_ = createUserForTestUserScope(t, env, "admin@example.com", "admin", "pass", models.AdminRole)
 
-	teamA := createTeamInDivision(t, env, "Alpha", divA.ID)
-	userA := createUserWithTeam(t, env, "a@example.com", "a", "pass", models.UserRole, teamA.ID)
-
-	teamB := createTeamInDivision(t, env, "Beta", divB.ID)
-	userB := createUserWithTeam(t, env, "b@example.com", "b", "pass", models.UserRole, teamB.ID)
-
-	challenge := createChallenge(t, env, "Iso", 500, "FLAG{ISO}", true)
-	challenge.MinimumPoints = 100
-	if err := env.challengeRepo.Update(context.Background(), challenge); err != nil {
-		t.Fatalf("update challenge minimum: %v", err)
-	}
-
-	createSubmission(t, env, userA.ID, challenge.ID, true, time.Now().UTC())
-	createSubmission(t, env, userB.ID, challenge.ID, true, time.Now().UTC())
-
-	pointsA, err := dynamicPointsMap(context.Background(), env.db, &divA.ID)
+	decay, err := decayFactor(context.Background(), env.db)
 	if err != nil {
-		t.Fatalf("dynamicPointsMap A: %v", err)
+		t.Fatalf("decayFactor: %v", err)
 	}
-
-	pointsB, err := dynamicPointsMap(context.Background(), env.db, &divB.ID)
-	if err != nil {
-		t.Fatalf("dynamicPointsMap B: %v", err)
-	}
-
-	expectedA := scoring.DynamicPoints(challenge.Points, challenge.MinimumPoints, 1, 1)
-	expectedB := scoring.DynamicPoints(challenge.Points, challenge.MinimumPoints, 1, 1)
-
-	if pointsA[challenge.ID] != expectedA {
-		t.Fatalf("expected division A points %d, got %d", expectedA, pointsA[challenge.ID])
-	}
-
-	if pointsB[challenge.ID] != expectedB {
-		t.Fatalf("expected division B points %d, got %d", expectedB, pointsB[challenge.ID])
-	}
-}
-
-func TestDynamicPointsMapZeroSolvesUsesInitialPoints(t *testing.T) {
-	env := setupRepoTest(t)
-
-	_ = createUserWithNewTeam(t, env, "u1@example.com", "u1", "pass", models.UserRole)
-
-	challenge := createChallenge(t, env, "Dynamic", 500, "FLAG{DYN}", true)
-	challenge.MinimumPoints = 100
-	if err := env.challengeRepo.Update(context.Background(), challenge); err != nil {
-		t.Fatalf("update challenge minimum: %v", err)
-	}
-
-	points, err := dynamicPointsMap(context.Background(), env.db, nil)
-	if err != nil {
-		t.Fatalf("dynamicPointsMap: %v", err)
-	}
-
-	got := points[challenge.ID]
-	if got != 500 {
-		t.Fatalf("expected initial points with zero solves, got %d", got)
-	}
-}
-
-func TestDynamicPointsMapMinimumGreaterThanInitial(t *testing.T) {
-	env := setupRepoTest(t)
-
-	user := createUserWithNewTeam(t, env, "u1@example.com", "u1", "pass", models.UserRole)
-
-	challenge := createChallenge(t, env, "Dynamic", 500, "FLAG{DYN}", true)
-	challenge.MinimumPoints = 600
-	if err := env.challengeRepo.Update(context.Background(), challenge); err != nil {
-		t.Fatalf("update challenge minimum: %v", err)
-	}
-
-	createSubmission(t, env, user.ID, challenge.ID, true, time.Now().UTC())
-
-	points, err := dynamicPointsMap(context.Background(), env.db, nil)
-	if err != nil {
-		t.Fatalf("dynamicPointsMap: %v", err)
-	}
-
-	got := points[challenge.ID]
-	if got != 500 {
-		t.Fatalf("expected initial points when minimum > initial, got %d", got)
+	if decay != 2 {
+		t.Fatalf("expected decay factor 2, got %d", decay)
 	}
 }

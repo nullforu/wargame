@@ -36,28 +36,18 @@ func (r *SubmissionRepo) Create(ctx context.Context, sub *models.Submission) err
 	return nil
 }
 
-func (r *SubmissionRepo) lockTeamScope(ctx context.Context, db bun.IDB, userID int64) (int64, int64, error) {
-	var teamID int64
+func (r *SubmissionRepo) lockUserScope(ctx context.Context, db bun.IDB, userID int64) error {
+	var lockedID int64
 	if err := db.NewSelect().
 		TableExpr("users AS u").
-		ColumnExpr("u.team_id").
+		ColumnExpr("u.id").
 		Where("u.id = ?", userID).
 		For("UPDATE").
-		Scan(ctx, &teamID); err != nil {
-		return teamID, 0, err
+		Scan(ctx, &lockedID); err != nil {
+		return err
 	}
 
-	var divisionID int64
-	if err := db.NewSelect().
-		TableExpr("teams AS t").
-		ColumnExpr("t.division_id").
-		Where("t.id = ?", teamID).
-		For("UPDATE").
-		Scan(ctx, &divisionID); err != nil {
-		return teamID, 0, err
-	}
-
-	return teamID, divisionID, nil
+	return nil
 }
 
 func (r *SubmissionRepo) lockChallengeScope(ctx context.Context, db bun.IDB, challengeID int64) error {
@@ -74,35 +64,22 @@ func (r *SubmissionRepo) lockChallengeScope(ctx context.Context, db bun.IDB, cha
 	return nil
 }
 
-func (r *SubmissionRepo) correctSubmissionCount(
-	ctx context.Context,
-	db bun.IDB,
-	challengeID int64,
-	teamID int64,
-) (int, error) {
+func (r *SubmissionRepo) correctSubmissionCount(ctx context.Context, db bun.IDB, challengeID, userID int64) (int, error) {
 	return db.NewSelect().
 		TableExpr("submissions AS s").
-		Join("JOIN users AS u ON u.id = s.user_id").
 		Where("s.correct = true").
 		Where("s.challenge_id = ?", challengeID).
-		Where("u.team_id = ?", teamID).
+		Where("s.user_id = ?", userID).
 		Count(ctx)
 }
 
-func (r *SubmissionRepo) correctSubmissionCountForChallenge(
-	ctx context.Context,
-	db bun.IDB,
-	challengeID int64,
-	divisionID int64,
-) (int, error) {
+func (r *SubmissionRepo) correctSubmissionCountForChallenge(ctx context.Context, db bun.IDB, challengeID int64) (int, error) {
 	return db.NewSelect().
 		TableExpr("submissions AS s").
 		Join("JOIN users AS u ON u.id = s.user_id").
-		Join("JOIN teams AS t ON t.id = u.team_id").
 		Where("s.correct = true").
 		Where("u.role NOT IN (?)", bun.In([]string{models.BlockedRole, models.AdminRole})).
 		Where("s.challenge_id = ?", challengeID).
-		Where("t.division_id = ?", divisionID).
 		Count(ctx)
 }
 
@@ -114,11 +91,10 @@ func (r *SubmissionRepo) solvedChallengesQuery(db bun.IDB) *bun.SelectQuery {
 		ColumnExpr("c.points AS points").
 		ColumnExpr("MIN(s.submitted_at) AS solved_at").
 		Join("JOIN challenges AS c ON c.id = s.challenge_id").
-		Join("JOIN users AS u ON u.id = s.user_id").
 		Where("s.correct = true")
 }
 
-func (r *SubmissionRepo) CreateCorrectIfNotSolvedByTeam(ctx context.Context, sub *models.Submission) (bool, error) {
+func (r *SubmissionRepo) CreateCorrectIfNotSolvedByUser(ctx context.Context, sub *models.Submission) (bool, error) {
 	if !sub.Correct {
 		if err := r.Create(ctx, sub); err != nil {
 			return false, err
@@ -128,24 +104,23 @@ func (r *SubmissionRepo) CreateCorrectIfNotSolvedByTeam(ctx context.Context, sub
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam begin", err)
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByUser begin", err)
 	}
 
-	teamID, divisionID, err := r.lockTeamScope(ctx, tx, sub.UserID)
-	if err != nil {
+	if err := r.lockUserScope(ctx, tx, sub.UserID); err != nil {
 		_ = tx.Rollback()
-		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam lock user", err)
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByUser lock user", err)
 	}
 
 	if err := r.lockChallengeScope(ctx, tx, sub.ChallengeID); err != nil {
 		_ = tx.Rollback()
-		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam lock challenge", err)
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByUser lock challenge", err)
 	}
 
-	count, err := r.correctSubmissionCount(ctx, tx, sub.ChallengeID, teamID)
+	count, err := r.correctSubmissionCount(ctx, tx, sub.ChallengeID, sub.UserID)
 	if err != nil {
 		_ = tx.Rollback()
-		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam check", err)
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByUser check", err)
 	}
 
 	if count > 0 {
@@ -153,21 +128,21 @@ func (r *SubmissionRepo) CreateCorrectIfNotSolvedByTeam(ctx context.Context, sub
 		return false, nil
 	}
 
-	challengeCount, err := r.correctSubmissionCountForChallenge(ctx, tx, sub.ChallengeID, divisionID)
+	challengeCount, err := r.correctSubmissionCountForChallenge(ctx, tx, sub.ChallengeID)
 	if err != nil {
 		_ = tx.Rollback()
-		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam first blood check", err)
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByUser first blood check", err)
 	}
 
 	sub.IsFirstBlood = challengeCount == 0
 
 	if _, err := tx.NewInsert().Model(sub).Exec(ctx); err != nil {
 		_ = tx.Rollback()
-		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam insert", err)
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByUser insert", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByTeam commit", err)
+		return false, wrapError("submissionRepo.CreateCorrectIfNotSolvedByUser commit", err)
 	}
 
 	return true, nil
@@ -176,13 +151,10 @@ func (r *SubmissionRepo) CreateCorrectIfNotSolvedByTeam(ctx context.Context, sub
 func (r *SubmissionRepo) HasCorrect(ctx context.Context, userID, challengeID int64) (bool, error) {
 	count, err := r.db.NewSelect().
 		TableExpr("submissions AS s").
-		Join("JOIN users AS u ON u.id = s.user_id").
-		Join("JOIN users AS me ON me.id = ?", userID).
 		Where("s.correct = true").
 		Where("s.challenge_id = ?", challengeID).
-		Where("u.team_id = me.team_id").
+		Where("s.user_id = ?", userID).
 		Count(ctx)
-
 	if err != nil {
 		return false, wrapError("submissionRepo.HasCorrect", err)
 	}
@@ -194,11 +166,10 @@ func (r *SubmissionRepo) SolvedChallenges(ctx context.Context, userID int64) ([]
 	rows := make([]models.SolvedChallenge, 0)
 
 	err := r.solvedChallengesQuery(r.db).
-		Where("u.id = ?", userID).
+		Where("s.user_id = ?", userID).
 		GroupExpr("s.challenge_id, c.title, c.points").
 		OrderExpr("solved_at ASC").
 		Scan(ctx, &rows)
-
 	if err != nil {
 		return nil, wrapError("submissionRepo.SolvedChallenges", err)
 	}
@@ -206,18 +177,15 @@ func (r *SubmissionRepo) SolvedChallenges(ctx context.Context, userID int64) ([]
 	return rows, nil
 }
 
-func (r *SubmissionRepo) TeamSolvedChallengeIDs(ctx context.Context, userID int64) (map[int64]struct{}, error) {
+func (r *SubmissionRepo) SolvedChallengeIDs(ctx context.Context, userID int64) (map[int64]struct{}, error) {
 	rows := make([]int64, 0)
-
 	if err := r.db.NewSelect().
 		TableExpr("submissions AS s").
 		ColumnExpr("DISTINCT s.challenge_id").
-		Join("JOIN users AS u ON u.id = s.user_id").
-		Join("JOIN users AS me ON me.id = ?", userID).
 		Where("s.correct = true").
-		Where("u.team_id = me.team_id").
+		Where("s.user_id = ?", userID).
 		Scan(ctx, &rows); err != nil {
-		return nil, wrapError("submissionRepo.TeamSolvedChallengeIDs", err)
+		return nil, wrapError("submissionRepo.SolvedChallengeIDs", err)
 	}
 
 	ids := make(map[int64]struct{}, len(rows))

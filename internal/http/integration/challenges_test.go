@@ -2,7 +2,6 @@ package http_test
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -17,7 +16,7 @@ func TestListChallenges(t *testing.T) {
 	_ = createChallenge(t, env, "Inactive", 50, "flag{2}", false)
 	_ = createChallenge(t, env, "Active 2", 200, "flag{3}", true)
 
-	rec := doRequest(t, env.router, http.MethodGet, fmt.Sprintf("/api/challenges?division_id=%d", env.defaultDivisionID), nil, nil)
+	rec := doRequest(t, env.router, http.MethodGet, "/api/challenges", nil, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
@@ -65,7 +64,7 @@ func TestChallengesLockedFlow(t *testing.T) {
 		t.Fatalf("update locked challenge: %v", err)
 	}
 
-	rec := doRequest(t, env.router, http.MethodGet, fmt.Sprintf("/api/challenges?division_id=%d", env.defaultDivisionID), nil, nil)
+	rec := doRequest(t, env.router, http.MethodGet, "/api/challenges", nil, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list status %d: %s", rec.Code, rec.Body.String())
 	}
@@ -122,7 +121,7 @@ func TestChallengesLockedFlow(t *testing.T) {
 		t.Fatalf("expected description to be omitted for locked challenge")
 	}
 
-	rec = doRequest(t, env.router, http.MethodGet, fmt.Sprintf("/api/challenges?division_id=%d", env.defaultDivisionID), nil, authHeader(access))
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges", nil, authHeader(access))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list auth status %d: %s", rec.Code, rec.Body.String())
 	}
@@ -285,61 +284,6 @@ func TestSubmitFlag(t *testing.T) {
 		}
 	})
 
-	t.Run("team already solved", func(t *testing.T) {
-		env := setupTest(t, testCfg)
-		team := createTeam(t, env, "Alpha")
-		user1 := createUserWithTeam(t, env, "u1@example.com", "u1", "pass", models.UserRole, team.ID)
-		user2 := createUserWithTeam(t, env, "u2@example.com", "u2", "pass", models.UserRole, team.ID)
-		access1, _, _ := loginUser(t, env.router, user1.Email, "pass")
-		access2, _, _ := loginUser(t, env.router, user2.Email, "pass")
-		challenge := createChallenge(t, env, "Warmup", 100, "flag{ok}", true)
-
-		rec := doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/submit", map[string]string{"flag": "flag{ok}"}, authHeader(access1))
-		if rec.Code != http.StatusOK {
-			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
-		}
-
-		rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/submit", map[string]string{"flag": "flag{ok}"}, authHeader(access2))
-		if rec.Code != http.StatusConflict {
-			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
-		}
-
-		var resp errorResp
-		decodeJSON(t, rec, &resp)
-
-		if resp.Error != service.ErrAlreadySolved.Error() {
-			t.Fatalf("unexpected error: %s", resp.Error)
-		}
-
-		rec = doRequest(t, env.router, http.MethodGet, "/api/users/"+itoa(user2.ID)+"/solved", nil, authHeader(access2))
-		if rec.Code != http.StatusOK {
-			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
-		}
-
-		var solvedPersonal []struct {
-			ChallengeID int64 `json:"challenge_id"`
-		}
-		decodeJSON(t, rec, &solvedPersonal)
-
-		if len(solvedPersonal) != 0 {
-			t.Fatalf("expected personal solved list empty, got %+v", solvedPersonal)
-		}
-
-		rec = doRequest(t, env.router, http.MethodGet, "/api/teams/"+itoa(team.ID)+"/solved", nil, authHeader(access2))
-		if rec.Code != http.StatusOK {
-			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
-		}
-
-		var solvedTeam []struct {
-			ChallengeID int64 `json:"challenge_id"`
-		}
-		decodeJSON(t, rec, &solvedTeam)
-
-		if len(solvedTeam) != 1 || solvedTeam[0].ChallengeID != challenge.ID {
-			t.Fatalf("unexpected team solved list: %+v", solvedTeam)
-		}
-	})
-
 	t.Run("rate limited", func(t *testing.T) {
 		env := setupTest(t, testCfg)
 		access, _, _ := registerAndLogin(t, env, "user@example.com", "user1", "strong-password")
@@ -383,7 +327,7 @@ func TestChallengesBeforeStart(t *testing.T) {
 	challenge := createChallenge(t, env, "Warmup", 100, "flag{ok}", true)
 	access, _, _ := registerAndLogin(t, env, "user@example.com", "user1", "strong-password")
 
-	rec := doRequest(t, env.router, http.MethodGet, fmt.Sprintf("/api/challenges?division_id=%d", env.defaultDivisionID), nil, nil)
+	rec := doRequest(t, env.router, http.MethodGet, "/api/challenges", nil, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list status %d: %s", rec.Code, rec.Body.String())
 	}
@@ -427,7 +371,7 @@ func TestChallengesAfterEnd(t *testing.T) {
 	challenge := createChallenge(t, env, "Warmup", 100, "flag{ok}", true)
 	access, _, _ := registerAndLogin(t, env, "user2@example.com", "user2", "strong-password")
 
-	rec := doRequest(t, env.router, http.MethodGet, fmt.Sprintf("/api/challenges?division_id=%d", env.defaultDivisionID), nil, nil)
+	rec := doRequest(t, env.router, http.MethodGet, "/api/challenges", nil, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list status %d: %s", rec.Code, rec.Body.String())
 	}
@@ -458,8 +402,7 @@ func TestChallengesAfterEnd(t *testing.T) {
 
 func TestChallengesDynamicScoring(t *testing.T) {
 	env := setupTest(t, testCfg)
-	team := createTeam(t, env, "Alpha")
-	userTeam := createUserWithTeam(t, env, "team@example.com", "team", "pass123", models.UserRole, team.ID)
+	userA := createUser(t, env, "usera@example.com", "usera", "pass123", models.UserRole)
 	userSolo := createUser(t, env, "solo@example.com", "solo", "pass123", models.UserRole)
 
 	challenge := createChallenge(t, env, "Dynamic", 500, "flag{dynamic}", true)
@@ -485,12 +428,12 @@ func TestChallengesDynamicScoring(t *testing.T) {
 		return resp.AccessToken
 	}
 
-	accessTeam := login(userTeam.Email, "pass123")
+	accessA := login(userA.Email, "pass123")
 	accessSolo := login(userSolo.Email, "pass123")
 
-	rec := doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/submit", map[string]string{"flag": "flag{dynamic}"}, authHeader(accessTeam))
+	rec := doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/submit", map[string]string{"flag": "flag{dynamic}"}, authHeader(accessA))
 	if rec.Code != http.StatusOK {
-		t.Fatalf("team submit status %d: %s", rec.Code, rec.Body.String())
+		t.Fatalf("first user submit status %d: %s", rec.Code, rec.Body.String())
 	}
 
 	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/submit", map[string]string{"flag": "flag{dynamic}"}, authHeader(accessSolo))
@@ -498,7 +441,7 @@ func TestChallengesDynamicScoring(t *testing.T) {
 		t.Fatalf("solo submit status %d: %s", rec.Code, rec.Body.String())
 	}
 
-	rec = doRequest(t, env.router, http.MethodGet, fmt.Sprintf("/api/challenges?division_id=%d", env.defaultDivisionID), nil, nil)
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges", nil, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list status %d: %s", rec.Code, rec.Body.String())
 	}

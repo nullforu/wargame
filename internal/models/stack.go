@@ -32,8 +32,6 @@ type AdminStackSummary struct {
 	UserID            int64      `bun:"user_id" json:"user_id"`
 	Username          string     `bun:"username" json:"username"`
 	Email             string     `bun:"email" json:"email"`
-	TeamID            int64      `bun:"team_id" json:"team_id"`
-	TeamName          string     `bun:"team_name" json:"team_name"`
 	ChallengeID       int64      `bun:"challenge_id" json:"challenge_id"`
 	ChallengeTitle    string     `bun:"challenge_title" json:"challenge_title"`
 	ChallengeCategory string     `bun:"challenge_category" json:"challenge_category"`

@@ -42,7 +42,6 @@ func baseBootstrapConfig() config.Config {
 		AppEnv:     "test",
 		BcryptCost: bcrypt.MinCost,
 		Bootstrap: config.BootstrapConfig{
-			AdminTeamEnabled: true,
 			AdminUserEnabled: true,
 			AdminEmail:       "admin@example.com",
 			AdminPassword:    "adminpass",
@@ -53,6 +52,7 @@ func baseBootstrapConfig() config.Config {
 
 func TestIsDatabaseEmpty(t *testing.T) {
 	db := setupBootstrapDB(t)
+	userRepo := repo.NewUserRepo(db)
 
 	empty, err := isDatabaseEmpty(context.Background(), db)
 	if err != nil {
@@ -63,14 +63,17 @@ func TestIsDatabaseEmpty(t *testing.T) {
 		t.Fatalf("expected empty database")
 	}
 
-	teamRepo := repo.NewTeamRepo(db)
-	team := &models.Team{
-		Name:      "Temp",
-		CreatedAt: time.Now().UTC(),
+	now := time.Now().UTC()
+	seed := &models.User{
+		Email:        "seed@example.com",
+		Username:     "seed",
+		PasswordHash: "hash",
+		Role:         models.UserRole,
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}
-
-	if err := teamRepo.Create(context.Background(), team); err != nil {
-		t.Fatalf("create team: %v", err)
+	if err := userRepo.Create(context.Background(), seed); err != nil {
+		t.Fatalf("seed user: %v", err)
 	}
 
 	empty, err = isDatabaseEmpty(context.Background(), db)
@@ -83,66 +86,22 @@ func TestIsDatabaseEmpty(t *testing.T) {
 	}
 }
 
-func TestEnsureAdminTeam(t *testing.T) {
-	db := setupBootstrapDB(t)
-	teamRepo := repo.NewTeamRepo(db)
-
-	divisionRepo := repo.NewDivisionRepo(db)
-	divisionID, err := ensureAdminDivision(context.Background(), divisionRepo)
-	if err != nil {
-		t.Fatalf("ensureAdminDivision: %v", err)
-	}
-
-	team, err := ensureAdminTeam(context.Background(), teamRepo, divisionID)
-	if err != nil {
-		t.Fatalf("ensureAdminTeam: %v", err)
-	}
-
-	if team == nil || team.Name != "Admin" {
-		t.Fatalf("expected admin team created")
-	}
-
-	team, err = ensureAdminTeam(context.Background(), teamRepo, divisionID)
-	if err != nil {
-		t.Fatalf("ensureAdminTeam second call: %v", err)
-	}
-
-	if team != nil {
-		t.Fatalf("expected no team on duplicate create")
-	}
-}
-
 func TestEnsureAdminUser(t *testing.T) {
 	db := setupBootstrapDB(t)
 	userRepo := repo.NewUserRepo(db)
-	teamRepo := repo.NewTeamRepo(db)
-	divisionRepo := repo.NewDivisionRepo(db)
 
 	cfg := baseBootstrapConfig()
-	divisionID, err := ensureAdminDivision(context.Background(), divisionRepo)
-	if err != nil {
-		t.Fatalf("ensureAdminDivision: %v", err)
-	}
 
-	team, err := ensureAdminTeam(context.Background(), teamRepo, divisionID)
-	if err != nil {
-		t.Fatalf("ensureAdminTeam: %v", err)
-	}
-
-	if team == nil {
-		t.Fatalf("expected team for admin user")
-	}
-
-	user, err := ensureAdminUser(context.Background(), cfg, team, userRepo)
+	user, err := ensureAdminUser(context.Background(), cfg, userRepo)
 	if err != nil {
 		t.Fatalf("ensureAdminUser: %v", err)
 	}
 
-	if user == nil || user.Role != models.AdminRole || user.TeamID != team.ID {
+	if user == nil || user.Role != models.AdminRole {
 		t.Fatalf("unexpected admin user")
 	}
 
-	user, err = ensureAdminUser(context.Background(), cfg, team, userRepo)
+	user, err = ensureAdminUser(context.Background(), cfg, userRepo)
 	if err != nil {
 		t.Fatalf("ensureAdminUser second call: %v", err)
 	}
@@ -152,25 +111,14 @@ func TestEnsureAdminUser(t *testing.T) {
 	}
 }
 
-func TestBootstrapAdminCreatesTeamAndUser(t *testing.T) {
+func TestBootstrapAdminCreatesUser(t *testing.T) {
 	db := setupBootstrapDB(t)
 	userRepo := repo.NewUserRepo(db)
-	teamRepo := repo.NewTeamRepo(db)
-	divisionRepo := repo.NewDivisionRepo(db)
 
 	cfg := baseBootstrapConfig()
 	logger := newTestLogger(t)
 
-	BootstrapAdmin(context.Background(), cfg, db, userRepo, teamRepo, divisionRepo, logger)
-
-	var teamCount int
-	if err := db.NewSelect().TableExpr("teams").ColumnExpr("COUNT(*)").Scan(context.Background(), &teamCount); err != nil {
-		t.Fatalf("count teams: %v", err)
-	}
-
-	if teamCount != 1 {
-		t.Fatalf("expected 1 team, got %d", teamCount)
-	}
+	BootstrapAdmin(context.Background(), cfg, db, userRepo, logger)
 
 	var userCount int
 	if err := db.NewSelect().TableExpr("users").ColumnExpr("COUNT(*)").Scan(context.Background(), &userCount); err != nil {
@@ -185,21 +133,35 @@ func TestBootstrapAdminCreatesTeamAndUser(t *testing.T) {
 func TestBootstrapAdminSkipsWhenNotEmpty(t *testing.T) {
 	db := setupBootstrapDB(t)
 	userRepo := repo.NewUserRepo(db)
-	teamRepo := repo.NewTeamRepo(db)
-	divisionRepo := repo.NewDivisionRepo(db)
+	now := time.Now().UTC()
+	if err := userRepo.Create(context.Background(), &models.User{Email: "existing@example.com", Username: "existing", PasswordHash: "hash", Role: models.UserRole, CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
 
 	cfg := baseBootstrapConfig()
 	logger := newTestLogger(t)
 
-	team := &models.Team{
-		Name:      "Existing",
-		CreatedAt: time.Now().UTC(),
-	}
-	if err := teamRepo.Create(context.Background(), team); err != nil {
-		t.Fatalf("create team: %v", err)
+	BootstrapAdmin(context.Background(), cfg, db, userRepo, logger)
+
+	var userCount int
+	if err := db.NewSelect().TableExpr("users").ColumnExpr("COUNT(*)").Scan(context.Background(), &userCount); err != nil {
+		t.Fatalf("count users: %v", err)
 	}
 
-	BootstrapAdmin(context.Background(), cfg, db, userRepo, teamRepo, divisionRepo, logger)
+	if userCount != 1 {
+		t.Fatalf("expected bootstrap skip with existing user, got count %d", userCount)
+	}
+}
+
+func TestBootstrapAdminDisabled(t *testing.T) {
+	db := setupBootstrapDB(t)
+	userRepo := repo.NewUserRepo(db)
+
+	cfg := baseBootstrapConfig()
+	cfg.Bootstrap.AdminUserEnabled = false
+	logger := newTestLogger(t)
+
+	BootstrapAdmin(context.Background(), cfg, db, userRepo, logger)
 
 	var userCount int
 	if err := db.NewSelect().TableExpr("users").ColumnExpr("COUNT(*)").Scan(context.Background(), &userCount); err != nil {
@@ -207,77 +169,19 @@ func TestBootstrapAdminSkipsWhenNotEmpty(t *testing.T) {
 	}
 
 	if userCount != 0 {
-		t.Fatalf("expected no users, got %d", userCount)
-	}
-}
-
-func TestBootstrapAdminDisabled(t *testing.T) {
-	db := setupBootstrapDB(t)
-	userRepo := repo.NewUserRepo(db)
-	teamRepo := repo.NewTeamRepo(db)
-	divisionRepo := repo.NewDivisionRepo(db)
-
-	cfg := baseBootstrapConfig()
-	cfg.Bootstrap.AdminTeamEnabled = false
-	cfg.Bootstrap.AdminUserEnabled = false
-	logger := newTestLogger(t)
-
-	BootstrapAdmin(context.Background(), cfg, db, userRepo, teamRepo, divisionRepo, logger)
-
-	var teamCount int
-	if err := db.NewSelect().TableExpr("teams").ColumnExpr("COUNT(*)").Scan(context.Background(), &teamCount); err != nil {
-		t.Fatalf("count teams: %v", err)
-	}
-
-	if teamCount != 0 {
-		t.Fatalf("expected 0 teams, got %d", teamCount)
-	}
-}
-
-func TestEnsureAdminDivisionExisting(t *testing.T) {
-	db := setupBootstrapDB(t)
-	divisionRepo := repo.NewDivisionRepo(db)
-
-	firstID, err := ensureAdminDivision(context.Background(), divisionRepo)
-	if err != nil {
-		t.Fatalf("ensureAdminDivision first: %v", err)
-	}
-
-	secondID, err := ensureAdminDivision(context.Background(), divisionRepo)
-	if err != nil {
-		t.Fatalf("ensureAdminDivision second: %v", err)
-	}
-
-	if firstID != secondID {
-		t.Fatalf("expected existing division id reuse, got %d and %d", firstID, secondID)
+		t.Fatalf("expected 0 users, got %d", userCount)
 	}
 }
 
 func TestEnsureAdminUserSkipsWhenCredentialsMissing(t *testing.T) {
 	db := setupBootstrapDB(t)
 	userRepo := repo.NewUserRepo(db)
-	teamRepo := repo.NewTeamRepo(db)
-	divisionRepo := repo.NewDivisionRepo(db)
 
 	cfg := baseBootstrapConfig()
 	cfg.Bootstrap.AdminEmail = " "
 	cfg.Bootstrap.AdminPassword = ""
 
-	divisionID, err := ensureAdminDivision(context.Background(), divisionRepo)
-	if err != nil {
-		t.Fatalf("ensureAdminDivision: %v", err)
-	}
-
-	team, err := ensureAdminTeam(context.Background(), teamRepo, divisionID)
-	if err != nil {
-		t.Fatalf("ensureAdminTeam: %v", err)
-	}
-
-	if team == nil {
-		t.Fatalf("expected team")
-	}
-
-	user, err := ensureAdminUser(context.Background(), cfg, team, userRepo)
+	user, err := ensureAdminUser(context.Background(), cfg, userRepo)
 	if err != nil {
 		t.Fatalf("ensureAdminUser: %v", err)
 	}
@@ -290,27 +194,11 @@ func TestEnsureAdminUserSkipsWhenCredentialsMissing(t *testing.T) {
 func TestEnsureAdminUserDefaultsUsername(t *testing.T) {
 	db := setupBootstrapDB(t)
 	userRepo := repo.NewUserRepo(db)
-	teamRepo := repo.NewTeamRepo(db)
-	divisionRepo := repo.NewDivisionRepo(db)
 
 	cfg := baseBootstrapConfig()
 	cfg.Bootstrap.AdminUsername = " "
 
-	divisionID, err := ensureAdminDivision(context.Background(), divisionRepo)
-	if err != nil {
-		t.Fatalf("ensureAdminDivision: %v", err)
-	}
-
-	team, err := ensureAdminTeam(context.Background(), teamRepo, divisionID)
-	if err != nil {
-		t.Fatalf("ensureAdminTeam: %v", err)
-	}
-
-	if team == nil {
-		t.Fatalf("expected team")
-	}
-
-	user, err := ensureAdminUser(context.Background(), cfg, team, userRepo)
+	user, err := ensureAdminUser(context.Background(), cfg, userRepo)
 	if err != nil {
 		t.Fatalf("ensureAdminUser: %v", err)
 	}
@@ -320,56 +208,46 @@ func TestEnsureAdminUserDefaultsUsername(t *testing.T) {
 	}
 }
 
-func TestBootstrapAdminTeamOnly(t *testing.T) {
+func TestBootstrapAdminDisabledLeavesExistingUsersUntouched(t *testing.T) {
 	db := setupBootstrapDB(t)
 	userRepo := repo.NewUserRepo(db)
-	teamRepo := repo.NewTeamRepo(db)
-	divisionRepo := repo.NewDivisionRepo(db)
+	now := time.Now().UTC()
+	if err := userRepo.Create(context.Background(), &models.User{Email: "existing@example.com", Username: "existing", PasswordHash: "hash", Role: models.UserRole, CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
 
 	cfg := baseBootstrapConfig()
 	cfg.Bootstrap.AdminUserEnabled = false
 	logger := newTestLogger(t)
 
-	BootstrapAdmin(context.Background(), cfg, db, userRepo, teamRepo, divisionRepo, logger)
-
-	var teamCount int
-	if err := db.NewSelect().TableExpr("teams").ColumnExpr("COUNT(*)").Scan(context.Background(), &teamCount); err != nil {
-		t.Fatalf("count teams: %v", err)
-	}
-
-	if teamCount != 1 {
-		t.Fatalf("expected 1 team, got %d", teamCount)
-	}
+	BootstrapAdmin(context.Background(), cfg, db, userRepo, logger)
 
 	var userCount int
 	if err := db.NewSelect().TableExpr("users").ColumnExpr("COUNT(*)").Scan(context.Background(), &userCount); err != nil {
 		t.Fatalf("count users: %v", err)
 	}
 
-	if userCount != 0 {
-		t.Fatalf("expected 0 users, got %d", userCount)
+	if userCount != 1 {
+		t.Fatalf("expected 1 existing user, got %d", userCount)
 	}
 }
 
-func TestBootstrapAdminUserOnlySkipsWithoutTeam(t *testing.T) {
+func TestBootstrapAdminEnabledCreatesOnlyOnce(t *testing.T) {
 	db := setupBootstrapDB(t)
 	userRepo := repo.NewUserRepo(db)
-	teamRepo := repo.NewTeamRepo(db)
-	divisionRepo := repo.NewDivisionRepo(db)
 
 	cfg := baseBootstrapConfig()
-	cfg.Bootstrap.AdminTeamEnabled = false
-	cfg.Bootstrap.AdminUserEnabled = true
 	logger := newTestLogger(t)
 
-	BootstrapAdmin(context.Background(), cfg, db, userRepo, teamRepo, divisionRepo, logger)
+	BootstrapAdmin(context.Background(), cfg, db, userRepo, logger)
+	BootstrapAdmin(context.Background(), cfg, db, userRepo, logger)
 
 	var userCount int
 	if err := db.NewSelect().TableExpr("users").ColumnExpr("COUNT(*)").Scan(context.Background(), &userCount); err != nil {
 		t.Fatalf("count users: %v", err)
 	}
 
-	if userCount != 0 {
-		t.Fatalf("expected 0 users when team bootstrap disabled, got %d", userCount)
+	if userCount != 1 {
+		t.Fatalf("expected exactly 1 admin user, got %d", userCount)
 	}
 }

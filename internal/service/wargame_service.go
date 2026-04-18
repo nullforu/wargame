@@ -88,7 +88,7 @@ func NewWargameService(cfg config.Config, challengeRepo *repo.ChallengeRepo, sub
 	return &WargameService{cfg: cfg, challengeRepo: challengeRepo, submissionRepo: submissionRepo, redis: redis, fileStore: fileStore}
 }
 
-func (s *WargameService) ListChallenges(ctx context.Context, divisionID *int64) ([]models.Challenge, error) {
+func (s *WargameService) ListChallenges(ctx context.Context) ([]models.Challenge, error) {
 	challenges, err := s.challengeRepo.ListActive(ctx)
 
 	if err != nil {
@@ -100,7 +100,7 @@ func (s *WargameService) ListChallenges(ctx context.Context, divisionID *int64) 
 		ptrs = append(ptrs, &challenges[i])
 	}
 
-	if err := s.applyDynamicPoints(ctx, ptrs, divisionID); err != nil {
+	if err := s.applyDynamicPoints(ctx, ptrs); err != nil {
 		return nil, fmt.Errorf("wargame.ListChallenges score: %w", err)
 	}
 
@@ -202,7 +202,7 @@ func (s *WargameService) CreateChallenge(ctx context.Context, title, description
 		return nil, fmt.Errorf("wargame.CreateChallenge: %w", err)
 	}
 
-	if err := s.applyDynamicPoints(ctx, []*models.Challenge{challenge}, nil); err != nil {
+	if err := s.applyDynamicPoints(ctx, []*models.Challenge{challenge}); err != nil {
 		return nil, fmt.Errorf("wargame.CreateChallenge score: %w", err)
 	}
 
@@ -377,7 +377,7 @@ func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, d
 		return nil, fmt.Errorf("wargame.UpdateChallenge update: %w", err)
 	}
 
-	if err := s.applyDynamicPoints(ctx, []*models.Challenge{challenge}, nil); err != nil {
+	if err := s.applyDynamicPoints(ctx, []*models.Challenge{challenge}); err != nil {
 		return nil, fmt.Errorf("wargame.UpdateChallenge score: %w", err)
 	}
 
@@ -453,7 +453,7 @@ func (s *WargameService) SubmitFlag(ctx context.Context, userID, challengeID int
 	}
 
 	if correct {
-		inserted, err := s.submissionRepo.CreateCorrectIfNotSolvedByTeam(ctx, sub)
+		inserted, err := s.submissionRepo.CreateCorrectIfNotSolvedByUser(ctx, sub)
 		if err != nil {
 			return false, fmt.Errorf("wargame.SubmitFlag create: %w", err)
 		}
@@ -557,14 +557,14 @@ func (s *WargameService) RequestChallengeFileDownload(ctx context.Context, userI
 	return download, nil
 }
 
-func (s *WargameService) TeamSolvedChallengeIDs(ctx context.Context, userID int64) (map[int64]struct{}, error) {
+func (s *WargameService) SolvedChallengeIDs(ctx context.Context, userID int64) (map[int64]struct{}, error) {
 	if userID <= 0 || s.submissionRepo == nil {
 		return map[int64]struct{}{}, nil
 	}
 
-	ids, err := s.submissionRepo.TeamSolvedChallengeIDs(ctx, userID)
+	ids, err := s.submissionRepo.SolvedChallengeIDs(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("wargame.TeamSolvedChallengeIDs: %w", err)
+		return nil, fmt.Errorf("wargame.SolvedChallengeIDs: %w", err)
 	}
 
 	return ids, nil
@@ -629,14 +629,14 @@ func (s *WargameService) DeleteChallengeFile(ctx context.Context, id int64) (*mo
 	return challenge, nil
 }
 
-func (s *WargameService) SolvedChallenges(ctx context.Context, userID int64, divisionID *int64) ([]models.SolvedChallenge, error) {
+func (s *WargameService) SolvedChallenges(ctx context.Context, userID int64) ([]models.SolvedChallenge, error) {
 	rows, err := s.submissionRepo.SolvedChallenges(ctx, userID)
 
 	if err != nil {
 		return nil, fmt.Errorf("wargame.SolvedChallenges: %w", err)
 	}
 
-	pointsMap, err := s.challengeRepo.DynamicPoints(ctx, divisionID)
+	pointsMap, err := s.challengeRepo.DynamicPoints(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("wargame.SolvedChallenges score: %w", err)
 	}
@@ -657,13 +657,13 @@ func (s *WargameService) ListAllSubmissions(ctx context.Context) ([]models.Submi
 	return rows, nil
 }
 
-func (s *WargameService) applyDynamicPoints(ctx context.Context, challenges []*models.Challenge, divisionID *int64) error {
-	pointsMap, err := s.challengeRepo.DynamicPoints(ctx, divisionID)
+func (s *WargameService) applyDynamicPoints(ctx context.Context, challenges []*models.Challenge) error {
+	pointsMap, err := s.challengeRepo.DynamicPoints(ctx)
 	if err != nil {
 		return err
 	}
 
-	solveCounts, err := s.challengeRepo.SolveCounts(ctx, divisionID)
+	solveCounts, err := s.challengeRepo.SolveCounts(ctx)
 	if err != nil {
 		return err
 	}

@@ -34,30 +34,10 @@ func (r *StackRepo) ListByUser(ctx context.Context, userID int64) ([]models.Stac
 	return stacks, nil
 }
 
-func (r *StackRepo) ListByTeam(ctx context.Context, teamID int64) ([]models.Stack, error) {
-	stacks := make([]models.Stack, 0)
-	if err := r.db.NewSelect().
-		Model(&stacks).
-		ColumnExpr("stack.*").
-		ColumnExpr("u.username AS username").
-		ColumnExpr("c.title AS challenge_title").
-		Join("JOIN users AS u ON u.id = stack.user_id").
-		Join("JOIN challenges AS c ON c.id = stack.challenge_id").
-		Where("u.team_id = ?", teamID).
-		Order("stack.created_at DESC").
-		Scan(ctx); err != nil {
-		return nil, wrapError("stackRepo.ListByTeam", err)
-	}
-
-	return stacks, nil
-}
-
+// Legacy alias kept for compatibility while stack scope is now always user-based.
 func (r *StackRepo) ListAll(ctx context.Context) ([]models.Stack, error) {
 	stacks := make([]models.Stack, 0)
-	if err := r.db.NewSelect().
-		Model(&stacks).
-		Order("created_at DESC").
-		Scan(ctx); err != nil {
+	if err := r.db.NewSelect().Model(&stacks).Order("created_at DESC").Scan(ctx); err != nil {
 		return nil, wrapError("stackRepo.ListAll", err)
 	}
 
@@ -75,13 +55,10 @@ func (r *StackRepo) ListAdmin(ctx context.Context) ([]models.AdminStackSummary, 
 		ColumnExpr("s.user_id AS user_id").
 		ColumnExpr("u.username AS username").
 		ColumnExpr("u.email AS email").
-		ColumnExpr("u.team_id AS team_id").
-		ColumnExpr("g.name AS team_name").
 		ColumnExpr("s.challenge_id AS challenge_id").
 		ColumnExpr("c.title AS challenge_title").
 		ColumnExpr("c.category AS challenge_category").
 		Join("JOIN users AS u ON u.id = s.user_id").
-		Join("JOIN teams AS g ON g.id = u.team_id").
 		Join("JOIN challenges AS c ON c.id = s.challenge_id").
 		OrderExpr("s.created_at DESC").
 		Scan(ctx, &stacks); err != nil {
@@ -92,10 +69,7 @@ func (r *StackRepo) ListAdmin(ctx context.Context) ([]models.AdminStackSummary, 
 }
 
 func (r *StackRepo) CountByUser(ctx context.Context, userID int64) (int, error) {
-	count, err := r.db.NewSelect().
-		Model((*models.Stack)(nil)).
-		Where("user_id = ?", userID).
-		Count(ctx)
+	count, err := r.db.NewSelect().Model((*models.Stack)(nil)).Where("user_id = ?", userID).Count(ctx)
 	if err != nil {
 		return 0, wrapError("stackRepo.CountByUser", err)
 	}
@@ -104,9 +78,7 @@ func (r *StackRepo) CountByUser(ctx context.Context, userID int64) (int, error) 
 }
 
 func (r *StackRepo) CountByUserExcludingStatuses(ctx context.Context, userID int64, statuses []string) (int, error) {
-	query := r.db.NewSelect().
-		Model((*models.Stack)(nil)).
-		Where("user_id = ?", userID)
+	query := r.db.NewSelect().Model((*models.Stack)(nil)).Where("user_id = ?", userID)
 	if len(statuses) > 0 {
 		query = query.Where("status NOT IN (?)", bun.In(statuses))
 	}
@@ -119,36 +91,7 @@ func (r *StackRepo) CountByUserExcludingStatuses(ctx context.Context, userID int
 	return count, nil
 }
 
-func (r *StackRepo) CountByTeamExcludingStatuses(ctx context.Context, teamID int64, statuses []string) (int, error) {
-	query := r.db.NewSelect().
-		Model((*models.Stack)(nil)).
-		Join("JOIN users AS u ON u.id = stack.user_id").
-		Where("u.team_id = ?", teamID)
-	if len(statuses) > 0 {
-		query = query.Where("stack.status NOT IN (?)", bun.In(statuses))
-	}
-
-	count, err := query.Count(ctx)
-	if err != nil {
-		return 0, wrapError("stackRepo.CountByTeamExcludingStatuses", err)
-	}
-
-	return count, nil
-}
-
-func (r *StackRepo) TeamIDForUser(ctx context.Context, userID int64) (int64, error) {
-	var teamID int64
-	if err := r.db.NewSelect().
-		TableExpr("users").
-		Column("team_id").
-		Where("id = ?", userID).
-		Scan(ctx, &teamID); err != nil {
-		return 0, wrapNotFound("stackRepo.TeamIDForUser", err)
-	}
-
-	return teamID, nil
-}
-
+// Legacy alias kept for compatibility while stack scope is now always user-based.
 func (r *StackRepo) GetByUserAndChallenge(ctx context.Context, userID, challengeID int64) (*models.Stack, error) {
 	stack := new(models.Stack)
 	if err := r.db.NewSelect().
@@ -167,24 +110,7 @@ func (r *StackRepo) GetByUserAndChallenge(ctx context.Context, userID, challenge
 	return stack, nil
 }
 
-func (r *StackRepo) GetByTeamAndChallenge(ctx context.Context, teamID, challengeID int64) (*models.Stack, error) {
-	stack := new(models.Stack)
-	if err := r.db.NewSelect().
-		Model(stack).
-		ColumnExpr("stack.*").
-		ColumnExpr("u.username AS username").
-		ColumnExpr("c.title AS challenge_title").
-		Join("JOIN users AS u ON u.id = stack.user_id").
-		Join("JOIN challenges AS c ON c.id = stack.challenge_id").
-		Where("u.team_id = ?", teamID).
-		Where("stack.challenge_id = ?", challengeID).
-		Scan(ctx); err != nil {
-		return nil, wrapNotFound("stackRepo.GetByTeamAndChallenge", err)
-	}
-
-	return stack, nil
-}
-
+// Legacy alias kept for compatibility while stack scope is now always user-based.
 func (r *StackRepo) GetByStackID(ctx context.Context, stackID string) (*models.Stack, error) {
 	stack := new(models.Stack)
 	if err := r.db.NewSelect().

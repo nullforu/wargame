@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -16,10 +15,8 @@ import (
 
 func TestAuthServiceRegisterSuccess(t *testing.T) {
 	env := setupServiceTest(t)
-	admin := createUserWithNewTeam(t, env, "admin@example.com", models.AdminRole, "pass", models.AdminRole)
-	key := createRegistrationKey(t, env, "ABCDEFGHJKLMNPQ2", admin.ID)
 
-	user, err := env.authSvc.Register(context.Background(), "USER@Example.com", "  user1  ", "pass1", key.Code, "127.0.0.1")
+	user, err := env.authSvc.Register(context.Background(), "USER@Example.com", "  user1  ", "pass1")
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -27,29 +24,12 @@ func TestAuthServiceRegisterSuccess(t *testing.T) {
 	if user.ID == 0 || user.Email != "user@example.com" || user.Username != "user1" {
 		t.Fatalf("unexpected user: %+v", user)
 	}
-
-	stored, err := env.regKeyRepo.GetByCodeForUpdate(context.Background(), env.db, key.Code)
-	if err != nil {
-		t.Fatalf("fetch key: %v", err)
-	}
-
-	if stored.UsedCount != 1 {
-		t.Fatalf("expected used_count 1, got %d", stored.UsedCount)
-	}
-
-	var uses []models.RegistrationKeyUse
-	if err := env.db.NewSelect().Model(&uses).Where("registration_key_id = ?", stored.ID).Scan(context.Background()); err != nil {
-		t.Fatalf("load uses: %v", err)
-	}
-	if len(uses) != 1 || uses[0].UsedBy != user.ID || uses[0].UsedByIP != "127.0.0.1" {
-		t.Fatalf("unexpected uses: %+v", uses)
-	}
 }
 
 func TestAuthServiceRegisterValidation(t *testing.T) {
 	env := setupServiceTest(t)
 
-	_, err := env.authSvc.Register(context.Background(), "bad", "", "", "12345", "")
+	_, err := env.authSvc.Register(context.Background(), "bad", "", "")
 	var ve *ValidationError
 	if !errors.As(err, &ve) {
 		t.Fatalf("expected validation error, got %v", err)
@@ -58,157 +38,17 @@ func TestAuthServiceRegisterValidation(t *testing.T) {
 
 func TestAuthServiceRegisterUserExists(t *testing.T) {
 	env := setupServiceTest(t)
-	admin := createUserWithNewTeam(t, env, "admin@example.com", models.AdminRole, "pass", models.AdminRole)
-	_ = createRegistrationKey(t, env, "ABCDEFGHJKLMNPQ3", admin.ID)
-	_ = createUserWithNewTeam(t, env, "user@example.com", "user1", "pass", models.UserRole)
+	_ = createUser(t, env, "user@example.com", "user1", "pass", models.UserRole)
 
-	_, err := env.authSvc.Register(context.Background(), "user@example.com", "newuser", "pass", "ABCDEFGHJKLMNPQ3", "")
+	_, err := env.authSvc.Register(context.Background(), "user@example.com", "newuser", "pass")
 	if !errors.Is(err, ErrUserExists) {
 		t.Fatalf("expected ErrUserExists, got %v", err)
 	}
 }
 
-func TestAuthServiceCreateRegistrationKeys(t *testing.T) {
-	env := setupServiceTest(t)
-	admin := createUserWithNewTeam(t, env, "admin@example.com", models.AdminRole, "pass", models.AdminRole)
-	team := createTeam(t, env, "Alpha")
-
-	if _, err := env.authSvc.CreateRegistrationKeys(context.Background(), admin.ID, 0, team.ID, 1); err == nil {
-		t.Fatalf("expected validation error")
-	}
-	if _, err := env.authSvc.CreateRegistrationKeys(context.Background(), admin.ID, 1, team.ID, 0); err == nil {
-		t.Fatalf("expected validation error")
-	}
-
-	keys, err := env.authSvc.CreateRegistrationKeys(context.Background(), admin.ID, 2, team.ID, 2)
-	if err != nil {
-		t.Fatalf("create keys: %v", err)
-	}
-
-	if len(keys) != 2 {
-		t.Fatalf("expected 2 keys, got %d", len(keys))
-	}
-
-	if keys[0].Code == keys[1].Code || len(keys[0].Code) != 16 || len(keys[1].Code) != 16 {
-		t.Fatalf("unexpected key codes: %+v", keys)
-	}
-	if keys[0].MaxUses != 2 {
-		t.Fatalf("expected max_uses 2, got %d", keys[0].MaxUses)
-	}
-}
-
-func TestAuthServiceCreateRegistrationKeysWithTeam(t *testing.T) {
-	env := setupServiceTest(t)
-	admin := createUserWithNewTeam(t, env, "admin@example.com", models.AdminRole, "pass", models.AdminRole)
-	team := createTeam(t, env, "Alpha")
-
-	keys, err := env.authSvc.CreateRegistrationKeys(context.Background(), admin.ID, 1, team.ID, 1)
-	if err != nil {
-		t.Fatalf("create keys: %v", err)
-	}
-
-	if len(keys) != 1 || keys[0].TeamID != team.ID {
-		t.Fatalf("expected team on key, got %+v", keys)
-	}
-}
-
-func TestAuthServiceCreateRegistrationKeysInvalidTeam(t *testing.T) {
-	env := setupServiceTest(t)
-	admin := createUserWithNewTeam(t, env, "admin@example.com", models.AdminRole, "pass", models.AdminRole)
-
-	_, err := env.authSvc.CreateRegistrationKeys(context.Background(), admin.ID, 1, 9999, 1)
-	var ve *ValidationError
-	if !errors.As(err, &ve) {
-		t.Fatalf("expected validation error, got %v", err)
-	}
-}
-
-func TestAuthServiceRegisterAssignsTeam(t *testing.T) {
-	env := setupServiceTest(t)
-	admin := createUserWithNewTeam(t, env, "admin@example.com", models.AdminRole, "pass", models.AdminRole)
-	team := createTeam(t, env, "Alpha")
-	key := createRegistrationKeyWithTeam(t, env, "ABCDEFGHJKLMNPQ4", admin.ID, team.ID)
-
-	user, err := env.authSvc.Register(context.Background(), "user@example.com", "user1", "pass1", key.Code, "")
-	if err != nil {
-		t.Fatalf("register: %v", err)
-	}
-
-	if user.TeamID != team.ID {
-		t.Fatalf("expected user team assigned, got %+v", user.TeamID)
-	}
-}
-
-func TestAuthServiceRegisterUsedRegistrationKey(t *testing.T) {
-	env := setupServiceTest(t)
-	admin := createUserWithNewTeam(t, env, "admin@example.com", models.AdminRole, "pass", models.AdminRole)
-	team := createTeam(t, env, "Key Team")
-
-	key := &models.RegistrationKey{
-		Code:      "ABCDEFGHJKLMNPQ5",
-		CreatedBy: admin.ID,
-		TeamID:    team.ID,
-		MaxUses:   1,
-		UsedCount: 1,
-		CreatedAt: time.Now().UTC(),
-	}
-	if err := env.regKeyRepo.Create(context.Background(), key); err != nil {
-		t.Fatalf("create key: %v", err)
-	}
-
-	_, err := env.authSvc.Register(context.Background(), "user@example.com", "user1", "pass1", key.Code, "")
-	var ve *ValidationError
-	if !errors.As(err, &ve) {
-		t.Fatalf("expected validation error, got %v", err)
-	}
-}
-
-func TestAuthServiceListRegistrationKeys(t *testing.T) {
-	env := setupServiceTest(t)
-	admin := createUserWithNewTeam(t, env, "admin@example.com", models.AdminRole, "pass", models.AdminRole)
-	user := createUserWithNewTeam(t, env, "user@example.com", "user1", "pass", models.UserRole)
-
-	usedAt := time.Now().UTC()
-	key := &models.RegistrationKey{
-		Code:      "ABCDEFGHJKLMNPQ6",
-		CreatedBy: admin.ID,
-		TeamID:    createTeam(t, env, "Key Team").ID,
-		MaxUses:   3,
-		UsedCount: 1,
-		CreatedAt: time.Now().UTC(),
-	}
-
-	if err := env.regKeyRepo.Create(context.Background(), key); err != nil {
-		t.Fatalf("create key: %v", err)
-	}
-
-	use := &models.RegistrationKeyUse{
-		RegistrationKeyID: key.ID,
-		UsedBy:            user.ID,
-		UsedByIP:          "192.0.2.1",
-		UsedAt:            usedAt,
-	}
-	if _, err := env.db.NewInsert().Model(use).Exec(context.Background()); err != nil {
-		t.Fatalf("create use: %v", err)
-	}
-
-	rows, err := env.authSvc.ListRegistrationKeys(context.Background())
-	if err != nil {
-		t.Fatalf("list keys: %v", err)
-	}
-
-	if len(rows) != 1 {
-		t.Fatalf("expected 1 key, got %d", len(rows))
-	}
-
-	if rows[0].CreatedByUsername != admin.Username || len(rows[0].Uses) != 1 || rows[0].Uses[0].UsedByUsername != user.Username {
-		t.Fatalf("unexpected key summary: %+v", rows[0])
-	}
-}
-
 func TestAuthServiceLoginRefreshLogout(t *testing.T) {
 	env := setupServiceTest(t)
-	user := createUserWithNewTeam(t, env, "user@example.com", "user1", "pass", models.UserRole)
+	user := createUser(t, env, "user@example.com", "user1", "pass", models.UserRole)
 
 	if _, _, _, err := env.authSvc.Login(context.Background(), "user@example.com", "wrong"); !errors.Is(err, ErrInvalidCreds) {
 		t.Fatalf("expected ErrInvalidCreds, got %v", err)
@@ -270,8 +110,9 @@ func TestAuthServiceLoginRefreshLogout(t *testing.T) {
 
 func TestAuthServiceLoginBlocked(t *testing.T) {
 	env := setupServiceTest(t)
-	user := createUserWithNewTeam(t, env, "blocked@example.com", models.BlockedRole, "pass", models.UserRole)
+	user := createUser(t, env, "blocked@example.com", "blocked", "pass", models.UserRole)
 	user.Role = models.BlockedRole
+
 	if err := env.userRepo.Update(context.Background(), user); err != nil {
 		t.Fatalf("update user: %v", err)
 	}
@@ -283,7 +124,7 @@ func TestAuthServiceLoginBlocked(t *testing.T) {
 
 func TestAuthServiceRefreshBlocked(t *testing.T) {
 	env := setupServiceTest(t)
-	user := createUserWithNewTeam(t, env, "user@example.com", "user1", "pass", models.UserRole)
+	user := createUser(t, env, "user@example.com", "user1", "pass", models.UserRole)
 
 	_, refresh, _, err := env.authSvc.Login(context.Background(), "user@example.com", "pass")
 	if err != nil {
@@ -302,7 +143,7 @@ func TestAuthServiceRefreshBlocked(t *testing.T) {
 
 func TestAuthServiceRefreshUserNotFound(t *testing.T) {
 	env := setupServiceTest(t)
-	user := createUserWithNewTeam(t, env, "user@example.com", "user1", "pass", models.UserRole)
+	user := createUser(t, env, "user@example.com", "user1", "pass", models.UserRole)
 
 	_, refresh, _, err := env.authSvc.Login(context.Background(), "user@example.com", "pass")
 	if err != nil {
@@ -318,16 +159,14 @@ func TestAuthServiceRefreshUserNotFound(t *testing.T) {
 	}
 }
 
-func TestAuthServiceRegisterMissingKey(t *testing.T) {
+func TestAuthServiceRegisterWithoutKey(t *testing.T) {
 	env := setupServiceTest(t)
-	_, err := env.authSvc.Register(context.Background(), "user@example.com", "user1", "pass", "MISSING1", "")
-	if err == nil {
-		t.Fatalf("expected error")
+	user, err := env.authSvc.Register(context.Background(), "user@example.com", "user1", "pass")
+	if err != nil {
+		t.Fatalf("expected register success without key, got %v", err)
 	}
-
-	var ve *ValidationError
-	if !errors.As(err, &ve) {
-		t.Fatalf("expected validation error, got %v", err)
+	if user.ID == 0 {
+		t.Fatalf("expected persisted user")
 	}
 }
 
@@ -341,7 +180,7 @@ func TestAuthServiceLoginUserNotFound(t *testing.T) {
 
 func TestAuthServiceParseRefreshTokenValidation(t *testing.T) {
 	env := setupServiceTest(t)
-	user := createUserWithNewTeam(t, env, "parse@example.com", "parse", "pass", models.UserRole)
+	user := createUser(t, env, "parse@example.com", "parse", "pass", models.UserRole)
 
 	access, err := auth.GenerateAccessToken(env.cfg.JWT, user.ID, user.Role)
 	if err != nil {
@@ -359,7 +198,7 @@ func TestAuthServiceParseRefreshTokenValidation(t *testing.T) {
 
 func TestAuthServiceAssertRefreshValidCases(t *testing.T) {
 	env := setupServiceTest(t)
-	user := createUserWithNewTeam(t, env, "assert@example.com", "assert", "pass", models.UserRole)
+	user := createUser(t, env, "assert@example.com", "assert", "pass", models.UserRole)
 	key := "custom-jti"
 
 	if err := env.authSvc.assertRefreshValid(context.Background(), key, user.ID); !errors.Is(err, ErrInvalidCreds) {
@@ -393,7 +232,7 @@ func TestAuthServiceAssertRefreshValidCases(t *testing.T) {
 
 func TestAuthServiceRefreshOldTokenRevoked(t *testing.T) {
 	env := setupServiceTest(t)
-	createUserWithNewTeam(t, env, "refresh-old@example.com", "refresh-old", "pass", models.UserRole)
+	createUser(t, env, "refresh-old@example.com", "refresh-old", "pass", models.UserRole)
 
 	_, refresh, _, err := env.authSvc.Login(context.Background(), "refresh-old@example.com", "pass")
 	if err != nil {
@@ -411,10 +250,8 @@ func TestAuthServiceRefreshOldTokenRevoked(t *testing.T) {
 
 func TestAuthServiceRegisterTrimsNormalization(t *testing.T) {
 	env := setupServiceTest(t)
-	admin := createUserWithNewTeam(t, env, "admin2@example.com", models.AdminRole, "pass", models.AdminRole)
-	key := createRegistrationKey(t, env, "ABCDEFGHJKLMNPQ7", admin.ID)
 
-	user, err := env.authSvc.Register(context.Background(), "  MiXeD@Example.com  ", "  trim-user  ", "pass1", "  "+strings.ToLower(key.Code)+"  ", " 192.0.2.5 ")
+	user, err := env.authSvc.Register(context.Background(), "  MiXeD@Example.com  ", "  trim-user  ", "pass1")
 	if err != nil {
 		t.Fatalf("register with normalization: %v", err)
 	}

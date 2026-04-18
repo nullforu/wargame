@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -29,14 +28,12 @@ type Handler struct {
 	app     *service.AppConfigService
 	users   *service.UserService
 	score   *service.ScoreboardService
-	divs    *service.DivisionService
-	teams   *service.TeamService
 	stacks  *service.StackService
 	redis   *redis.Client
 }
 
-func New(cfg config.Config, auth *service.AuthService, wargame *service.WargameService, app *service.AppConfigService, users *service.UserService, score *service.ScoreboardService, divisions *service.DivisionService, teams *service.TeamService, stacks *service.StackService, redis *redis.Client) *Handler {
-	return &Handler{cfg: cfg, auth: auth, wargame: wargame, app: app, users: users, score: score, divs: divisions, teams: teams, stacks: stacks, redis: redis}
+func New(cfg config.Config, auth *service.AuthService, wargame *service.WargameService, app *service.AppConfigService, users *service.UserService, score *service.ScoreboardService, stacks *service.StackService, redis *redis.Client) *Handler {
+	return &Handler{cfg: cfg, auth: auth, wargame: wargame, app: app, users: users, score: score, stacks: stacks, redis: redis}
 }
 
 func (h *Handler) respondFromCache(ctx *gin.Context, cacheKey string) bool {
@@ -54,16 +51,7 @@ func (h *Handler) storeCache(ctx *gin.Context, cacheKey string, response any, tt
 	if err != nil {
 		return
 	}
-
 	_ = h.redis.Set(ctx.Request.Context(), cacheKey, responseJSON, ttl).Err()
-}
-
-func cacheKeyWithDivision(base string, divisionID *int64) string {
-	if divisionID == nil {
-		return base
-	}
-
-	return fmt.Sprintf("%s:div:%d", base, *divisionID)
 }
 
 func (h *Handler) invalidateCacheByPrefix(ctx context.Context, prefix string) {
@@ -76,88 +64,15 @@ func (h *Handler) invalidateCacheByPrefix(ctx context.Context, prefix string) {
 	}
 }
 
-func (h *Handler) invalidateTimelineCache(ctx context.Context, divisionIDs []int64) {
-	if len(divisionIDs) == 0 {
-		h.invalidateCacheByPrefix(ctx, "timeline:")
-		return
-	}
-
-	for _, divisionID := range divisionIDs {
-		divID := divisionID
-		_ = h.redis.Del(ctx,
-			cacheKeyWithDivision("timeline:users", &divID),
-			cacheKeyWithDivision("timeline:teams", &divID),
-		).Err()
-	}
-}
-
-func (h *Handler) invalidateLeaderboardCache(ctx context.Context, divisionIDs []int64) {
-	if len(divisionIDs) == 0 {
-		h.invalidateCacheByPrefix(ctx, "leaderboard:")
-		return
-	}
-
-	for _, divisionID := range divisionIDs {
-		divID := divisionID
-		_ = h.redis.Del(ctx,
-			cacheKeyWithDivision("leaderboard:users", &divID),
-			cacheKeyWithDivision("leaderboard:teams", &divID),
-		).Err()
-	}
-}
-
-func uniqueDivisionIDs(ids []int64) []int64 {
-	if len(ids) == 0 {
-		return nil
-	}
-
-	seen := make(map[int64]struct{}, len(ids))
-	out := make([]int64, 0, len(ids))
-
-	for _, id := range ids {
-		if id <= 0 {
-			continue
-		}
-
-		if _, exists := seen[id]; exists {
-			continue
-		}
-
-		seen[id] = struct{}{}
-		out = append(out, id)
-	}
-
-	return out
-}
-
-func (h *Handler) publishScoreboardEvent(ctx context.Context, reason string, divisionIDs []int64) {
-	divisionIDs = uniqueDivisionIDs(divisionIDs)
-	scope := "all"
-
-	if len(divisionIDs) > 0 {
-		scope = "division"
-	}
-
-	event := realtime.ScoreboardEvent{
-		Scope:       scope,
-		Reason:      reason,
-		TS:          time.Now().UTC(),
-		DivisionIDs: divisionIDs,
-	}
-
+func (h *Handler) notifyScoreboardChanged(ctx context.Context, reason string) {
+	h.invalidateCacheByPrefix(ctx, "leaderboard:")
+	h.invalidateCacheByPrefix(ctx, "timeline:")
+	event := realtime.ScoreboardEvent{Scope: "all", Reason: reason, TS: time.Now().UTC()}
 	payload, err := json.Marshal(event)
 	if err != nil {
 		return
 	}
-
 	_ = h.redis.Publish(ctx, "scoreboard.events", payload).Err()
-}
-
-func (h *Handler) notifyScoreboardChanged(ctx context.Context, reason string, divisionIDs ...int64) {
-	divisionIDs = uniqueDivisionIDs(divisionIDs)
-	h.invalidateLeaderboardCache(ctx, divisionIDs)
-	h.invalidateTimelineCache(ctx, divisionIDs)
-	h.publishScoreboardEvent(ctx, reason, divisionIDs)
 }
 
 func parseIDParam(ctx *gin.Context, name string) (int64, bool) {
@@ -165,59 +80,20 @@ func parseIDParam(ctx *gin.Context, name string) (int64, bool) {
 	if value == "" {
 		return 0, false
 	}
-
 	id, err := strconv.ParseInt(value, 10, 64)
 	if err != nil || id <= 0 {
 		return 0, false
 	}
-
 	return id, true
 }
 
 func parseIDParamOrError(ctx *gin.Context, name string) (int64, bool) {
 	id, ok := parseIDParam(ctx, name)
 	if !ok {
-		ctx.JSON(http.StatusBadRequest, errorResponse{
-			Error:   service.ErrInvalidInput.Error(),
-			Details: []service.FieldError{{Field: name, Reason: "invalid"}},
-		})
+		ctx.JSON(http.StatusBadRequest, errorResponse{Error: service.ErrInvalidInput.Error(), Details: []service.FieldError{{Field: name, Reason: "invalid"}}})
 		return 0, false
 	}
-
 	return id, true
-}
-
-func parseOptionalPositiveIDQuery(ctx *gin.Context, name string) (*int64, error) {
-	raw := strings.TrimSpace(ctx.Query(name))
-	if raw == "" {
-		return nil, nil
-	}
-
-	id, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || id <= 0 {
-		return nil, service.NewValidationError(service.FieldError{Field: name, Reason: "invalid"})
-	}
-
-	return &id, nil
-}
-
-func (h *Handler) resolveDivisionID(ctx *gin.Context, require bool) (*int64, bool) {
-	divisionID, err := parseOptionalPositiveIDQuery(ctx, "division_id")
-	if err != nil {
-		writeError(ctx, err)
-		return nil, false
-	}
-
-	if divisionID != nil {
-		return divisionID, true
-	}
-
-	if require {
-		writeError(ctx, service.NewValidationError(service.FieldError{Field: "division_id", Reason: "required"}))
-		return nil, false
-	}
-
-	return nil, true
 }
 
 func (h *Handler) optionalUserID(ctx *gin.Context) int64 {
@@ -225,17 +101,14 @@ func (h *Handler) optionalUserID(ctx *gin.Context) int64 {
 	if authHeader == "" {
 		return 0
 	}
-
 	parts := strings.SplitN(authHeader, " ", 2)
 	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
 		return 0
 	}
-
 	claims, err := auth.ParseToken(h.cfg.JWT, parts[1])
 	if err != nil || claims.Type != auth.TokenTypeAccess {
 		return 0
 	}
-
 	return claims.UserID
 }
 
@@ -243,11 +116,9 @@ func isChallengeLocked(challenge models.Challenge, solved map[int64]struct{}, us
 	if challenge.PreviousChallengeID == nil || *challenge.PreviousChallengeID <= 0 {
 		return false
 	}
-
 	if userID <= 0 {
 		return true
 	}
-
 	_, ok := solved[*challenge.PreviousChallengeID]
 	return !ok
 }
@@ -258,11 +129,8 @@ func (h *Handler) wargameState(ctx *gin.Context) (service.WargameState, bool) {
 		writeError(ctx, err)
 		return service.WargameStateActive, false
 	}
-
 	return state, true
 }
-
-// App Config Handlers
 
 func (h *Handler) GetConfig(ctx *gin.Context) {
 	cfg, updatedAt, etag, err := h.app.Get(ctx.Request.Context())
@@ -284,15 +152,7 @@ func (h *Handler) GetConfig(ctx *gin.Context) {
 		ctx.Header("Last-Modified", updatedAt.UTC().Format(http.TimeFormat))
 	}
 
-	ctx.JSON(http.StatusOK, appConfigResponse{
-		Title:             cfg.Title,
-		Description:       cfg.Description,
-		HeaderTitle:       cfg.HeaderTitle,
-		HeaderDescription: cfg.HeaderDescription,
-		WargameStartAt:    cfg.WargameStartAt,
-		WargameEndAt:      cfg.WargameEndAt,
-		UpdatedAt:         updatedAt.UTC(),
-	})
+	ctx.JSON(http.StatusOK, appConfigResponse{Title: cfg.Title, Description: cfg.Description, HeaderTitle: cfg.HeaderTitle, HeaderDescription: cfg.HeaderDescription, WargameStartAt: cfg.WargameStartAt, WargameEndAt: cfg.WargameEndAt, UpdatedAt: updatedAt.UTC()})
 }
 
 func etagMatches(ifNoneMatch, etag string) bool {
@@ -302,12 +162,10 @@ func etagMatches(ifNoneMatch, etag string) bool {
 		if trimmed == "*" {
 			return true
 		}
-
 		if normalizeETag(trimmed) == needle {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -316,7 +174,6 @@ func normalizeETag(tag string) string {
 	if after, ok := strings.CutPrefix(tag, "W/"); ok {
 		tag = strings.TrimSpace(after)
 	}
-
 	return strings.Trim(tag, "\"")
 }
 
@@ -326,47 +183,24 @@ func (h *Handler) AdminUpdateConfig(ctx *gin.Context) {
 		writeBindError(ctx, err)
 		return
 	}
-
-	input := service.AppConfigUpdate{
-		Title:             appConfigInputFromOptional(req.Title),
-		Description:       appConfigInputFromOptional(req.Description),
-		HeaderTitle:       appConfigInputFromOptional(req.HeaderTitle),
-		HeaderDescription: appConfigInputFromOptional(req.HeaderDescription),
-		WargameStartAt:    appConfigInputFromOptional(req.WargameStartAt),
-		WargameEndAt:      appConfigInputFromOptional(req.WargameEndAt),
-	}
-
+	input := service.AppConfigUpdate{Title: appConfigInputFromOptional(req.Title), Description: appConfigInputFromOptional(req.Description), HeaderTitle: appConfigInputFromOptional(req.HeaderTitle), HeaderDescription: appConfigInputFromOptional(req.HeaderDescription), WargameStartAt: appConfigInputFromOptional(req.WargameStartAt), WargameEndAt: appConfigInputFromOptional(req.WargameEndAt)}
 	cfg, updatedAt, _, err := h.app.Update(ctx.Request.Context(), input)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	ctx.Header("Cache-Control", "no-store")
-	ctx.JSON(http.StatusOK, appConfigResponse{
-		Title:             cfg.Title,
-		Description:       cfg.Description,
-		HeaderTitle:       cfg.HeaderTitle,
-		HeaderDescription: cfg.HeaderDescription,
-		WargameStartAt:    cfg.WargameStartAt,
-		WargameEndAt:      cfg.WargameEndAt,
-		UpdatedAt:         updatedAt.UTC(),
-	})
+	ctx.JSON(http.StatusOK, appConfigResponse{Title: cfg.Title, Description: cfg.Description, HeaderTitle: cfg.HeaderTitle, HeaderDescription: cfg.HeaderDescription, WargameStartAt: cfg.WargameStartAt, WargameEndAt: cfg.WargameEndAt, UpdatedAt: updatedAt.UTC()})
 }
 
 func appConfigInputFromOptional(value optionalString) service.AppConfigUpdateInput {
 	if !value.Set {
-		return service.AppConfigUpdateInput{}
+		return service.AppConfigUpdateInput{Set: false}
 	}
-
 	if value.Value == nil {
 		return service.AppConfigUpdateInput{Set: true, Null: true}
 	}
-
 	return service.AppConfigUpdateInput{Set: true, Value: *value.Value}
 }
-
-// Auth Handlers
 
 func (h *Handler) Register(ctx *gin.Context) {
 	var req registerRequest
@@ -375,35 +209,12 @@ func (h *Handler) Register(ctx *gin.Context) {
 		return
 	}
 
-	ip := ctx.ClientIP()
-
-	user, err := h.auth.Register(ctx.Request.Context(), req.Email, req.Username, req.Password, req.RegistrationKey, ip)
+	user, err := h.auth.Register(ctx.Request.Context(), req.Email, req.Username, req.Password)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	h.notifyScoreboardChanged(ctx.Request.Context(), "user_registered", user.DivisionID)
-
-	ctx.JSON(http.StatusCreated, registerResponse{
-		ID:       user.ID,
-		Email:    user.Email,
-		Username: user.Username,
-	})
-}
-
-func (h *Handler) userStackSummary(ctx context.Context, userID int64) (int, int) {
-	if h.stacks == nil {
-		return 0, 0
-	}
-
-	count, limit, err := h.stacks.UserStackSummary(ctx, userID)
-	if err != nil {
-		slog.Warn("stack summary lookup failed", slog.Int64("user_id", userID), slog.Any("error", err))
-		return 0, limit
-	}
-
-	return count, limit
+	ctx.JSON(http.StatusCreated, registerResponse{ID: user.ID, Email: user.Email, Username: user.Username})
 }
 
 func (h *Handler) Login(ctx *gin.Context) {
@@ -412,20 +223,13 @@ func (h *Handler) Login(ctx *gin.Context) {
 		writeBindError(ctx, err)
 		return
 	}
-
 	accessToken, refreshToken, user, err := h.auth.Login(ctx.Request.Context(), req.Email, req.Password)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	stackCount, stackLimit := h.userStackSummary(ctx.Request.Context(), user.ID)
-
-	ctx.JSON(http.StatusOK, loginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		User:         newUserMeResponse(user, stackCount, stackLimit),
-	})
+	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
+	ctx.JSON(http.StatusOK, loginResponse{AccessToken: accessToken, RefreshToken: refreshToken, User: newUserMeResponse(user, stackCount, stackLimit)})
 }
 
 func (h *Handler) Refresh(ctx *gin.Context) {
@@ -434,17 +238,12 @@ func (h *Handler) Refresh(ctx *gin.Context) {
 		writeBindError(ctx, err)
 		return
 	}
-
 	accessToken, refreshToken, err := h.auth.Refresh(ctx.Request.Context(), req.RefreshToken)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	ctx.JSON(http.StatusOK, refreshResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	})
+	ctx.JSON(http.StatusOK, refreshResponse{AccessToken: accessToken, RefreshToken: refreshToken})
 }
 
 func (h *Handler) Logout(ctx *gin.Context) {
@@ -453,25 +252,20 @@ func (h *Handler) Logout(ctx *gin.Context) {
 		writeBindError(ctx, err)
 		return
 	}
-
 	if err := h.auth.Logout(ctx.Request.Context(), req.RefreshToken); err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 func (h *Handler) Me(ctx *gin.Context) {
-	userID := middleware.UserID(ctx)
-	user, err := h.users.GetByID(ctx.Request.Context(), userID)
+	user, err := h.users.GetByID(ctx.Request.Context(), middleware.UserID(ctx))
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	stackCount, stackLimit := h.userStackSummary(ctx.Request.Context(), userID)
-
+	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
 	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
 }
 
@@ -481,40 +275,26 @@ func (h *Handler) UpdateMe(ctx *gin.Context) {
 		writeBindError(ctx, err)
 		return
 	}
-
-	userID := middleware.UserID(ctx)
-	user, err := h.users.UpdateProfile(ctx.Request.Context(), userID, req.Username)
+	user, err := h.users.UpdateProfile(ctx.Request.Context(), middleware.UserID(ctx), req.Username)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	stackCount, stackLimit := h.userStackSummary(ctx.Request.Context(), userID)
-
-	h.notifyScoreboardChanged(ctx.Request.Context(), "user_profile_update", user.DivisionID)
-
+	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
 	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
 }
-
-// Challenge Handlers
 
 func (h *Handler) ListChallenges(ctx *gin.Context) {
 	state, ok := h.wargameState(ctx)
 	if !ok {
 		return
 	}
-
 	if state == service.WargameStateNotStarted {
 		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
 		return
 	}
 
-	divisionID, ok := h.resolveDivisionID(ctx, true)
-	if !ok {
-		return
-	}
-
-	challenges, err := h.wargame.ListChallenges(ctx.Request.Context(), divisionID)
+	challenges, err := h.wargame.ListChallenges(ctx.Request.Context())
 	if err != nil {
 		writeError(ctx, err)
 		return
@@ -522,7 +302,6 @@ func (h *Handler) ListChallenges(ctx *gin.Context) {
 
 	userID := h.optionalUserID(ctx)
 	solved := map[int64]struct{}{}
-
 	hasPrereq := false
 	for i := range challenges {
 		if challenges[i].PreviousChallengeID != nil && *challenges[i].PreviousChallengeID > 0 {
@@ -530,9 +309,8 @@ func (h *Handler) ListChallenges(ctx *gin.Context) {
 			break
 		}
 	}
-
 	if userID > 0 && hasPrereq {
-		solved, err = h.wargame.TeamSolvedChallengeIDs(ctx.Request.Context(), userID)
+		solved, err = h.wargame.SolvedChallengeIDs(ctx.Request.Context(), userID)
 		if err != nil {
 			writeError(ctx, err)
 			return
@@ -544,7 +322,6 @@ func (h *Handler) ListChallenges(ctx *gin.Context) {
 	for i := range challenges {
 		byID[challenges[i].ID] = &challenges[i]
 	}
-
 	for _, challenge := range challenges {
 		ch := challenge
 		if isChallengeLocked(ch, solved, userID) {
@@ -552,11 +329,9 @@ func (h *Handler) ListChallenges(ctx *gin.Context) {
 			if ch.PreviousChallengeID != nil {
 				previous = byID[*ch.PreviousChallengeID]
 			}
-
 			resp = append(resp, newLockedChallengeResponse(&ch, previous))
 			continue
 		}
-
 		resp = append(resp, newChallengeResponse(&ch))
 	}
 
@@ -568,7 +343,6 @@ func (h *Handler) SubmitFlag(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-
 	if state != service.WargameStateActive {
 		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
 		return
@@ -578,7 +352,6 @@ func (h *Handler) SubmitFlag(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-
 	var req submitRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		writeBindError(ctx, err)
@@ -590,24 +363,13 @@ func (h *Handler) SubmitFlag(ctx *gin.Context) {
 		writeError(ctx, err)
 		return
 	}
-
 	if correct {
-		divisionID, err := h.users.GetDivisionID(ctx.Request.Context(), middleware.UserID(ctx))
-		if err != nil {
-			h.notifyScoreboardChanged(ctx.Request.Context(), "submission_correct")
-		} else {
-			h.notifyScoreboardChanged(ctx.Request.Context(), "submission_correct", divisionID)
-		}
-
+		h.notifyScoreboardChanged(ctx.Request.Context(), "submission_correct")
 		if h.stacks != nil {
 			_ = h.stacks.DeleteStackByUserAndChallenge(ctx.Request.Context(), middleware.UserID(ctx), challengeID)
 		}
 	}
-
-	ctx.JSON(http.StatusOK, gin.H{
-		"correct":       correct,
-		"wargame_state": string(state),
-	})
+	ctx.JSON(http.StatusOK, gin.H{"correct": correct, "wargame_state": string(state)})
 }
 
 func (h *Handler) CreateStack(ctx *gin.Context) {
@@ -615,28 +377,23 @@ func (h *Handler) CreateStack(ctx *gin.Context) {
 		writeError(ctx, service.ErrStackDisabled)
 		return
 	}
-
 	state, ok := h.wargameState(ctx)
 	if !ok {
 		return
 	}
-
 	if state != service.WargameStateActive {
 		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
 		return
 	}
-
 	challengeID, ok := parseIDParamOrError(ctx, "id")
 	if !ok {
 		return
 	}
-
 	stackModel, err := h.stacks.GetOrCreateStack(ctx.Request.Context(), middleware.UserID(ctx), challengeID)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	ctx.JSON(http.StatusCreated, newStackResponse(stackModel, string(state)))
 }
 
@@ -645,28 +402,23 @@ func (h *Handler) GetStack(ctx *gin.Context) {
 		writeError(ctx, service.ErrStackDisabled)
 		return
 	}
-
 	state, ok := h.wargameState(ctx)
 	if !ok {
 		return
 	}
-
 	if state == service.WargameStateNotStarted {
 		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
 		return
 	}
-
 	challengeID, ok := parseIDParamOrError(ctx, "id")
 	if !ok {
 		return
 	}
-
 	stackModel, err := h.stacks.GetStack(ctx.Request.Context(), middleware.UserID(ctx), challengeID)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	ctx.JSON(http.StatusOK, newStackResponse(stackModel, string(state)))
 }
 
@@ -675,27 +427,22 @@ func (h *Handler) DeleteStack(ctx *gin.Context) {
 		writeError(ctx, service.ErrStackDisabled)
 		return
 	}
-
 	state, ok := h.wargameState(ctx)
 	if !ok {
 		return
 	}
-
 	if state == service.WargameStateNotStarted {
 		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
 		return
 	}
-
 	challengeID, ok := parseIDParamOrError(ctx, "id")
 	if !ok {
 		return
 	}
-
 	if err := h.stacks.DeleteStack(ctx.Request.Context(), middleware.UserID(ctx), challengeID); err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	ctx.JSON(http.StatusOK, gin.H{"status": "ok", "wargame_state": string(state)})
 }
 
@@ -704,29 +451,24 @@ func (h *Handler) ListStacks(ctx *gin.Context) {
 		writeError(ctx, service.ErrStackDisabled)
 		return
 	}
-
 	state, ok := h.wargameState(ctx)
 	if !ok {
 		return
 	}
-
 	if state == service.WargameStateNotStarted {
 		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
 		return
 	}
-
 	stacks, err := h.stacks.ListUserStacks(ctx.Request.Context(), middleware.UserID(ctx))
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	resp := make([]stackResponse, 0, len(stacks))
 	for i := range stacks {
 		stackModel := stacks[i]
 		resp = append(resp, newStackResponse(&stackModel, string(state)))
 	}
-
 	ctx.JSON(http.StatusOK, stacksListResponse{WargameState: string(state), Stacks: resp})
 }
 
@@ -735,18 +477,15 @@ func (h *Handler) AdminListStacks(ctx *gin.Context) {
 		writeError(ctx, service.ErrStackDisabled)
 		return
 	}
-
 	stacks, err := h.stacks.ListAdminStacks(ctx.Request.Context())
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	resp := make([]adminStackResponse, 0, len(stacks))
 	for i := range stacks {
 		resp = append(resp, newAdminStackResponse(stacks[i]))
 	}
-
 	ctx.JSON(http.StatusOK, adminStacksListResponse{Stacks: resp})
 }
 
@@ -755,18 +494,15 @@ func (h *Handler) AdminDeleteStack(ctx *gin.Context) {
 		writeError(ctx, service.ErrStackDisabled)
 		return
 	}
-
 	stackID := strings.TrimSpace(ctx.Param("stack_id"))
 	if stackID == "" {
 		writeError(ctx, service.NewValidationError(service.FieldError{Field: "stack_id", Reason: "required"}))
 		return
 	}
-
 	if err := h.stacks.DeleteStackByStackID(ctx.Request.Context(), stackID); err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	ctx.JSON(http.StatusOK, gin.H{"deleted": true, "stack_id": stackID})
 }
 
@@ -775,19 +511,16 @@ func (h *Handler) AdminGetStack(ctx *gin.Context) {
 		writeError(ctx, service.ErrStackDisabled)
 		return
 	}
-
 	stackID := strings.TrimSpace(ctx.Param("stack_id"))
 	if stackID == "" {
 		writeError(ctx, service.NewValidationError(service.FieldError{Field: "stack_id", Reason: "required"}))
 		return
 	}
-
 	stackModel, err := h.stacks.GetStackByStackID(ctx.Request.Context(), stackID)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	ctx.JSON(http.StatusOK, newStackResponse(stackModel, ""))
 }
 
@@ -796,62 +529,37 @@ func (h *Handler) AdminReport(ctx *gin.Context) {
 		writeError(ctx, service.ErrStackDisabled)
 		return
 	}
-
-	challenges, err := h.wargame.ListChallenges(ctx.Request.Context(), nil)
+	challenges, err := h.wargame.ListChallenges(ctx.Request.Context())
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	divisions, err := h.divs.ListDivisions(ctx.Request.Context())
+	users, err := h.users.List(ctx.Request.Context())
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	teams, err := h.teams.ListTeams(ctx.Request.Context(), nil)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	users, err := h.users.List(ctx.Request.Context(), nil)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
 	stacks, err := h.stacks.ListAllStacks(ctx.Request.Context())
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	keys, err := h.auth.ListRegistrationKeys(ctx.Request.Context())
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
 	submissions, err := h.wargame.ListAllSubmissions(ctx.Request.Context())
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	appConfigs, err := h.app.GetAllRows(ctx.Request.Context())
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	leaderboard, err := h.score.Leaderboard(ctx.Request.Context(), nil)
+	leaderboard, err := h.score.Leaderboard(ctx.Request.Context())
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	teamLeaderboard, err := h.score.TeamLeaderboard(ctx.Request.Context(), nil)
+	userTimeline, err := h.score.UserTimeline(ctx.Request.Context(), nil)
 	if err != nil {
 		writeError(ctx, err)
 		return
@@ -861,46 +569,16 @@ func (h *Handler) AdminReport(ctx *gin.Context) {
 	for i := range challenges {
 		reportChallenges = append(reportChallenges, newAdminReportChallenge(challenges[i]))
 	}
-
 	reportUsers := make([]adminReportUser, 0, len(users))
 	for i := range users {
 		reportUsers = append(reportUsers, newAdminReportUser(users[i]))
 	}
-
 	reportSubmissions := make([]adminReportSubmission, 0, len(submissions))
 	for i := range submissions {
 		reportSubmissions = append(reportSubmissions, newAdminReportSubmission(submissions[i]))
 	}
 
-	userTimeline, err := h.score.UserTimeline(ctx.Request.Context(), nil, nil)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	teamTimelineRows, err := h.score.TeamTimeline(ctx.Request.Context(), nil, nil)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	timeline := timelineResponse{Submissions: userTimeline}
-	teamTimeline := teamTimelineResponse{Submissions: teamTimelineRows}
-
-	ctx.JSON(http.StatusOK, adminReportResponse{
-		Challenges:       reportChallenges,
-		Divisions:        divisions,
-		Teams:            teams,
-		Users:            reportUsers,
-		Stacks:           stacks,
-		RegistrationKeys: keys,
-		Submissions:      reportSubmissions,
-		AppConfig:        appConfigs,
-		Timeline:         timeline,
-		TeamTimeline:     teamTimeline,
-		Leaderboard:      leaderboard,
-		TeamLeaderboard:  teamLeaderboard,
-	})
+	ctx.JSON(http.StatusOK, adminReportResponse{Challenges: reportChallenges, Users: reportUsers, Stacks: stacks, Submissions: reportSubmissions, AppConfig: appConfigs, Timeline: timelineResponse{Submissions: userTimeline}, Leaderboard: leaderboard})
 }
 
 func (h *Handler) CreateChallenge(ctx *gin.Context) {
@@ -909,28 +587,23 @@ func (h *Handler) CreateChallenge(ctx *gin.Context) {
 		writeBindError(ctx, err)
 		return
 	}
-
 	active := true
 	if req.IsActive != nil {
 		active = *req.IsActive
 	}
-
 	minimumPoints := req.Points
 	if req.MinimumPoints != nil {
 		minimumPoints = *req.MinimumPoints
 	}
-
 	stackEnabled := false
 	if req.StackEnabled != nil {
 		stackEnabled = *req.StackEnabled
 	}
-
 	challenge, err := h.wargame.CreateChallenge(ctx.Request.Context(), req.Title, req.Description, req.Category, req.Points, minimumPoints, req.Flag, active, stackEnabled, stack.TargetPortSpecs(req.StackTargetPorts), req.StackPodSpec, req.PreviousChallengeID)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	h.notifyScoreboardChanged(ctx.Request.Context(), "challenge_created")
 	ctx.JSON(http.StatusCreated, newChallengeResponse(challenge))
 }
@@ -940,39 +613,32 @@ func (h *Handler) UpdateChallenge(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-
 	var req updateChallengeRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		writeBindError(ctx, err)
 		return
 	}
-
 	title, err := requireNonNullOptionalString("title", req.Title)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	description, err := requireNonNullOptionalString("description", req.Description)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	category, err := requireNonNullOptionalString("category", req.Category)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	flag, err := requireNonNullOptionalString("flag", req.Flag)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	stackPodSpec := optionalStringToPointer(req.StackPodSpec)
-
 	previousChallengeID := (*int64)(nil)
 	previousChallengeSet := req.PreviousChallengeID.Set
 	if previousChallengeSet {
@@ -993,11 +659,9 @@ func requireNonNullOptionalString(field string, value optionalString) (*string, 
 	if !value.Set {
 		return nil, nil
 	}
-
 	if value.Value == nil {
 		return nil, service.NewValidationError(service.FieldError{Field: field, Reason: "invalid"})
 	}
-
 	return value.Value, nil
 }
 
@@ -1005,12 +669,10 @@ func optionalStringToPointer(value optionalString) *string {
 	if !value.Set {
 		return nil
 	}
-
 	if value.Value == nil {
 		empty := ""
 		return &empty
 	}
-
 	return value.Value
 }
 
@@ -1019,19 +681,12 @@ func (h *Handler) AdminGetChallenge(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-
 	challenge, err := h.wargame.GetChallengeByID(ctx.Request.Context(), challengeID)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	resp := adminChallengeResponse{
-		challengeResponse: newChallengeResponse(challenge),
-		StackPodSpec:      challenge.StackPodSpec,
-	}
-
-	ctx.JSON(http.StatusOK, resp)
+	ctx.JSON(http.StatusOK, adminChallengeResponse{challengeResponse: newChallengeResponse(challenge), StackPodSpec: challenge.StackPodSpec})
 }
 
 func (h *Handler) DeleteChallenge(ctx *gin.Context) {
@@ -1039,12 +694,10 @@ func (h *Handler) DeleteChallenge(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-
 	if err := h.wargame.DeleteChallenge(ctx.Request.Context(), challengeID); err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	h.notifyScoreboardChanged(ctx.Request.Context(), "challenge_deleted")
 	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
@@ -1054,27 +707,17 @@ func (h *Handler) RequestChallengeFileUpload(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-
 	var req challengeFileUploadRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		writeBindError(ctx, err)
 		return
 	}
-
 	challenge, upload, err := h.wargame.RequestChallengeFileUpload(ctx.Request.Context(), challengeID, req.Filename)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	ctx.JSON(http.StatusOK, challengeFileUploadResponse{
-		Challenge: newChallengeResponse(challenge),
-		Upload: presignedPostResponse{
-			URL:       upload.URL,
-			Fields:    upload.Fields,
-			ExpiresAt: upload.ExpiresAt,
-		},
-	})
+	ctx.JSON(http.StatusOK, challengeFileUploadResponse{Challenge: newChallengeResponse(challenge), Upload: presignedPostResponse{URL: upload.URL, Fields: upload.Fields, ExpiresAt: upload.ExpiresAt}})
 }
 
 func (h *Handler) RequestChallengeFileDownload(ctx *gin.Context) {
@@ -1082,28 +725,20 @@ func (h *Handler) RequestChallengeFileDownload(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-
 	if state == service.WargameStateNotStarted {
 		ctx.JSON(http.StatusOK, wargameStateResponse{WargameState: string(state)})
 		return
 	}
-
 	challengeID, ok := parseIDParamOrError(ctx, "id")
 	if !ok {
 		return
 	}
-
 	download, err := h.wargame.RequestChallengeFileDownload(ctx.Request.Context(), middleware.UserID(ctx), challengeID)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	ctx.JSON(http.StatusOK, presignedURLResponse{
-		URL:          download.URL,
-		ExpiresAt:    download.ExpiresAt,
-		WargameState: string(state),
-	})
+	ctx.JSON(http.StatusOK, presignedURLResponse{URL: download.URL, ExpiresAt: download.ExpiresAt, WargameState: string(state)})
 }
 
 func (h *Handler) DeleteChallengeFile(ctx *gin.Context) {
@@ -1111,382 +746,54 @@ func (h *Handler) DeleteChallengeFile(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-
 	challenge, err := h.wargame.DeleteChallengeFile(ctx.Request.Context(), challengeID)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	ctx.JSON(http.StatusOK, newChallengeResponse(challenge))
 }
 
-// Registration Key Handlers
-
-func (h *Handler) CreateRegistrationKeys(ctx *gin.Context) {
-	var req createRegistrationKeysRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		writeBindError(ctx, err)
-		return
-	}
-
-	count := 0
-	if req.Count != nil {
-		count = *req.Count
-	}
-
-	maxUses := 1
-	if req.MaxUses != nil {
-		maxUses = *req.MaxUses
-	}
-
-	if req.TeamID == nil {
-		writeError(ctx, service.NewValidationError(service.FieldError{Field: "team_id", Reason: "required"}))
-		return
-	}
-
-	teamID := *req.TeamID
-	adminID := middleware.UserID(ctx)
-	admin, err := h.users.GetByID(ctx.Request.Context(), adminID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	keys, err := h.auth.CreateRegistrationKeys(ctx.Request.Context(), adminID, count, teamID, maxUses)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	team, err := h.teams.GetTeam(ctx.Request.Context(), teamID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	resp := make([]models.RegistrationKeySummary, 0, len(keys))
-	for _, key := range keys {
-		resp = append(resp, models.RegistrationKeySummary{
-			ID:                key.ID,
-			Code:              key.Code,
-			CreatedBy:         key.CreatedBy,
-			CreatedByUsername: admin.Username,
-			TeamID:            key.TeamID,
-			TeamName:          team.Name,
-			MaxUses:           key.MaxUses,
-			UsedCount:         key.UsedCount,
-			CreatedAt:         key.CreatedAt,
-		})
-	}
-
-	ctx.JSON(http.StatusCreated, resp)
-}
-
-func (h *Handler) ListRegistrationKeys(ctx *gin.Context) {
-	rows, err := h.auth.ListRegistrationKeys(ctx.Request.Context())
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, rows)
-}
-
-func (h *Handler) AdminMoveUserTeam(ctx *gin.Context) {
-	userID, ok := parseIDParamOrError(ctx, "id")
-	if !ok {
-		return
-	}
-
-	var req adminMoveUserTeamRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		writeBindError(ctx, err)
-		return
-	}
-
-	beforeDivisionID, err := h.users.GetDivisionID(ctx.Request.Context(), userID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	updated, err := h.users.MoveUserTeam(ctx.Request.Context(), userID, req.TeamID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	if updated.DivisionID != beforeDivisionID {
-		h.notifyScoreboardChanged(ctx.Request.Context(), "user_team_moved", beforeDivisionID, updated.DivisionID)
-	} else {
-		h.notifyScoreboardChanged(ctx.Request.Context(), "user_team_moved", updated.DivisionID)
-	}
-
-	ctx.JSON(http.StatusOK, newAdminUserResponse(updated))
-}
-
-func (h *Handler) AdminBlockUser(ctx *gin.Context) {
-	userID, ok := parseIDParamOrError(ctx, "id")
-	if !ok {
-		return
-	}
-
-	var req adminBlockUserRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		writeBindError(ctx, err)
-		return
-	}
-
-	updated, err := h.users.BlockUser(ctx.Request.Context(), userID, req.Reason)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	h.notifyScoreboardChanged(ctx.Request.Context(), "user_blocked", updated.DivisionID)
-
-	ctx.JSON(http.StatusOK, newAdminUserResponse(updated))
-}
-
-func (h *Handler) AdminUnblockUser(ctx *gin.Context) {
-	userID, ok := parseIDParamOrError(ctx, "id")
-	if !ok {
-		return
-	}
-
-	updated, err := h.users.UnblockUser(ctx.Request.Context(), userID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	h.notifyScoreboardChanged(ctx.Request.Context(), "user_unblocked", updated.DivisionID)
-
-	ctx.JSON(http.StatusOK, newAdminUserResponse(updated))
-}
-
-// Scoreboard Handlers
-
 func (h *Handler) Leaderboard(ctx *gin.Context) {
-	divisionID, ok := h.resolveDivisionID(ctx, true)
-	if !ok {
-		return
-	}
-
-	cacheKey := cacheKeyWithDivision("leaderboard:users", divisionID)
+	cacheKey := "leaderboard:users"
 	if h.respondFromCache(ctx, cacheKey) {
 		return
 	}
-
-	rows, err := h.score.Leaderboard(ctx.Request.Context(), divisionID)
+	rows, err := h.score.Leaderboard(ctx.Request.Context())
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	h.storeCache(ctx, cacheKey, rows, h.cfg.Cache.LeaderboardTTL)
-	ctx.JSON(http.StatusOK, rows)
-}
-
-func (h *Handler) TeamLeaderboard(ctx *gin.Context) {
-	divisionID, ok := h.resolveDivisionID(ctx, true)
-	if !ok {
-		return
-	}
-
-	cacheKey := cacheKeyWithDivision("leaderboard:teams", divisionID)
-	if h.respondFromCache(ctx, cacheKey) {
-		return
-	}
-
-	rows, err := h.score.TeamLeaderboard(ctx.Request.Context(), divisionID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
 	h.storeCache(ctx, cacheKey, rows, h.cfg.Cache.LeaderboardTTL)
 	ctx.JSON(http.StatusOK, rows)
 }
 
 func (h *Handler) Timeline(ctx *gin.Context) {
-	divisionID, ok := h.resolveDivisionID(ctx, true)
-	if !ok {
-		return
-	}
-
-	cacheKey := cacheKeyWithDivision("timeline:users", divisionID)
+	cacheKey := "timeline:users"
 	if h.respondFromCache(ctx, cacheKey) {
 		return
 	}
-
-	submissions, err := h.score.UserTimeline(ctx.Request.Context(), nil, divisionID)
+	submissions, err := h.score.UserTimeline(ctx.Request.Context(), nil)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	response := timelineResponse{Submissions: submissions}
 	h.storeCache(ctx, cacheKey, response, h.cfg.Cache.TimelineTTL)
-
 	ctx.JSON(http.StatusOK, response)
 }
-
-func (h *Handler) TeamTimeline(ctx *gin.Context) {
-	divisionID, ok := h.resolveDivisionID(ctx, true)
-	if !ok {
-		return
-	}
-
-	cacheKey := cacheKeyWithDivision("timeline:teams", divisionID)
-	if h.respondFromCache(ctx, cacheKey) {
-		return
-	}
-
-	submissions, err := h.score.TeamTimeline(ctx.Request.Context(), nil, divisionID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	response := teamTimelineResponse{Submissions: submissions}
-
-	h.storeCache(ctx, cacheKey, response, h.cfg.Cache.TimelineTTL)
-
-	ctx.JSON(http.StatusOK, response)
-}
-
-// Division Handlers
-
-func (h *Handler) ListDivisions(ctx *gin.Context) {
-	rows, err := h.divs.ListDivisions(ctx.Request.Context())
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, rows)
-}
-
-func (h *Handler) CreateDivision(ctx *gin.Context) {
-	var req createDivisionRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		writeBindError(ctx, err)
-		return
-	}
-
-	division, err := h.divs.CreateDivision(ctx.Request.Context(), req.Name)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	ctx.JSON(http.StatusCreated, division)
-}
-
-// Team Handlers
-
-func (h *Handler) CreateTeam(ctx *gin.Context) {
-	var req createTeamRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		writeBindError(ctx, err)
-		return
-	}
-
-	team, err := h.teams.CreateTeam(ctx.Request.Context(), req.Name, req.DivisionID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	h.notifyScoreboardChanged(ctx.Request.Context(), "team_created", team.DivisionID)
-
-	ctx.JSON(http.StatusCreated, newTeamResponse(team))
-}
-
-func (h *Handler) ListTeams(ctx *gin.Context) {
-	divisionID, err := parseOptionalPositiveIDQuery(ctx, "division_id")
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	teams, err := h.teams.ListTeams(ctx.Request.Context(), divisionID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, teams)
-}
-
-func (h *Handler) GetTeam(ctx *gin.Context) {
-	teamID, ok := parseIDParamOrError(ctx, "id")
-	if !ok {
-		return
-	}
-
-	team, err := h.teams.GetTeam(ctx.Request.Context(), teamID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, team)
-}
-
-func (h *Handler) ListTeamMembers(ctx *gin.Context) {
-	teamID, ok := parseIDParamOrError(ctx, "id")
-	if !ok {
-		return
-	}
-
-	rows, err := h.teams.ListMembers(ctx.Request.Context(), teamID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, rows)
-}
-
-func (h *Handler) ListTeamSolved(ctx *gin.Context) {
-	teamID, ok := parseIDParamOrError(ctx, "id")
-	if !ok {
-		return
-	}
-
-	rows, err := h.teams.ListSolvedChallenges(ctx.Request.Context(), teamID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, rows)
-}
-
-// User Handlers
 
 func (h *Handler) ListUsers(ctx *gin.Context) {
-	divisionID, err := parseOptionalPositiveIDQuery(ctx, "division_id")
+	users, err := h.users.List(ctx.Request.Context())
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	users, err := h.users.List(ctx.Request.Context(), divisionID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
 	resp := make([]userDetailResponse, 0, len(users))
 	for _, user := range users {
 		u := user
 		resp = append(resp, newUserDetailResponse(&u))
 	}
-
 	ctx.JSON(http.StatusOK, resp)
 }
 
@@ -1495,13 +802,11 @@ func (h *Handler) GetUser(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-
 	user, err := h.users.GetByID(ctx.Request.Context(), userID)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
 	ctx.JSON(http.StatusOK, newUserDetailResponse(user))
 }
 
@@ -1510,24 +815,47 @@ func (h *Handler) GetUserSolved(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-
-	_, err := h.users.GetByID(ctx.Request.Context(), userID)
+	if _, err := h.users.GetByID(ctx.Request.Context(), userID); err != nil {
+		writeError(ctx, err)
+		return
+	}
+	rows, err := h.wargame.SolvedChallenges(ctx.Request.Context(), userID)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-
-	divisionID, err := h.users.GetDivisionID(ctx.Request.Context(), userID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
-	rows, err := h.wargame.SolvedChallenges(ctx.Request.Context(), userID, &divisionID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
 	ctx.JSON(http.StatusOK, rows)
+}
+
+func (h *Handler) AdminBlockUser(ctx *gin.Context) {
+	userID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+	var req adminBlockUserRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+	updated, err := h.users.BlockUser(ctx.Request.Context(), userID, req.Reason)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+	h.notifyScoreboardChanged(ctx.Request.Context(), "user_blocked")
+	ctx.JSON(http.StatusOK, newAdminUserResponse(updated))
+}
+
+func (h *Handler) AdminUnblockUser(ctx *gin.Context) {
+	userID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+	updated, err := h.users.UnblockUser(ctx.Request.Context(), userID)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+	h.notifyScoreboardChanged(ctx.Request.Context(), "user_unblocked")
+	ctx.JSON(http.StatusOK, newAdminUserResponse(updated))
 }

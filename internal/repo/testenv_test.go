@@ -19,16 +19,12 @@ import (
 )
 
 type repoEnv struct {
-	cfg               config.Config
-	db                *bun.DB
-	userRepo          *UserRepo
-	regKeyRepo        *RegistrationKeyRepo
-	divisionRepo      *DivisionRepo
-	teamRepo          *TeamRepo
-	challengeRepo     *ChallengeRepo
-	submissionRepo    *SubmissionRepo
-	stackRepo         *StackRepo
-	defaultDivisionID int64
+	cfg            config.Config
+	db             *bun.DB
+	userRepo       *UserRepo
+	challengeRepo  *ChallengeRepo
+	submissionRepo *SubmissionRepo
+	stackRepo      *StackRepo
 }
 
 var (
@@ -146,36 +142,24 @@ func setupRepoTest(t *testing.T) repoEnv {
 		cfg:            repoCfg,
 		db:             repoDB,
 		userRepo:       NewUserRepo(repoDB),
-		regKeyRepo:     NewRegistrationKeyRepo(repoDB),
-		divisionRepo:   NewDivisionRepo(repoDB),
-		teamRepo:       NewTeamRepo(repoDB),
 		challengeRepo:  NewChallengeRepo(repoDB),
 		submissionRepo: NewSubmissionRepo(repoDB),
 		stackRepo:      NewStackRepo(repoDB),
 	}
-
-	division := &models.Division{
-		Name:      "Default",
-		CreatedAt: time.Now().UTC(),
-	}
-	if err := env.divisionRepo.Create(context.Background(), division); err != nil {
-		t.Fatalf("create division: %v", err)
-	}
-
-	env.defaultDivisionID = division.ID
 
 	return env
 }
 
 func resetRepoState(t *testing.T) {
 	t.Helper()
-	if _, err := repoDB.ExecContext(context.Background(), "TRUNCATE TABLE app_configs, submissions, registration_key_uses, registration_keys, stacks, challenges, users, teams, divisions RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := repoDB.ExecContext(context.Background(), "TRUNCATE TABLE app_configs, submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 }
 
-func createUserWithTeam(t *testing.T, env repoEnv, email, username, password, role string, teamID int64) *models.User {
+func createUser(t *testing.T, env repoEnv, email, username, password, role string) *models.User {
 	t.Helper()
+
 	hash, err := auth.HashPassword(password, env.cfg.BcryptCost)
 	if err != nil {
 		t.Fatalf("hash password: %v", err)
@@ -186,10 +170,10 @@ func createUserWithTeam(t *testing.T, env repoEnv, email, username, password, ro
 		Username:     username,
 		PasswordHash: hash,
 		Role:         role,
-		TeamID:       teamID,
 		CreatedAt:    time.Now().UTC(),
 		UpdatedAt:    time.Now().UTC(),
 	}
+
 	if err := env.userRepo.Create(context.Background(), user); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -197,53 +181,9 @@ func createUserWithTeam(t *testing.T, env repoEnv, email, username, password, ro
 	return user
 }
 
-func createUserWithNewTeam(t *testing.T, env repoEnv, email, username, password, role string) *models.User {
+func createUserForTestUserScope(t *testing.T, env repoEnv, email, username, password, role string) *models.User {
 	t.Helper()
-	team := createTeam(t, env, "team-"+username)
-	return createUserWithTeam(t, env, email, username, password, role, team.ID)
-}
-
-func createTeam(t *testing.T, env repoEnv, name string) *models.Team {
-	t.Helper()
-	team := &models.Team{
-		Name:       name,
-		DivisionID: env.defaultDivisionID,
-		CreatedAt:  time.Now().UTC(),
-	}
-	if err := env.teamRepo.Create(context.Background(), team); err != nil {
-		t.Fatalf("create team: %v", err)
-	}
-
-	return team
-}
-
-func createDivision(t *testing.T, env repoEnv, name string) *models.Division {
-	t.Helper()
-
-	division := &models.Division{
-		Name:      name,
-		CreatedAt: time.Now().UTC(),
-	}
-	if err := env.divisionRepo.Create(context.Background(), division); err != nil {
-		t.Fatalf("create division: %v", err)
-	}
-
-	return division
-}
-
-func createTeamInDivision(t *testing.T, env repoEnv, name string, divisionID int64) *models.Team {
-	t.Helper()
-
-	team := &models.Team{
-		Name:       name,
-		DivisionID: divisionID,
-		CreatedAt:  time.Now().UTC(),
-	}
-	if err := env.teamRepo.Create(context.Background(), team); err != nil {
-		t.Fatalf("create team: %v", err)
-	}
-
-	return team
+	return createUser(t, env, email, username, password, role)
 }
 
 func createChallenge(t *testing.T, env repoEnv, title string, points int, flag string, active bool) *models.Challenge {

@@ -103,7 +103,6 @@ type StackConfig struct {
 }
 
 type BootstrapConfig struct {
-	AdminTeamEnabled bool
 	AdminUserEnabled bool
 	AdminEmail       string
 	AdminPassword    string
@@ -230,7 +229,7 @@ func Load() (Config, error) {
 		errs = append(errs, err)
 	}
 
-	stackMaxScope := strings.ToLower(strings.TrimSpace(getEnv("STACKS_MAX_SCOPE", "team")))
+	stackMaxScope := strings.ToLower(strings.TrimSpace(getEnv("STACKS_MAX_SCOPE", "user")))
 
 	stackMaxPer, err := getEnvInt("STACKS_MAX_PER", 3)
 	if err != nil {
@@ -255,11 +254,6 @@ func Load() (Config, error) {
 	}
 
 	stackCreateMax, err := getEnvInt("STACKS_CREATE_MAX", 1)
-	if err != nil {
-		errs = append(errs, err)
-	}
-
-	bootstrapAdminTeamEnabled, err := getEnvBool("BOOTSTRAP_ADMIN_TEAM", true)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -338,7 +332,6 @@ func Load() (Config, error) {
 			CreateMax:           stackCreateMax,
 		},
 		Bootstrap: BootstrapConfig{
-			AdminTeamEnabled: bootstrapAdminTeamEnabled,
 			AdminUserEnabled: bootstrapAdminUserEnabled,
 			AdminEmail:       getEnv("BOOTSTRAP_ADMIN_EMAIL", ""),
 			AdminPassword:    getEnv("BOOTSTRAP_ADMIN_PASSWORD", ""),
@@ -494,8 +487,8 @@ func validateConfig(cfg Config) error {
 		if cfg.Stack.MaxPer <= 0 {
 			errs = append(errs, errors.New("STACKS_MAX_PER must be positive"))
 		}
-		if cfg.Stack.MaxScope != "user" && cfg.Stack.MaxScope != "team" {
-			errs = append(errs, errors.New("STACKS_MAX_SCOPE must be user or team"))
+		if cfg.Stack.MaxScope != "user" {
+			errs = append(errs, errors.New("STACKS_MAX_SCOPE must be user"))
 		}
 		if cfg.Stack.ProvisionerUseGRPC {
 			if cfg.Stack.ProvisionerGRPCAddr == "" {
@@ -641,7 +634,6 @@ func FormatForLog(cfg Config) map[string]any {
 			"create_max":            cfg.Stack.CreateMax,
 		},
 		"bootstrap": map[string]any{
-			"admin_team_enabled": cfg.Bootstrap.AdminTeamEnabled,
 			"admin_user_enabled": cfg.Bootstrap.AdminUserEnabled,
 			"admin_username":     cfg.Bootstrap.AdminUsername,
 			"admin_email":        cfg.Bootstrap.AdminEmail,

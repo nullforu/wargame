@@ -2,7 +2,6 @@ package http_test
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -26,7 +25,7 @@ func TestScoreboard(t *testing.T) {
 	createSubmission(t, env, user2.ID, challenge2.ID, true, time.Now().UTC())
 	createSubmission(t, env, blocked.ID, challenge2.ID, true, time.Now().UTC())
 
-	rec := doRequest(t, env.router, http.MethodGet, fmt.Sprintf("/api/leaderboard?division_id=%d", env.defaultDivisionID), nil, nil)
+	rec := doRequest(t, env.router, http.MethodGet, "/api/leaderboard", nil, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
@@ -40,90 +39,6 @@ func TestScoreboard(t *testing.T) {
 
 	if resp.Entries[0].UserID != user2.ID || resp.Entries[0].Score != 300 {
 		t.Fatalf("unexpected first row: %+v", resp.Entries[0])
-	}
-}
-
-func TestScoreboardTeams(t *testing.T) {
-	env := setupTest(t, testCfg)
-	teamA := createTeam(t, env, "Alpha")
-	teamB := createTeam(t, env, "Beta")
-	user1 := createUserWithTeam(t, env, "u1@example.com", "u1", "pass", models.UserRole, teamA.ID)
-	user2 := createUserWithTeam(t, env, "u2@example.com", "u2", "pass", models.UserRole, teamB.ID)
-	user3 := createUser(t, env, "u3@example.com", "u3", "pass", models.UserRole)
-	blocked := createUserWithTeam(t, env, "blocked@example.com", models.BlockedRole, "pass", models.UserRole, teamB.ID)
-	blocked.Role = models.BlockedRole
-	if err := env.userRepo.Update(context.Background(), blocked); err != nil {
-		t.Fatalf("block user: %v", err)
-	}
-	challenge1 := createChallenge(t, env, "Ch1", 100, "flag{1}", true)
-	challenge2 := createChallenge(t, env, "Ch2", 50, "flag{2}", true)
-
-	createSubmission(t, env, user1.ID, challenge1.ID, true, time.Now().UTC())
-	createSubmission(t, env, user2.ID, challenge2.ID, true, time.Now().UTC())
-	createSubmission(t, env, user3.ID, challenge2.ID, true, time.Now().UTC())
-	createSubmission(t, env, blocked.ID, challenge2.ID, true, time.Now().UTC())
-
-	rec := doRequest(t, env.router, http.MethodGet, fmt.Sprintf("/api/leaderboard/teams?division_id=%d", env.defaultDivisionID), nil, nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	var resp models.TeamLeaderboardResponse
-	decodeJSON(t, rec, &resp)
-
-	if len(resp.Entries) != 3 {
-		t.Fatalf("expected 3 rows, got %d", len(resp.Entries))
-	}
-
-	if resp.Entries[0].TeamName != "Alpha" || resp.Entries[0].Score != 100 {
-		t.Fatalf("unexpected first row: %+v", resp.Entries[0])
-	}
-
-	if resp.Entries[2].TeamName != "team-u3" || resp.Entries[2].Score != 50 {
-		t.Fatalf("unexpected last row: %+v", resp.Entries[2])
-	}
-}
-
-func TestScoreboardTeamTimeline(t *testing.T) {
-	env := setupTest(t, testCfg)
-	teamA := createTeam(t, env, "Alpha")
-	user1 := createUserWithTeam(t, env, "u1@example.com", "u1", "pass", models.UserRole, teamA.ID)
-	user2 := createUser(t, env, "u2@example.com", "u2", "pass", models.UserRole)
-	blocked := createUserWithTeam(t, env, "blocked@example.com", models.BlockedRole, "pass", models.UserRole, teamA.ID)
-	blocked.Role = models.BlockedRole
-	if err := env.userRepo.Update(context.Background(), blocked); err != nil {
-		t.Fatalf("block user: %v", err)
-	}
-	challenge1 := createChallenge(t, env, "Ch1", 100, "flag{1}", true)
-	challenge2 := createChallenge(t, env, "Ch2", 200, "flag{2}", true)
-
-	base := time.Date(2026, 1, 24, 12, 0, 0, 0, time.UTC)
-	createSubmission(t, env, user1.ID, challenge1.ID, true, base.Add(3*time.Minute))
-	createSubmission(t, env, user2.ID, challenge2.ID, true, base.Add(7*time.Minute))
-	createSubmission(t, env, blocked.ID, challenge1.ID, true, base.Add(5*time.Minute))
-
-	rec := doRequest(t, env.router, http.MethodGet, fmt.Sprintf("/api/timeline/teams?division_id=%d", env.defaultDivisionID), nil, nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	var resp struct {
-		Submissions []struct {
-			TeamID         int64     `json:"team_id"`
-			TeamName       string    `json:"team_name"`
-			Timestamp      time.Time `json:"timestamp"`
-			Points         int       `json:"points"`
-			ChallengeCount int       `json:"challenge_count"`
-		} `json:"submissions"`
-	}
-	decodeJSON(t, rec, &resp)
-
-	if len(resp.Submissions) != 2 {
-		t.Fatalf("expected 2 submissions, got %d", len(resp.Submissions))
-	}
-
-	if resp.Submissions[0].TeamName == "" || resp.Submissions[1].TeamName == "" {
-		t.Fatalf("unexpected submissions: %+v", resp.Submissions)
 	}
 }
 
@@ -145,7 +60,7 @@ func TestScoreboardTimeline(t *testing.T) {
 	createSubmission(t, env, user1.ID, challenge2.ID, true, base.Add(16*time.Minute))
 	createSubmission(t, env, blocked.ID, challenge2.ID, true, base.Add(20*time.Minute))
 
-	rec := doRequest(t, env.router, http.MethodGet, fmt.Sprintf("/api/timeline?division_id=%d", env.defaultDivisionID), nil, nil)
+	rec := doRequest(t, env.router, http.MethodGet, "/api/timeline", nil, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
@@ -180,8 +95,7 @@ func TestScoreboardTimeline(t *testing.T) {
 
 func TestScoreboardDynamicScoring(t *testing.T) {
 	env := setupTest(t, testCfg)
-	team := createTeam(t, env, fmt.Sprintf("Alpha-%d", time.Now().UnixNano()))
-	userTeam := createUserWithTeam(t, env, "team@example.com", "team", "pass123", models.UserRole, team.ID)
+	userA := createUser(t, env, "usera@example.com", "usera", "pass123", models.UserRole)
 	userSolo := createUser(t, env, "solo@example.com", "solo", "pass123", models.UserRole)
 	blocked := createUser(t, env, "blocked@example.com", models.BlockedRole, "pass123", models.UserRole)
 	blocked.Role = models.BlockedRole
@@ -195,11 +109,11 @@ func TestScoreboardDynamicScoring(t *testing.T) {
 		t.Fatalf("update challenge: %v", err)
 	}
 
-	createSubmission(t, env, userTeam.ID, challenge.ID, true, time.Now().UTC())
+	createSubmission(t, env, userA.ID, challenge.ID, true, time.Now().UTC())
 	createSubmission(t, env, userSolo.ID, challenge.ID, true, time.Now().UTC())
 	createSubmission(t, env, blocked.ID, challenge.ID, true, time.Now().UTC())
 
-	rec := doRequest(t, env.router, http.MethodGet, fmt.Sprintf("/api/leaderboard?division_id=%d", env.defaultDivisionID), nil, nil)
+	rec := doRequest(t, env.router, http.MethodGet, "/api/leaderboard", nil, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}

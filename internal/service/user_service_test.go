@@ -8,183 +8,76 @@ import (
 	"wargame/internal/models"
 )
 
-func TestUserServiceMoveUserTeam(t *testing.T) {
-	env := setupServiceTest(t)
-	user := createUserWithNewTeam(t, env, "move@example.com", "move", "pass", models.UserRole)
-	newTeam := createTeam(t, env, "new-team")
-
-	updated, err := env.userSvc.MoveUserTeam(context.Background(), user.ID, newTeam.ID)
-	if err != nil {
-		t.Fatalf("move user team: %v", err)
-	}
-
-	if updated.TeamID != newTeam.ID {
-		t.Fatalf("expected team id %d, got %d", newTeam.ID, updated.TeamID)
-	}
-
-	if updated.TeamName != newTeam.Name {
-		t.Fatalf("expected team name %q, got %q", newTeam.Name, updated.TeamName)
-	}
-
-	if _, err := env.userSvc.MoveUserTeam(context.Background(), user.ID, 999999); err == nil {
-		t.Fatalf("expected error for invalid team")
-	}
-}
-
-func TestUserServiceBlockUnblock(t *testing.T) {
-	env := setupServiceTest(t)
-	user := createUserWithNewTeam(t, env, "block@example.com", "block", "pass", models.UserRole)
-
-	blocked, err := env.userSvc.BlockUser(context.Background(), user.ID, "bad")
-	if err != nil {
-		t.Fatalf("block user: %v", err)
-	}
-
-	if blocked.Role != models.BlockedRole || blocked.BlockedReason == nil {
-		t.Fatalf("expected blocked user, got %+v", blocked)
-	}
-
-	unblocked, err := env.userSvc.UnblockUser(context.Background(), user.ID)
-	if err != nil {
-		t.Fatalf("unblock user: %v", err)
-	}
-
-	if unblocked.Role != models.UserRole || unblocked.BlockedReason != nil {
-		t.Fatalf("expected unblocked user, got %+v", unblocked)
-	}
-
-	admin := createUserWithNewTeam(t, env, "admin@example.com", models.AdminRole, "pass", models.AdminRole)
-	if _, err := env.userSvc.BlockUser(context.Background(), admin.ID, "bad"); err == nil {
-		t.Fatalf("expected admin block error")
-	}
-
-	if _, err := env.userSvc.UnblockUser(context.Background(), admin.ID); err == nil {
-		t.Fatalf("expected admin unblock error")
-	}
-}
-
 func TestUserServiceGetByIDListUpdateProfile(t *testing.T) {
 	env := setupServiceTest(t)
-	team := createTeam(t, env, "team-a")
-	user := createUserWithTeam(t, env, "user@example.com", models.UserRole, "pass", models.UserRole, team.ID)
+	user := createUser(t, env, "user@example.com", "user", "pass", models.UserRole)
 
 	got, err := env.userSvc.GetByID(context.Background(), user.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
-
-	if got.ID != user.ID || got.TeamName != team.Name {
+	if got.ID != user.ID {
 		t.Fatalf("unexpected user: %+v", got)
 	}
 
-	users, err := env.userSvc.List(context.Background(), nil)
+	users, err := env.userSvc.List(context.Background())
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-
 	if len(users) != 1 || users[0].ID != user.ID {
 		t.Fatalf("unexpected list: %+v", users)
 	}
 
-	updated, err := env.userSvc.UpdateProfile(context.Background(), user.ID, ptr("newname"))
+	newName := "newname"
+	updated, err := env.userSvc.UpdateProfile(context.Background(), user.ID, &newName)
 	if err != nil {
 		t.Fatalf("UpdateProfile: %v", err)
 	}
-
-	if updated.Username != "newname" {
-		t.Fatalf("expected username updated, got %s", updated.Username)
+	if updated.Username != newName {
+		t.Fatalf("expected username %q, got %q", newName, updated.Username)
 	}
 }
 
-func ptr(value string) *string {
-	return &value
-}
-
-func TestUserServiceGetDivisionID(t *testing.T) {
+func TestUserServiceBlockUnblock(t *testing.T) {
 	env := setupServiceTest(t)
-	div := env.defaultDivisionID
-	team := createTeam(t, env, "div-team")
-	user := createUserWithTeam(t, env, "div@example.com", "divuser", "pass", models.UserRole, team.ID)
+	user := createUser(t, env, "block@example.com", "block", "pass", models.UserRole)
+	admin := createUser(t, env, "admin@example.com", "admin", "pass", models.AdminRole)
 
-	got, err := env.userSvc.GetDivisionID(context.Background(), user.ID)
+	blocked, err := env.userSvc.BlockUser(context.Background(), user.ID, "policy")
 	if err != nil {
-		t.Fatalf("get division id: %v", err)
+		t.Fatalf("BlockUser: %v", err)
+	}
+	if blocked.Role != models.BlockedRole {
+		t.Fatalf("expected blocked role, got %s", blocked.Role)
 	}
 
-	if got != div {
-		t.Fatalf("expected division id %d, got %d", div, got)
+	if _, err := env.userSvc.BlockUser(context.Background(), admin.ID, "policy"); err == nil {
+		t.Fatalf("expected admin block error")
 	}
 
-	if _, err := env.userSvc.GetDivisionID(context.Background(), 0); err == nil {
-		t.Fatalf("expected validation error for invalid id")
+	unblocked, err := env.userSvc.UnblockUser(context.Background(), user.ID)
+	if err != nil {
+		t.Fatalf("UnblockUser: %v", err)
 	}
-
-	if _, err := env.userSvc.GetDivisionID(context.Background(), 999999); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("expected not found, got %v", err)
+	if unblocked.Role != models.UserRole {
+		t.Fatalf("expected user role after unblock, got %s", unblocked.Role)
 	}
 }
 
-func TestUserServiceGetByIDValidationAndNotFound(t *testing.T) {
+func TestUserServiceValidationAndNotFound(t *testing.T) {
 	env := setupServiceTest(t)
 
 	if _, err := env.userSvc.GetByID(context.Background(), 0); err == nil {
 		t.Fatalf("expected validation error")
 	}
-
 	if _, err := env.userSvc.GetByID(context.Background(), 999999); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
-}
 
-func TestUserServiceListInvalidDivisionID(t *testing.T) {
-	env := setupServiceTest(t)
-	invalid := int64(0)
-
-	if _, err := env.userSvc.List(context.Background(), &invalid); err == nil {
-		t.Fatalf("expected validation error")
+	if _, err := env.userSvc.BlockUser(context.Background(), 1, " "); err == nil {
+		t.Fatalf("expected empty reason validation error")
 	}
-}
-
-func TestUserServiceUpdateProfileWithoutUsernameChange(t *testing.T) {
-	env := setupServiceTest(t)
-	user := createUserWithNewTeam(t, env, "same@example.com", "same-user", "pass", models.UserRole)
-
-	updated, err := env.userSvc.UpdateProfile(context.Background(), user.ID, nil)
-	if err != nil {
-		t.Fatalf("UpdateProfile with nil username: %v", err)
-	}
-
-	if updated.Username != "same-user" {
-		t.Fatalf("expected username unchanged, got %q", updated.Username)
-	}
-}
-
-func TestUserServiceMoveUserTeamValidationAndNotFound(t *testing.T) {
-	env := setupServiceTest(t)
-	user := createUserWithNewTeam(t, env, "move2@example.com", "move2", "pass", models.UserRole)
-	team := createTeam(t, env, "target-team")
-
-	if _, err := env.userSvc.MoveUserTeam(context.Background(), user.ID, 0); err == nil {
-		t.Fatalf("expected validation error for team id")
-	}
-
-	if _, err := env.userSvc.MoveUserTeam(context.Background(), 999999, team.ID); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("expected ErrNotFound for missing user, got %v", err)
-	}
-}
-
-func TestUserServiceBlockUnblockValidationAndNotFound(t *testing.T) {
-	env := setupServiceTest(t)
-
-	if _, err := env.userSvc.BlockUser(context.Background(), 1, "   "); err == nil {
-		t.Fatalf("expected validation error for empty reason")
-	}
-
-	if _, err := env.userSvc.BlockUser(context.Background(), 999999, "policy"); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("expected ErrNotFound for missing user, got %v", err)
-	}
-
 	if _, err := env.userSvc.UnblockUser(context.Background(), 999999); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("expected ErrNotFound for missing user, got %v", err)
+		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }

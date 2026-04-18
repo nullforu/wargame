@@ -98,7 +98,6 @@ func TestLoadConfigCustomValues(t *testing.T) {
 	os.Setenv("S3_FORCE_PATH_STYLE", "true")
 	os.Setenv("S3_PRESIGN_TTL", "20m")
 	os.Setenv("STACKS_ENABLED", "true")
-	os.Setenv("STACKS_MAX_SCOPE", "team")
 	os.Setenv("STACKS_MAX_PER", "5")
 	os.Setenv("STACKS_PROVISIONER_BASE_URL", "http://localhost:18081")
 	os.Setenv("STACKS_PROVISIONER_API_KEY", "custom-key")
@@ -191,9 +190,6 @@ func TestLoadConfigCustomValues(t *testing.T) {
 	}
 	if cfg.Stack.CreateMax != 2 {
 		t.Errorf("expected Stack.CreateMax 2, got %d", cfg.Stack.CreateMax)
-	}
-	if cfg.Stack.MaxScope != "team" {
-		t.Errorf("expected Stack.MaxScope team, got %s", cfg.Stack.MaxScope)
 	}
 	if cfg.Stack.MaxPer != 5 {
 		t.Errorf("expected Stack.MaxPer 5, got %d", cfg.Stack.MaxPer)
@@ -839,7 +835,6 @@ func TestFormatForLog(t *testing.T) {
 			ProvisionerTimeout: 5 * time.Second,
 		},
 		Bootstrap: BootstrapConfig{
-			AdminTeamEnabled: true,
 			AdminUserEnabled: true,
 			AdminEmail:       "admin@example.com",
 			AdminPassword:    "adminpass",

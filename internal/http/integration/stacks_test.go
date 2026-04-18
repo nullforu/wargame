@@ -13,9 +13,6 @@ import (
 	"wargame/internal/service"
 	"wargame/internal/stack"
 	"wargame/internal/storage"
-	"wargame/internal/utils"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 func setupStackTest(t *testing.T, cfg config.Config, client stack.API) testEnv {
@@ -24,9 +21,6 @@ func setupStackTest(t *testing.T, cfg config.Config, client stack.API) testEnv {
 	resetState(t)
 
 	userRepo := repo.NewUserRepo(testDB)
-	registrationKeyRepo := repo.NewRegistrationKeyRepo(testDB)
-	divisionRepo := repo.NewDivisionRepo(testDB)
-	teamRepo := repo.NewTeamRepo(testDB)
 	challengeRepo := repo.NewChallengeRepo(testDB)
 	submissionRepo := repo.NewSubmissionRepo(testDB)
 	scoreRepo := repo.NewScoreboardRepo(testDB)
@@ -35,78 +29,28 @@ func setupStackTest(t *testing.T, cfg config.Config, client stack.API) testEnv {
 
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
 
-	authSvc := service.NewAuthService(cfg, testDB, userRepo, registrationKeyRepo, teamRepo, testRedis)
-	userSvc := service.NewUserService(userRepo, teamRepo)
+	authSvc := service.NewAuthService(cfg, userRepo, testRedis)
+	userSvc := service.NewUserService(userRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
-	divisionSvc := service.NewDivisionService(divisionRepo)
-	teamSvc := service.NewTeamService(teamRepo, divisionRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, testRedis, fileStore)
 	appConfigSvc := service.NewAppConfigService(appConfigRepo, testRedis, cfg.Cache.AppConfigTTL)
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, client, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, appConfigSvc, userSvc, scoreSvc, divisionSvc, teamSvc, stackSvc, testRedis, testLogger, nil)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, appConfigSvc, userSvc, scoreSvc, stackSvc, testRedis, testLogger, nil)
 
-	env := testEnv{
+	return testEnv{
 		cfg:            cfg,
 		router:         router,
 		userRepo:       userRepo,
-		regKeyRepo:     registrationKeyRepo,
-		divisionRepo:   divisionRepo,
-		teamRepo:       teamRepo,
 		challengeRepo:  challengeRepo,
 		submissionRepo: submissionRepo,
 		appConfigRepo:  appConfigRepo,
+		stackRepo:      stackRepo,
 		authSvc:        authSvc,
 		wargameSvc:     wargameSvc,
-		divisionSvc:    divisionSvc,
-		teamSvc:        teamSvc,
 		appConfigSvc:   appConfigSvc,
+		stackSvc:       stackSvc,
 	}
-
-	division := &models.Division{
-		Name:      "Default",
-		CreatedAt: time.Now().UTC(),
-	}
-	if err := divisionRepo.Create(context.Background(), division); err != nil {
-		t.Fatalf("create division: %v", err)
-	}
-
-	env.defaultDivisionID = division.ID
-
-	return env
-}
-
-func createStackChallenge(t *testing.T, env testEnv, title string) *models.Challenge {
-	t.Helper()
-	podSpec := "apiVersion: v1\nkind: Pod\nmetadata:\n  name: challenge\nspec:\n  containers:\n    - name: app\n      image: nginx:stable\n      ports:\n        - containerPort: 80\n          protocol: TCP\n"
-
-	challenge := &models.Challenge{
-		Title:         title,
-		Description:   "stack desc",
-		Category:      "Web",
-		Points:        100,
-		MinimumPoints: 100,
-		StackEnabled:  true,
-		StackTargetPorts: stack.TargetPortSpecs{
-			{ContainerPort: 80, Protocol: "TCP"},
-		},
-		StackPodSpec: &podSpec,
-		IsActive:     true,
-		CreatedAt:    time.Now().UTC(),
-	}
-
-	hash, err := utils.HashFlag("flag{stack}", bcrypt.MinCost)
-	if err != nil {
-		t.Fatalf("hash flag: %v", err)
-	}
-
-	challenge.FlagHash = hash
-
-	if err := env.challengeRepo.Create(context.Background(), challenge); err != nil {
-		t.Fatalf("create challenge: %v", err)
-	}
-
-	return challenge
 }
 
 func TestStackLifecycle(t *testing.T) {
@@ -226,104 +170,6 @@ func TestStackCreateLocked(t *testing.T) {
 	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/stack", nil, authHeader(access))
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create unlocked stack status %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestStackListTeamScope(t *testing.T) {
-	cfg := testCfg
-	cfg.Stack = config.StackConfig{
-		Enabled:      true,
-		MaxScope:     "team",
-		MaxPer:       3,
-		CreateWindow: time.Minute,
-		CreateMax:    1,
-	}
-
-	mock := stack.NewProvisionerMock()
-	env := setupStackTest(t, cfg, mock.Client())
-
-	admin := ensureAdminUser(t, env)
-	team := createTeam(t, env, "team-"+nextRegistrationCode())
-	keyA := createRegistrationKeyWithTeam(t, env, admin.ID, team.ID)
-	keyB := createRegistrationKeyWithTeam(t, env, admin.ID, team.ID)
-
-	userA := func() string {
-		regBody := map[string]string{
-			"email":            "team-a@example.com",
-			"username":         "team-a",
-			"password":         "strong-pass",
-			"registration_key": keyA.Code,
-		}
-		rec := doRequest(t, env.router, http.MethodPost, "/api/auth/register", regBody, nil)
-		if rec.Code != http.StatusCreated {
-			t.Fatalf("register team-a status %d: %s", rec.Code, rec.Body.String())
-		}
-
-		loginBody := map[string]string{"email": "team-a@example.com", "password": "strong-pass"}
-		rec = doRequest(t, env.router, http.MethodPost, "/api/auth/login", loginBody, nil)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("login team-a status %d: %s", rec.Code, rec.Body.String())
-		}
-
-		var loginResp struct {
-			AccessToken string `json:"access_token"`
-		}
-		decodeJSON(t, rec, &loginResp)
-
-		return loginResp.AccessToken
-	}()
-
-	userB := func() string {
-		regBody := map[string]string{
-			"email":            "team-b@example.com",
-			"username":         "team-b",
-			"password":         "strong-pass",
-			"registration_key": keyB.Code,
-		}
-		rec := doRequest(t, env.router, http.MethodPost, "/api/auth/register", regBody, nil)
-		if rec.Code != http.StatusCreated {
-			t.Fatalf("register team-b status %d: %s", rec.Code, rec.Body.String())
-		}
-
-		loginBody := map[string]string{"email": "team-b@example.com", "password": "strong-pass"}
-		rec = doRequest(t, env.router, http.MethodPost, "/api/auth/login", loginBody, nil)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("login team-b status %d: %s", rec.Code, rec.Body.String())
-		}
-
-		var loginResp struct {
-			AccessToken string `json:"access_token"`
-		}
-		decodeJSON(t, rec, &loginResp)
-
-		return loginResp.AccessToken
-	}()
-
-	challenge := createStackChallenge(t, env, "TeamScopeStack")
-
-	rec := doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/stack", nil, authHeader(userA))
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("create stack status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	rec = doRequest(t, env.router, http.MethodGet, "/api/stacks", nil, authHeader(userB))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("list stacks status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	var resp struct {
-		Stacks []struct {
-			CreatedByUsername string `json:"created_by_username"`
-			ChallengeTitle    string `json:"challenge_title"`
-		} `json:"stacks"`
-	}
-	decodeJSON(t, rec, &resp)
-	if len(resp.Stacks) != 1 {
-		t.Fatalf("expected 1 team stack, got %d", len(resp.Stacks))
-	}
-
-	if resp.Stacks[0].CreatedByUsername == "" || resp.Stacks[0].ChallengeTitle == "" {
-		t.Fatalf("expected created_by and challenge_title, got %+v", resp.Stacks[0])
 	}
 }
 

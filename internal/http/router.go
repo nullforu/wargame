@@ -16,7 +16,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, appConfigSvc *service.AppConfigService, userSvc *service.UserService, scoreSvc *service.ScoreboardService, divisionSvc *service.DivisionService, teamSvc *service.TeamService, stackSvc *service.StackService, redis *redis.Client, logger *logging.Logger, sse *realtime.SSEHub) *gin.Engine {
+func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, appConfigSvc *service.AppConfigService, userSvc *service.UserService, scoreSvc *service.ScoreboardService, stackSvc *service.StackService, redis *redis.Client, logger *logging.Logger, sse *realtime.SSEHub) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -26,18 +26,15 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 	r.Use(middleware.RequestLogger(cfg.Logging, logger))
 	r.Use(middleware.CORS(cfg.AppEnv != "production", cfg.CORS.AllowedOrigins))
 
-	h := handlers.New(cfg, authSvc, wargameSvc, appConfigSvc, userSvc, scoreSvc, divisionSvc, teamSvc, stackSvc, redis)
+	h := handlers.New(cfg, authSvc, wargameSvc, appConfigSvc, userSvc, scoreSvc, stackSvc, redis)
 	sseHandler := handlers.NewSSEHandler(sse)
 
-	r.GET("/healthz", func(ctx *gin.Context) {
-		ctx.JSON(nethttp.StatusOK, gin.H{"status": "ok"})
-	})
+	r.GET("/healthz", func(ctx *gin.Context) { ctx.JSON(nethttp.StatusOK, gin.H{"status": "ok"}) })
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	api := r.Group("/api")
 	{
 		api.GET("/config", h.GetConfig)
-
 		api.POST("/auth/register", h.Register)
 		api.POST("/auth/login", h.Login)
 		api.POST("/auth/refresh", h.Refresh)
@@ -46,14 +43,7 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		api.GET("/challenges", h.ListChallenges)
 		api.GET("/scoreboard/stream", sseHandler.ScoreboardStream)
 		api.GET("/leaderboard", h.Leaderboard)
-		api.GET("/leaderboard/teams", h.TeamLeaderboard)
 		api.GET("/timeline", h.Timeline)
-		api.GET("/timeline/teams", h.TeamTimeline)
-		api.GET("/divisions", h.ListDivisions)
-		api.GET("/teams", h.ListTeams)
-		api.GET("/teams/:id", h.GetTeam)
-		api.GET("/teams/:id/members", h.ListTeamMembers)
-		api.GET("/teams/:id/solved", h.ListTeamSolved)
 		api.GET("/users", h.ListUsers)
 		api.GET("/users/:id", h.GetUser)
 		api.GET("/users/:id/solved", h.GetUserSolved)
@@ -81,15 +71,10 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		admin.DELETE("/challenges/:id", h.DeleteChallenge)
 		admin.POST("/challenges/:id/file/upload", h.RequestChallengeFileUpload)
 		admin.DELETE("/challenges/:id/file", h.DeleteChallengeFile)
-		admin.POST("/registration-keys", h.CreateRegistrationKeys)
-		admin.GET("/registration-keys", h.ListRegistrationKeys)
-		admin.POST("/divisions", h.CreateDivision)
-		admin.POST("/teams", h.CreateTeam)
 		admin.GET("/stacks", h.AdminListStacks)
 		admin.GET("/stacks/:stack_id", h.AdminGetStack)
 		admin.DELETE("/stacks/:stack_id", h.AdminDeleteStack)
 		admin.GET("/report", h.AdminReport)
-		admin.POST("/users/:id/team", h.AdminMoveUserTeam)
 		admin.POST("/users/:id/block", h.AdminBlockUser)
 		admin.POST("/users/:id/unblock", h.AdminUnblockUser)
 	}

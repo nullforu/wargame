@@ -56,19 +56,7 @@ func (s *StackService) UserStackSummary(ctx context.Context, userID int64) (int,
 		return 0, limit, nil
 	}
 
-	var count int
-	var err error
-	if s.maxScopeIsTeam() {
-		teamID, lookupErr := s.stackRepo.TeamIDForUser(ctx, userID)
-		if lookupErr != nil {
-			return 0, limit, lookupErr
-		}
-
-		count, err = s.stackRepo.CountByTeamExcludingStatuses(ctx, teamID, terminalStackStatusList)
-	} else {
-		count, err = s.stackRepo.CountByUserExcludingStatuses(ctx, userID, terminalStackStatusList)
-	}
-
+	count, err := s.stackRepo.CountByUserExcludingStatuses(ctx, userID, terminalStackStatusList)
 	if err != nil {
 		return 0, limit, err
 	}
@@ -81,18 +69,7 @@ func (s *StackService) ListUserStacks(ctx context.Context, userID int64) ([]mode
 		return nil, err
 	}
 
-	var stacks []models.Stack
-	var err error
-	if s.maxScopeIsTeam() {
-		teamID, lookupErr := s.stackRepo.TeamIDForUser(ctx, userID)
-		if lookupErr != nil {
-			return nil, lookupErr
-		}
-		stacks, err = s.stackRepo.ListByTeam(ctx, teamID)
-	} else {
-		stacks, err = s.stackRepo.ListByUser(ctx, userID)
-	}
-
+	stacks, err := s.stackRepo.ListByUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -208,17 +185,8 @@ func (s *StackService) GetOrCreateStack(ctx context.Context, userID, challengeID
 		return nil, err
 	}
 
-	if s.maxScopeIsTeam() {
-		teamID, lookupErr := s.stackRepo.TeamIDForUser(ctx, userID)
-		if lookupErr == nil {
-			if reloaded, reloadErr := s.stackRepo.GetByTeamAndChallenge(ctx, teamID, challengeID); reloadErr == nil {
-				return reloaded, nil
-			}
-		}
-	} else {
-		if reloaded, reloadErr := s.stackRepo.GetByUserAndChallenge(ctx, userID, challengeID); reloadErr == nil {
-			return reloaded, nil
-		}
+	if reloaded, reloadErr := s.stackRepo.GetByUserAndChallenge(ctx, userID, challengeID); reloadErr == nil {
+		return reloaded, nil
 	}
 
 	return stackModel, nil
@@ -229,18 +197,7 @@ func (s *StackService) GetStack(ctx context.Context, userID, challengeID int64) 
 		return nil, err
 	}
 
-	var existing *models.Stack
-	var err error
-	if s.maxScopeIsTeam() {
-		teamID, lookupErr := s.stackRepo.TeamIDForUser(ctx, userID)
-		if lookupErr != nil {
-			return nil, lookupErr
-		}
-		existing, err = s.stackRepo.GetByTeamAndChallenge(ctx, teamID, challengeID)
-	} else {
-		existing, err = s.stackRepo.GetByUserAndChallenge(ctx, userID, challengeID)
-	}
-
+	existing, err := s.stackRepo.GetByUserAndChallenge(ctx, userID, challengeID)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
 			return nil, ErrStackNotFound
@@ -257,17 +214,7 @@ func (s *StackService) DeleteStack(ctx context.Context, userID, challengeID int6
 		return err
 	}
 
-	var existing *models.Stack
-	var err error
-	if s.maxScopeIsTeam() {
-		teamID, lookupErr := s.stackRepo.TeamIDForUser(ctx, userID)
-		if lookupErr != nil {
-			return lookupErr
-		}
-		existing, err = s.stackRepo.GetByTeamAndChallenge(ctx, teamID, challengeID)
-	} else {
-		existing, err = s.stackRepo.GetByUserAndChallenge(ctx, userID, challengeID)
-	}
+	existing, err := s.stackRepo.GetByUserAndChallenge(ctx, userID, challengeID)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
 			return ErrStackNotFound
@@ -292,17 +239,7 @@ func (s *StackService) DeleteStackByUserAndChallenge(ctx context.Context, userID
 		return err
 	}
 
-	var existing *models.Stack
-	var err error
-	if s.maxScopeIsTeam() {
-		teamID, lookupErr := s.stackRepo.TeamIDForUser(ctx, userID)
-		if lookupErr != nil {
-			return lookupErr
-		}
-		existing, err = s.stackRepo.GetByTeamAndChallenge(ctx, teamID, challengeID)
-	} else {
-		existing, err = s.stackRepo.GetByUserAndChallenge(ctx, userID, challengeID)
-	}
+	existing, err := s.stackRepo.GetByUserAndChallenge(ctx, userID, challengeID)
 
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
@@ -402,18 +339,7 @@ func (s *StackService) ensureUnlocked(ctx context.Context, userID int64, challen
 }
 
 func (s *StackService) findExistingStack(ctx context.Context, userID, challengeID int64) (*models.Stack, error) {
-	var existing *models.Stack
-	var err error
-	if s.maxScopeIsTeam() {
-		teamID, lookupErr := s.stackRepo.TeamIDForUser(ctx, userID)
-		if lookupErr != nil {
-			return nil, lookupErr
-		}
-		existing, err = s.stackRepo.GetByTeamAndChallenge(ctx, teamID, challengeID)
-	} else {
-		existing, err = s.stackRepo.GetByUserAndChallenge(ctx, userID, challengeID)
-	}
-
+	existing, err := s.stackRepo.GetByUserAndChallenge(ctx, userID, challengeID)
 	if err == nil {
 		refreshed, refreshErr := s.refreshStack(ctx, existing)
 		if refreshErr == nil {
@@ -440,31 +366,10 @@ func (s *StackService) applyRateLimit(ctx context.Context, userID int64) error {
 	}
 
 	key := stackRateLimitKey(userID)
-	if s.maxScopeIsTeam() {
-		teamID, err := s.stackRepo.TeamIDForUser(ctx, userID)
-		if err != nil {
-			return fmt.Errorf("stack.GetOrCreateStack team: %w", err)
-		}
-		key = stackTeamRateLimitKey(teamID)
-	}
-
 	return rateLimit(ctx, s.redis, key, s.cfg.CreateWindow, s.cfg.CreateMax)
 }
 
 func (s *StackService) ensureUserLimit(ctx context.Context, userID int64) error {
-	if s.maxScopeIsTeam() {
-		activeStacks, err := s.ListUserStacks(ctx, userID)
-		if err != nil {
-			return fmt.Errorf("stack.GetOrCreateStack list: %w", err)
-		}
-
-		if len(activeStacks) >= s.cfg.MaxPer {
-			return ErrStackLimitReached
-		}
-
-		return nil
-	}
-
 	activeStacks, err := s.ListUserStacks(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("stack.GetOrCreateStack list: %w", err)
@@ -616,12 +521,4 @@ func timePtr(value time.Time) *time.Time {
 
 func stackRateLimitKey(userID int64) string {
 	return "stack:create:" + strconv.FormatInt(userID, 10)
-}
-
-func stackTeamRateLimitKey(teamID int64) string {
-	return "stack:create:team:" + strconv.FormatInt(teamID, 10)
-}
-
-func (s *StackService) maxScopeIsTeam() bool {
-	return strings.EqualFold(s.cfg.MaxScope, "team")
 }

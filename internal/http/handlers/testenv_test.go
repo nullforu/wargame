@@ -26,27 +26,21 @@ import (
 )
 
 type handlerEnv struct {
-	cfg               config.Config
-	db                *bun.DB
-	redis             *redis.Client
-	userRepo          *repo.UserRepo
-	regKeyRepo        *repo.RegistrationKeyRepo
-	divisionRepo      *repo.DivisionRepo
-	teamRepo          *repo.TeamRepo
-	challengeRepo     *repo.ChallengeRepo
-	submissionRepo    *repo.SubmissionRepo
-	appConfigRepo     *repo.AppConfigRepo
-	stackRepo         *repo.StackRepo
-	authSvc           *service.AuthService
-	userSvc           *service.UserService
-	scoreSvc          *service.ScoreboardService
-	wargameSvc        *service.WargameService
-	divisionSvc       *service.DivisionService
-	teamSvc           *service.TeamService
-	appConfigSvc      *service.AppConfigService
-	stackSvc          *service.StackService
-	handler           *Handler
-	defaultDivisionID int64
+	cfg            config.Config
+	db             *bun.DB
+	redis          *redis.Client
+	userRepo       *repo.UserRepo
+	challengeRepo  *repo.ChallengeRepo
+	submissionRepo *repo.SubmissionRepo
+	appConfigRepo  *repo.AppConfigRepo
+	stackRepo      *repo.StackRepo
+	authSvc        *service.AuthService
+	userSvc        *service.UserService
+	scoreSvc       *service.ScoreboardService
+	wargameSvc     *service.WargameService
+	appConfigSvc   *service.AppConfigService
+	stackSvc       *service.StackService
+	handler        *Handler
 }
 
 var (
@@ -226,9 +220,6 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 	resetHandlerState(t)
 
 	userRepo := repo.NewUserRepo(handlerDB)
-	regRepo := repo.NewRegistrationKeyRepo(handlerDB)
-	divisionRepo := repo.NewDivisionRepo(handlerDB)
-	teamRepo := repo.NewTeamRepo(handlerDB)
 	challengeRepo := repo.NewChallengeRepo(handlerDB)
 	submissionRepo := repo.NewSubmissionRepo(handlerDB)
 	scoreRepo := repo.NewScoreboardRepo(handlerDB)
@@ -238,24 +229,19 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
 
 	appConfigSvc := service.NewAppConfigService(appConfigRepo, handlerRedis, handlerCfg.Cache.AppConfigTTL)
-	authSvc := service.NewAuthService(handlerCfg, handlerDB, userRepo, regRepo, teamRepo, handlerRedis)
-	userSvc := service.NewUserService(userRepo, teamRepo)
+	userSvc := service.NewUserService(userRepo)
+	authSvc := service.NewAuthService(handlerCfg, userRepo, handlerRedis)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
-	divisionSvc := service.NewDivisionService(divisionRepo)
-	teamSvc := service.NewTeamService(teamRepo, divisionRepo)
 	wargameSvc := service.NewWargameService(handlerCfg, challengeRepo, submissionRepo, handlerRedis, fileStore)
 	stackSvc := service.NewStackService(handlerCfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, handlerRedis)
 
-	handler := New(handlerCfg, authSvc, wargameSvc, appConfigSvc, userSvc, scoreSvc, divisionSvc, teamSvc, stackSvc, handlerRedis)
+	handler := New(handlerCfg, authSvc, wargameSvc, appConfigSvc, userSvc, scoreSvc, stackSvc, handlerRedis)
 
 	env := handlerEnv{
 		cfg:            handlerCfg,
 		db:             handlerDB,
 		redis:          handlerRedis,
 		userRepo:       userRepo,
-		regKeyRepo:     regRepo,
-		divisionRepo:   divisionRepo,
-		teamRepo:       teamRepo,
 		challengeRepo:  challengeRepo,
 		submissionRepo: submissionRepo,
 		appConfigRepo:  appConfigRepo,
@@ -264,22 +250,10 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 		userSvc:        userSvc,
 		scoreSvc:       scoreSvc,
 		wargameSvc:     wargameSvc,
-		divisionSvc:    divisionSvc,
-		teamSvc:        teamSvc,
 		appConfigSvc:   appConfigSvc,
 		stackSvc:       stackSvc,
 		handler:        handler,
 	}
-
-	division := &models.Division{
-		Name:      "Default",
-		CreatedAt: time.Now().UTC(),
-	}
-	if err := divisionRepo.Create(context.Background(), division); err != nil {
-		t.Fatalf("create division: %v", err)
-	}
-
-	env.defaultDivisionID = division.ID
 
 	return env
 }
@@ -287,7 +261,7 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 func resetHandlerState(t *testing.T) {
 	t.Helper()
 
-	if _, err := handlerDB.ExecContext(context.Background(), "TRUNCATE TABLE app_configs, submissions, registration_key_uses, registration_keys, stacks, challenges, users, teams, divisions RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := handlerDB.ExecContext(context.Background(), "TRUNCATE TABLE app_configs, submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
@@ -306,13 +280,6 @@ func skipIfHandlerDisabled(t *testing.T) {
 
 func createHandlerUser(t *testing.T, env handlerEnv, email, username, password, role string) *models.User {
 	t.Helper()
-	team := createHandlerTeam(t, env, "team-"+username)
-
-	return createHandlerUserWithTeam(t, env, email, username, password, role, team.ID)
-}
-
-func createHandlerUserWithTeam(t *testing.T, env handlerEnv, email, username, password, role string, teamID int64) *models.User {
-	t.Helper()
 
 	hash, err := auth.HashPassword(password, env.cfg.BcryptCost)
 	if err != nil {
@@ -324,7 +291,6 @@ func createHandlerUserWithTeam(t *testing.T, env handlerEnv, email, username, pa
 		Username:     username,
 		PasswordHash: hash,
 		Role:         role,
-		TeamID:       teamID,
 		CreatedAt:    time.Now().UTC(),
 		UpdatedAt:    time.Now().UTC(),
 	}
@@ -334,90 +300,6 @@ func createHandlerUserWithTeam(t *testing.T, env handlerEnv, email, username, pa
 	}
 
 	return user
-}
-
-func createHandlerRegistrationKey(t *testing.T, env handlerEnv, code string, createdBy int64) *models.RegistrationKey {
-	t.Helper()
-
-	team := createHandlerTeam(t, env, "reg-"+code)
-	key := &models.RegistrationKey{
-		Code:      code,
-		CreatedBy: createdBy,
-		TeamID:    team.ID,
-		MaxUses:   1,
-		UsedCount: 0,
-		CreatedAt: time.Now().UTC(),
-	}
-
-	if err := env.regKeyRepo.Create(context.Background(), key); err != nil {
-		t.Fatalf("create registration key: %v", err)
-	}
-
-	return key
-}
-
-func createHandlerRegistrationKeyWithTeam(t *testing.T, env handlerEnv, code string, createdBy int64, teamID int64) *models.RegistrationKey {
-	t.Helper()
-
-	key := &models.RegistrationKey{
-		Code:      code,
-		CreatedBy: createdBy,
-		TeamID:    teamID,
-		MaxUses:   1,
-		UsedCount: 0,
-		CreatedAt: time.Now().UTC(),
-	}
-
-	if err := env.regKeyRepo.Create(context.Background(), key); err != nil {
-		t.Fatalf("create registration key: %v", err)
-	}
-
-	return key
-}
-
-func createHandlerTeam(t *testing.T, env handlerEnv, name string) *models.Team {
-	t.Helper()
-
-	team := &models.Team{
-		Name:       name,
-		DivisionID: env.defaultDivisionID,
-		CreatedAt:  time.Now().UTC(),
-	}
-
-	if err := env.teamRepo.Create(context.Background(), team); err != nil {
-		t.Fatalf("create team: %v", err)
-	}
-
-	return team
-}
-
-func createHandlerDivision(t *testing.T, env handlerEnv, name string) *models.Division {
-	t.Helper()
-
-	division := &models.Division{
-		Name:      name,
-		CreatedAt: time.Now().UTC(),
-	}
-	if err := env.divisionRepo.Create(context.Background(), division); err != nil {
-		t.Fatalf("create division: %v", err)
-	}
-
-	return division
-}
-
-func createHandlerTeamInDivision(t *testing.T, env handlerEnv, name string, divisionID int64) *models.Team {
-	t.Helper()
-
-	team := &models.Team{
-		Name:       name,
-		DivisionID: divisionID,
-		CreatedAt:  time.Now().UTC(),
-	}
-	if err := env.teamRepo.Create(context.Background(), team); err != nil {
-		t.Fatalf("create team: %v", err)
-	}
-
-	return team
 }
 
 func createHandlerChallenge(t *testing.T, env handlerEnv, title string, points int, flag string, active bool) *models.Challenge {

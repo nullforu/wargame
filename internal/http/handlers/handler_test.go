@@ -83,10 +83,6 @@ func setCachePayload(t *testing.T, env handlerEnv, key string, payload []byte) {
 	}
 }
 
-func cacheKeyForDivision(env handlerEnv, base string) string {
-	return cacheKeyWithDivision(base, &env.defaultDivisionID)
-}
-
 func waitForCacheClear(t *testing.T, env handlerEnv, keys ...string) {
 	t.Helper()
 
@@ -342,14 +338,11 @@ func TestHandlerAdminConfigWargameWindowClear(t *testing.T) {
 
 func TestHandlerRegisterLoginRefreshLogout(t *testing.T) {
 	env := setupHandlerTest(t)
-	admin := createHandlerUser(t, env, "admin@example.com", models.AdminRole, "pass", models.AdminRole)
-	key := createHandlerRegistrationKey(t, env, "ABCDEFGHJKLMNPQ2", admin.ID)
 
 	regBody := map[string]string{
-		"email":            "user@example.com",
-		"username":         "user1",
-		"password":         "pass1",
-		"registration_key": key.Code,
+		"email":    "user@example.com",
+		"username": "user1",
+		"password": "pass1",
 	}
 
 	ctx, rec := newJSONContext(t, http.MethodPost, "/api/auth/register", regBody)
@@ -381,10 +374,6 @@ func TestHandlerRegisterLoginRefreshLogout(t *testing.T) {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
 		User         struct {
-			TeamID        int64      `json:"team_id"`
-			TeamName      string     `json:"team_name"`
-			DivisionID    int64      `json:"division_id"`
-			DivisionName  string     `json:"division_name"`
 			StackCount    int        `json:"stack_count"`
 			StackLimit    int        `json:"stack_limit"`
 			BlockedReason *string    `json:"blocked_reason"`
@@ -395,15 +384,6 @@ func TestHandlerRegisterLoginRefreshLogout(t *testing.T) {
 
 	if loginResp.AccessToken == "" || loginResp.RefreshToken == "" {
 		t.Fatalf("missing tokens")
-	}
-	if loginResp.User.TeamID != key.TeamID {
-		t.Fatalf("expected team_id %d, got %d", key.TeamID, loginResp.User.TeamID)
-	}
-	if loginResp.User.TeamName != "reg-"+key.Code {
-		t.Fatalf("expected team_name %q, got %q", "reg-"+key.Code, loginResp.User.TeamName)
-	}
-	if loginResp.User.DivisionID == 0 || loginResp.User.DivisionName == "" {
-		t.Fatalf("missing division fields in login response")
 	}
 	if loginResp.User.StackCount != 0 {
 		t.Fatalf("expected stack_count 0, got %d", loginResp.User.StackCount)
@@ -441,11 +421,12 @@ func TestHandlerRegisterLoginRefreshLogout(t *testing.T) {
 }
 
 func TestHandlerUserStackSummaryWithoutStackService(t *testing.T) {
-	handler := New(handlerCfg, nil, nil, nil, nil, nil, nil, nil, nil, handlerRedis)
-
-	count, limit := handler.userStackSummary(context.Background(), 123)
-	if count != 0 || limit != 0 {
-		t.Fatalf("expected zero summary, got %d/%d", count, limit)
+	handler := New(handlerCfg, nil, nil, nil, nil, nil, nil, handlerRedis)
+	if handler == nil {
+		t.Fatalf("expected handler instance")
+	}
+	if handler.stacks != nil {
+		t.Fatalf("expected nil stack service")
 	}
 }
 
@@ -462,60 +443,6 @@ func TestHandlerBindErrorDetails(t *testing.T) {
 	env.handler.Login(ctx)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("bind type status %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestHandlerAdminMoveUserTeam(t *testing.T) {
-	env := setupHandlerTest(t)
-	teamA := createHandlerTeam(t, env, "Alpha")
-	teamB := createHandlerTeam(t, env, "Beta")
-	user := createHandlerUserWithTeam(t, env, "user@example.com", "user1", "pass", models.UserRole, teamA.ID)
-
-	setCachePayload(t, env, cacheKeyForDivision(env, "leaderboard:users"), []byte(`{"challenges":[],"entries":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "leaderboard:teams"), []byte(`{"challenges":[],"entries":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "timeline:users"), []byte(`{"submissions":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "timeline:teams"), []byte(`{"submissions":[]}`))
-
-	ctx, rec := newJSONContext(t, http.MethodPost, "/api/admin/users/1/team", map[string]any{"team_id": teamB.ID})
-	ctx.Params = gin.Params{{Key: "id", Value: strconv.FormatInt(user.ID, 10)}}
-
-	env.handler.AdminMoveUserTeam(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("move team status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	var resp adminUserResponse
-	decodeJSON(t, rec, &resp)
-	if resp.TeamID != teamB.ID {
-		t.Fatalf("expected team_id %d, got %d", teamB.ID, resp.TeamID)
-	}
-
-	waitForCacheClear(t, env,
-		cacheKeyForDivision(env, "leaderboard:users"),
-		cacheKeyForDivision(env, "leaderboard:teams"),
-		cacheKeyForDivision(env, "timeline:users"),
-		cacheKeyForDivision(env, "timeline:teams"),
-	)
-
-	ctx, rec = newJSONContext(t, http.MethodPost, "/api/admin/users/1/team", map[string]any{"team_id": -1})
-	ctx.Params = gin.Params{{Key: "id", Value: strconv.FormatInt(user.ID, 10)}}
-	env.handler.AdminMoveUserTeam(ctx)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rec.Code)
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodPost, "/api/admin/users/1/team", map[string]any{"team_id": 9999})
-	ctx.Params = gin.Params{{Key: "id", Value: strconv.FormatInt(user.ID, 10)}}
-	env.handler.AdminMoveUserTeam(ctx)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rec.Code)
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodPost, "/api/admin/users/1/team", map[string]any{"team_id": teamB.ID})
-	ctx.Params = gin.Params{{Key: "id", Value: "0"}}
-	env.handler.AdminMoveUserTeam(ctx)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rec.Code)
 	}
 }
 
@@ -608,8 +535,7 @@ func TestHandlerChallengesAndSubmit(t *testing.T) {
 	challenge := createHandlerChallenge(t, env, "Challenge", 100, "FLAG{1}", true)
 	other := createHandlerChallenge(t, env, "Other", 50, "FLAG{2}", true)
 
-	divisionID := int64(1)
-	ctx, rec := newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/challenges?division_id=%d", divisionID), nil)
+	ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
 
 	env.handler.ListChallenges(ctx)
 	if rec.Code != http.StatusOK {
@@ -641,29 +567,6 @@ func TestHandlerChallengesAndSubmit(t *testing.T) {
 	env.handler.SubmitFlag(ctx)
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("submit already status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	team := createHandlerTeam(t, env, "Alpha")
-	teamUser1 := createHandlerUserWithTeam(t, env, "t1@example.com", "t1", "pass", models.UserRole, team.ID)
-	teamUser2 := createHandlerUserWithTeam(t, env, "t2@example.com", "t2", "pass", models.UserRole, team.ID)
-	teamChallenge := createHandlerChallenge(t, env, "Team", 120, "FLAG{TEAM}", true)
-
-	ctx, rec = newJSONContext(t, http.MethodPost, "/api/challenges/3/submit", map[string]string{"flag": "FLAG{TEAM}"})
-	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", teamChallenge.ID)}}
-	ctx.Set("userID", teamUser1.ID)
-
-	env.handler.SubmitFlag(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("submit team correct status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodPost, "/api/challenges/3/submit", map[string]string{"flag": "FLAG{TEAM}"})
-	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", teamChallenge.ID)}}
-	ctx.Set("userID", teamUser2.ID)
-
-	env.handler.SubmitFlag(ctx)
-	if rec.Code != http.StatusConflict {
-		t.Fatalf("submit team already status %d: %s", rec.Code, rec.Body.String())
 	}
 
 	ctx, rec = newJSONContext(t, http.MethodPost, "/api/challenges/2/submit", map[string]string{"flag": "WRONG"})
@@ -788,13 +691,13 @@ func TestHandlerChallengesAndSubmit(t *testing.T) {
 	_ = other
 }
 
-func TestHandlerChallengesRequiresDivisionID(t *testing.T) {
+func TestHandlerChallengesWithoutFilterParameter(t *testing.T) {
 	env := setupHandlerTest(t)
 
 	ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
 	env.handler.ListChallenges(ctx)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 }
 
@@ -803,7 +706,7 @@ func TestHandlerListChallengesNotStarted(t *testing.T) {
 	start := time.Now().Add(2 * time.Hour)
 	setHandlerWargameWindow(t, env, &start, nil)
 
-	ctx, rec := newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/challenges?division_id=%d", env.defaultDivisionID), nil)
+	ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
 	env.handler.ListChallenges(ctx)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list challenges status %d: %s", rec.Code, rec.Body.String())
@@ -830,7 +733,7 @@ func TestHandlerListChallengesNoPrereqWithAuth(t *testing.T) {
 
 	challenge := createHandlerChallenge(t, env, "NoPrereq", 100, "FLAG{N}", true)
 
-	ctx, rec := newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/challenges?division_id=%d", env.defaultDivisionID), nil)
+	ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
 	ctx.Request.Header.Set("Authorization", "Bearer "+access)
 	env.handler.ListChallenges(ctx)
 	if rec.Code != http.StatusOK {
@@ -883,7 +786,7 @@ func TestHandlerListChallengesLocked(t *testing.T) {
 		t.Fatalf("update locked challenge: %v", err)
 	}
 
-	ctx, rec := newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/challenges?division_id=%d", env.defaultDivisionID), nil)
+	ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
 	env.handler.ListChallenges(ctx)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list status %d: %s", rec.Code, rec.Body.String())
@@ -946,7 +849,7 @@ func TestHandlerListChallengesLocked(t *testing.T) {
 		t.Fatalf("expected locked challenge in list")
 	}
 
-	ctx, rec = newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/challenges?division_id=%d", env.defaultDivisionID), nil)
+	ctx, rec = newJSONContext(t, http.MethodGet, "/api/challenges", nil)
 	ctx.Request.Header.Set("Authorization", "Bearer "+access)
 	env.handler.ListChallenges(ctx)
 	if rec.Code != http.StatusOK {
@@ -975,7 +878,7 @@ func TestHandlerListChallengesLocked(t *testing.T) {
 
 	createHandlerSubmission(t, env, user.ID, prev.ID, true, time.Now().UTC())
 
-	ctx, rec = newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/challenges?division_id=%d", env.defaultDivisionID), nil)
+	ctx, rec = newJSONContext(t, http.MethodGet, "/api/challenges", nil)
 	ctx.Request.Header.Set("Authorization", "Bearer "+access)
 	env.handler.ListChallenges(ctx)
 	if rec.Code != http.StatusOK {
@@ -1071,7 +974,7 @@ func TestHandlerRequestChallengeFileUploadStorageUnavailable(t *testing.T) {
 	wargameSvc := service.NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, env.redis, nil)
 	scoreRepo := repo.NewScoreboardRepo(env.db)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
-	handler := New(env.cfg, env.authSvc, wargameSvc, env.appConfigSvc, env.userSvc, scoreSvc, env.divisionSvc, env.teamSvc, nil, env.redis)
+	handler := New(env.cfg, env.authSvc, wargameSvc, env.appConfigSvc, env.userSvc, scoreSvc, nil, env.redis)
 
 	ctx, rec := newJSONContext(t, http.MethodPost, "/api/admin/challenges/1/file/upload", map[string]string{"filename": "bundle.zip"})
 	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", challenge.ID)}}
@@ -1095,10 +998,8 @@ func TestHandlerChallengeCacheInvalidation(t *testing.T) {
 		"is_active":   false,
 	}
 
-	setCachePayload(t, env, cacheKeyForDivision(env, "leaderboard:users"), []byte(`{"challenges":[],"entries":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "leaderboard:teams"), []byte(`{"challenges":[],"entries":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "timeline:users"), []byte(`{"submissions":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "timeline:teams"), []byte(`{"submissions":[]}`))
+	setCachePayload(t, env, "leaderboard:users", []byte(`{"challenges":[],"entries":[]}`))
+	setCachePayload(t, env, "timeline:users", []byte(`{"submissions":[]}`))
 
 	ctx, rec := newJSONContext(t, http.MethodPut, "/api/admin/challenges/1", updateReq)
 	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", challenge.ID)}}
@@ -1110,16 +1011,12 @@ func TestHandlerChallengeCacheInvalidation(t *testing.T) {
 	}
 
 	waitForCacheClear(t, env,
-		cacheKeyForDivision(env, "leaderboard:users"),
-		cacheKeyForDivision(env, "leaderboard:teams"),
-		cacheKeyForDivision(env, "timeline:users"),
-		cacheKeyForDivision(env, "timeline:teams"),
+		"leaderboard:users",
+		"timeline:users",
 	)
 
-	setCachePayload(t, env, cacheKeyForDivision(env, "leaderboard:users"), []byte(`{"challenges":[],"entries":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "leaderboard:teams"), []byte(`{"challenges":[],"entries":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "timeline:users"), []byte(`{"submissions":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "timeline:teams"), []byte(`{"submissions":[]}`))
+	setCachePayload(t, env, "leaderboard:users", []byte(`{"challenges":[],"entries":[]}`))
+	setCachePayload(t, env, "timeline:users", []byte(`{"submissions":[]}`))
 
 	ctx, rec = newJSONContext(t, http.MethodDelete, "/api/admin/challenges/1", nil)
 	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", challenge.ID)}}
@@ -1131,10 +1028,8 @@ func TestHandlerChallengeCacheInvalidation(t *testing.T) {
 	}
 
 	waitForCacheClear(t, env,
-		cacheKeyForDivision(env, "leaderboard:users"),
-		cacheKeyForDivision(env, "leaderboard:teams"),
-		cacheKeyForDivision(env, "timeline:users"),
-		cacheKeyForDivision(env, "timeline:teams"),
+		"leaderboard:users",
+		"timeline:users",
 	)
 }
 
@@ -1160,10 +1055,8 @@ func TestHandlerCreateChallengeAndBindErrors(t *testing.T) {
 	ctx, rec = newJSONContext(t, http.MethodPost, "/api/admin/challenges", body)
 	ctx.Set("userID", admin.ID)
 
-	setCachePayload(t, env, cacheKeyForDivision(env, "leaderboard:users"), []byte(`{"challenges":[],"entries":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "leaderboard:teams"), []byte(`{"challenges":[],"entries":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "timeline:users"), []byte(`{"submissions":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "timeline:teams"), []byte(`{"submissions":[]}`))
+	setCachePayload(t, env, "leaderboard:users", []byte(`{"challenges":[],"entries":[]}`))
+	setCachePayload(t, env, "timeline:users", []byte(`{"submissions":[]}`))
 
 	env.handler.CreateChallenge(ctx)
 	if rec.Code != http.StatusCreated {
@@ -1171,10 +1064,8 @@ func TestHandlerCreateChallengeAndBindErrors(t *testing.T) {
 	}
 
 	waitForCacheClear(t, env,
-		cacheKeyForDivision(env, "leaderboard:users"),
-		cacheKeyForDivision(env, "leaderboard:teams"),
-		cacheKeyForDivision(env, "timeline:users"),
-		cacheKeyForDivision(env, "timeline:teams"),
+		"leaderboard:users",
+		"timeline:users",
 	)
 }
 
@@ -1213,21 +1104,6 @@ func setupHandlerStackService(t *testing.T, env handlerEnv, client stack.API) (*
 	stackRepo := repo.NewStackRepo(env.db)
 	stackCfg := config.StackConfig{
 		Enabled:      true,
-		MaxPer:       3,
-		CreateWindow: time.Minute,
-		CreateMax:    5,
-	}
-
-	stackSvc := service.NewStackService(stackCfg, stackRepo, env.challengeRepo, env.submissionRepo, client, env.redis)
-	return stackSvc, stackRepo
-}
-
-func setupHandlerStackServiceWithScope(t *testing.T, env handlerEnv, client stack.API, scope string) (*service.StackService, *repo.StackRepo) {
-	t.Helper()
-	stackRepo := repo.NewStackRepo(env.db)
-	stackCfg := config.StackConfig{
-		Enabled:      true,
-		MaxScope:     scope,
 		MaxPer:       3,
 		CreateWindow: time.Minute,
 		CreateMax:    5,
@@ -1351,111 +1227,9 @@ func TestStackHandlersList(t *testing.T) {
 	}
 }
 
-func TestStackHandlersListTeamScope(t *testing.T) {
-	env := setupHandlerTest(t)
-	team := createHandlerTeam(t, env, "TeamList")
-	user := createHandlerUserWithTeam(t, env, "t1@example.com", "t1", "pass", models.UserRole, team.ID)
-	user2 := createHandlerUserWithTeam(t, env, "t2@example.com", "t2", "pass", models.UserRole, team.ID)
-	challenge1 := createHandlerStackChallenge(t, env, "team-stack-1")
-	challenge2 := createHandlerStackChallenge(t, env, "team-stack-2")
-
-	mock := &stack.MockClient{
-		GetStackStatusFn: func(ctx context.Context, stackID string) (*stack.StackStatus, error) {
-			return &stack.StackStatus{StackID: stackID, Status: "running", Ports: []stack.PortMapping{{ContainerPort: 80, Protocol: "TCP", NodePort: 31001}}}, nil
-		},
-	}
-
-	stackSvc, stackRepo := setupHandlerStackServiceWithScope(t, env, mock, "team")
-	env.handler.stacks = stackSvc
-
-	now := time.Now().UTC()
-	stack1 := &models.Stack{UserID: user.ID, ChallengeID: challenge1.ID, StackID: "team-stack-1", Status: "running", Ports: stack.PortMappings{{ContainerPort: 80, Protocol: "TCP", NodePort: 31001}}, CreatedAt: now, UpdatedAt: now}
-	stack2 := &models.Stack{UserID: user2.ID, ChallengeID: challenge2.ID, StackID: "team-stack-2", Status: "running", Ports: stack.PortMappings{{ContainerPort: 80, Protocol: "TCP", NodePort: 31002}}, CreatedAt: now, UpdatedAt: now}
-	if err := stackRepo.Create(context.Background(), stack1); err != nil {
-		t.Fatalf("create stack1: %v", err)
-	}
-
-	if err := stackRepo.Create(context.Background(), stack2); err != nil {
-		t.Fatalf("create stack2: %v", err)
-	}
-
-	ctx, rec := newJSONContext(t, http.MethodGet, "/api/stacks", nil)
-	ctx.Set("userID", user.ID)
-	env.handler.ListStacks(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-
-	var resp stacksListResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-
-	if len(resp.Stacks) != 2 {
-		t.Fatalf("expected 2 team stacks, got %d", len(resp.Stacks))
-	}
-
-	if resp.Stacks[0].CreatedByUserID == 0 || resp.Stacks[0].CreatedByUsername == "" {
-		t.Fatalf("expected created_by fields set, got %+v", resp.Stacks[0])
-	}
-
-	if resp.Stacks[0].ChallengeTitle == "" {
-		t.Fatalf("expected challenge_title set, got %+v", resp.Stacks[0])
-	}
-}
-
-func TestStackHandlersGetTeamScope(t *testing.T) {
-	env := setupHandlerTest(t)
-	team := createHandlerTeam(t, env, "TeamGet")
-	user := createHandlerUserWithTeam(t, env, "g1@example.com", "g1", "pass", models.UserRole, team.ID)
-	user2 := createHandlerUserWithTeam(t, env, "g2@example.com", "g2", "pass", models.UserRole, team.ID)
-	challenge := createHandlerStackChallenge(t, env, "team-get")
-
-	mock := &stack.MockClient{
-		GetStackStatusFn: func(ctx context.Context, stackID string) (*stack.StackStatus, error) {
-			return &stack.StackStatus{StackID: stackID, Status: "running", Ports: []stack.PortMapping{{ContainerPort: 80, Protocol: "TCP", NodePort: 31001}}}, nil
-		},
-	}
-
-	stackSvc, stackRepo := setupHandlerStackServiceWithScope(t, env, mock, "team")
-	env.handler.stacks = stackSvc
-
-	now := time.Now().UTC()
-	stackModel := &models.Stack{UserID: user2.ID, ChallengeID: challenge.ID, StackID: "team-get", Status: "running", Ports: stack.PortMappings{{ContainerPort: 80, Protocol: "TCP", NodePort: 31001}}, CreatedAt: now, UpdatedAt: now}
-	if err := stackRepo.Create(context.Background(), stackModel); err != nil {
-		t.Fatalf("create stack: %v", err)
-	}
-
-	ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+fmt.Sprint(challenge.ID)+"/stack", nil)
-	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprint(challenge.ID)}}
-	ctx.Set("userID", user.ID)
-	env.handler.GetStack(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("get stack status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	var resp stackResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-
-	if resp.StackID != "team-get" {
-		t.Fatalf("expected team stack, got %+v", resp)
-	}
-
-	if resp.CreatedByUserID != user2.ID || resp.CreatedByUsername == "" {
-		t.Fatalf("expected created_by fields, got %+v", resp)
-	}
-
-	if resp.ChallengeTitle != challenge.Title {
-		t.Fatalf("expected challenge_title %q, got %q", challenge.Title, resp.ChallengeTitle)
-	}
-}
-
 func TestAdminStackHandlersList(t *testing.T) {
 	env := setupHandlerTest(t)
-	team := createHandlerTeam(t, env, "Alpha")
-	user := createHandlerUserWithTeam(t, env, "admin@example.com", "uadmin", "pass", models.UserRole, team.ID)
+	user := createHandlerUser(t, env, "admin@example.com", "uadmin", "pass", models.UserRole)
 	challenge := createHandlerStackChallenge(t, env, "admin-stack")
 
 	mock := &stack.MockClient{
@@ -1496,7 +1270,7 @@ func TestAdminStackHandlersList(t *testing.T) {
 	}
 
 	item := resp.Stacks[0]
-	if item.StackID != "stack-admin-1" || item.Username != user.Username || item.TeamName != team.Name || item.ChallengeTitle != challenge.Title {
+	if item.StackID != "stack-admin-1" || item.Username != user.Username || item.ChallengeTitle != challenge.Title {
 		t.Fatalf("unexpected admin stack response: %+v", item)
 	}
 }
@@ -1678,17 +1452,6 @@ func TestAdminReport(t *testing.T) {
 
 	if _, err := env.appConfigRepo.Upsert(context.Background(), "title", "Report Wargame"); err != nil {
 		t.Fatalf("upsert app config: %v", err)
-	}
-
-	key := createHandlerRegistrationKey(t, env, "ABCDEFGHJKLMNPQ2", user.ID)
-	use := &models.RegistrationKeyUse{
-		RegistrationKeyID: key.ID,
-		UsedBy:            user.ID,
-		UsedByIP:          "127.0.0.1",
-		UsedAt:            time.Now().UTC(),
-	}
-	if _, err := env.db.NewInsert().Model(use).Exec(context.Background()); err != nil {
-		t.Fatalf("create registration key use: %v", err)
 	}
 
 	ctx, rec := newJSONContext(t, http.MethodGet, "/api/admin/report", nil)
@@ -1905,46 +1668,6 @@ func TestHandlerDownloadNotStarted(t *testing.T) {
 	}
 }
 
-// Registration Key Handler Tests
-
-func TestHandlerRegistrationKeys(t *testing.T) {
-	env := setupHandlerTest(t)
-	admin := createHandlerUser(t, env, "admin@example.com", models.AdminRole, "pass", models.AdminRole)
-	team := createHandlerTeam(t, env, "Alpha")
-
-	ctx, rec := newJSONContext(t, http.MethodPost, "/api/admin/registration-keys", map[string]int{"count": 1})
-	ctx.Set("userID", admin.ID)
-
-	env.handler.CreateRegistrationKeys(ctx)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("create keys missing team status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodPost, "/api/admin/registration-keys", map[string]int{"count": 0, "team_id": int(team.ID)})
-	ctx.Set("userID", admin.ID)
-
-	env.handler.CreateRegistrationKeys(ctx)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("create keys invalid status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodPost, "/api/admin/registration-keys", map[string]int{"count": 2, "team_id": int(team.ID), "max_uses": 3})
-	ctx.Set("userID", admin.ID)
-
-	env.handler.CreateRegistrationKeys(ctx)
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("create keys status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodGet, "/api/admin/registration-keys", nil)
-	ctx.Set("userID", admin.ID)
-
-	env.handler.ListRegistrationKeys(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("list keys status %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
 // Scoreboard Handler Tests
 
 func TestHandlerLeaderboardTimelineSolved(t *testing.T) {
@@ -1957,13 +1680,13 @@ func TestHandlerLeaderboardTimelineSolved(t *testing.T) {
 	createHandlerSubmission(t, env, user1.ID, ch1.ID, true, time.Now().Add(-2*time.Minute))
 	createHandlerSubmission(t, env, user2.ID, ch2.ID, true, time.Now().Add(-1*time.Minute))
 
-	ctx, rec := newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/leaderboard?division_id=%d", env.defaultDivisionID), nil)
+	ctx, rec := newJSONContext(t, http.MethodGet, "/api/leaderboard", nil)
 	env.handler.Leaderboard(ctx)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("leaderboard status %d: %s", rec.Code, rec.Body.String())
 	}
 
-	ctx, rec = newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/timeline?division_id=%d", env.defaultDivisionID), nil)
+	ctx, rec = newJSONContext(t, http.MethodGet, "/api/timeline", nil)
 	env.handler.Timeline(ctx)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("timeline status %d: %s", rec.Code, rec.Body.String())
@@ -1990,117 +1713,18 @@ func TestHandlerLeaderboardTimelineSolved(t *testing.T) {
 		t.Fatalf("me solved status %d: %s", rec.Code, rec.Body.String())
 	}
 
-	team := createHandlerTeam(t, env, "Alpha")
-	teamUser1 := createHandlerUserWithTeam(t, env, "t1@example.com", "t1", "pass", models.UserRole, team.ID)
-	teamUser2 := createHandlerUserWithTeam(t, env, "t2@example.com", "t2", "pass", models.UserRole, team.ID)
-	teamChallenge := createHandlerChallenge(t, env, "TeamSolved", 120, "FLAG{TEAM}", true)
-
-	createHandlerSubmission(t, env, teamUser1.ID, teamChallenge.ID, true, time.Now().Add(-time.Minute))
-
-	ctx, rec = newJSONContext(t, http.MethodGet, "/api/users/1/solved", nil)
-	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", teamUser2.ID)}}
-	env.handler.GetUserSolved(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("me solved status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	var personal []struct {
-		ChallengeID int64 `json:"challenge_id"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &personal); err != nil {
-		t.Fatalf("decode me solved: %v", err)
-	}
-
-	if len(personal) != 0 {
-		t.Fatalf("expected personal solved empty, got %+v", personal)
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodGet, "/api/teams/1/solved", nil)
-	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", team.ID)}}
-	env.handler.ListTeamSolved(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("me solved team status %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestHandlerTeamScoreboard(t *testing.T) {
-	env := setupHandlerTest(t)
-	teamA := createHandlerTeam(t, env, "Alpha")
-	teamB := createHandlerTeam(t, env, "Beta")
-	teamC := createHandlerTeam(t, env, "Gamma")
-	user1 := createHandlerUserWithTeam(t, env, "u1@example.com", "u1", "pass", models.UserRole, teamA.ID)
-	user2 := createHandlerUserWithTeam(t, env, "u2@example.com", "u2", "pass", models.UserRole, teamB.ID)
-	user3 := createHandlerUserWithTeam(t, env, "u3@example.com", "u3", "pass", models.UserRole, teamC.ID)
-
-	ch1 := createHandlerChallenge(t, env, "Ch1", 100, "FLAG{1}", true)
-	ch2 := createHandlerChallenge(t, env, "Ch2", 50, "FLAG{2}", true)
-
-	createHandlerSubmission(t, env, user1.ID, ch1.ID, true, time.Now().Add(-3*time.Minute))
-	createHandlerSubmission(t, env, user2.ID, ch2.ID, true, time.Now().Add(-2*time.Minute))
-	createHandlerSubmission(t, env, user3.ID, ch2.ID, true, time.Now().Add(-1*time.Minute))
-
-	ctx, rec := newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/leaderboard/teams?division_id=%d", env.defaultDivisionID), nil)
-	env.handler.TeamLeaderboard(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("team leaderboard status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	var leaderboard struct {
-		Challenges []struct {
-			ID int64 `json:"id"`
-		} `json:"challenges"`
-		Entries []struct {
-			TeamName string `json:"team_name"`
-			Score    int    `json:"score"`
-			Solves   []struct {
-				ChallengeID int64 `json:"challenge_id"`
-			} `json:"solves"`
-		} `json:"entries"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &leaderboard); err != nil {
-		t.Fatalf("decode leaderboard: %v", err)
-	}
-
-	if len(leaderboard.Entries) != 3 || leaderboard.Entries[0].TeamName != "Alpha" || leaderboard.Entries[2].TeamName != "Gamma" {
-		t.Fatalf("unexpected leaderboard: %+v", leaderboard)
-	}
-
-	if len(leaderboard.Challenges) != 2 {
-		t.Fatalf("expected 2 challenges, got %d", len(leaderboard.Challenges))
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/timeline/teams?division_id=%d", env.defaultDivisionID), nil)
-	env.handler.TeamTimeline(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("team timeline status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	var resp struct {
-		Submissions []struct {
-			TeamName       string `json:"team_name"`
-			Points         int    `json:"points"`
-			ChallengeCount int    `json:"challenge_count"`
-		} `json:"submissions"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode timeline: %v", err)
-	}
-
-	if len(resp.Submissions) == 0 || resp.Submissions[0].TeamName == "" {
-		t.Fatalf("unexpected timeline response: %+v", resp)
-	}
 }
 
 func TestHandlerTimelineUsesCache(t *testing.T) {
 	env := setupHandlerTest(t)
-	cacheKey := cacheKeyForDivision(env, "timeline:users")
+	cacheKey := "timeline:users"
 	payload := []byte(`{"submissions":[]}`)
 
 	if err := env.redis.Set(context.Background(), cacheKey, payload, time.Minute).Err(); err != nil {
 		t.Fatalf("set cache: %v", err)
 	}
 
-	ctx, rec := newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/timeline?division_id=%d", env.defaultDivisionID), nil)
+	ctx, rec := newJSONContext(t, http.MethodGet, "/api/timeline", nil)
 	env.handler.Timeline(ctx)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("timeline cache status %d: %s", rec.Code, rec.Body.String())
@@ -2111,36 +1735,16 @@ func TestHandlerTimelineUsesCache(t *testing.T) {
 	}
 }
 
-func TestHandlerTeamTimelineUsesCache(t *testing.T) {
-	env := setupHandlerTest(t)
-	cacheKey := cacheKeyForDivision(env, "timeline:teams")
-	payload := []byte(`{"submissions":[]}`)
-
-	if err := env.redis.Set(context.Background(), cacheKey, payload, time.Minute).Err(); err != nil {
-		t.Fatalf("set cache: %v", err)
-	}
-
-	ctx, rec := newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/timeline/teams?division_id=%d", env.defaultDivisionID), nil)
-	env.handler.TeamTimeline(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("team timeline cache status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	if !bytes.Equal(rec.Body.Bytes(), payload) {
-		t.Fatalf("expected cached response")
-	}
-}
-
 func TestHandlerLeaderboardUsesCache(t *testing.T) {
 	env := setupHandlerTest(t)
-	cacheKey := cacheKeyForDivision(env, "leaderboard:users")
+	cacheKey := "leaderboard:users"
 	payload := []byte(`{"challenges":[],"entries":[]}`)
 
 	if err := env.redis.Set(context.Background(), cacheKey, payload, time.Minute).Err(); err != nil {
 		t.Fatalf("set cache: %v", err)
 	}
 
-	ctx, rec := newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/leaderboard?division_id=%d", env.defaultDivisionID), nil)
+	ctx, rec := newJSONContext(t, http.MethodGet, "/api/leaderboard", nil)
 	env.handler.Leaderboard(ctx)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("leaderboard cache status %d: %s", rec.Code, rec.Body.String())
@@ -2151,34 +1755,17 @@ func TestHandlerLeaderboardUsesCache(t *testing.T) {
 	}
 }
 
-func TestHandlerTeamLeaderboardUsesCache(t *testing.T) {
-	env := setupHandlerTest(t)
-	cacheKey := cacheKeyForDivision(env, "leaderboard:teams")
-	payload := []byte(`{"challenges":[],"entries":[]}`)
-
-	if err := env.redis.Set(context.Background(), cacheKey, payload, time.Minute).Err(); err != nil {
-		t.Fatalf("set cache: %v", err)
-	}
-
-	ctx, rec := newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/leaderboard/teams?division_id=%d", env.defaultDivisionID), nil)
-	env.handler.TeamLeaderboard(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("leaderboard teams cache status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	if !bytes.Equal(rec.Body.Bytes(), payload) {
-		t.Fatalf("expected cached response")
-	}
-}
-
 func TestHandlerLeaderboardError(t *testing.T) {
+	if err := handlerRedis.FlushAll(context.Background()).Err(); err != nil {
+		t.Fatalf("flush redis: %v", err)
+	}
+
 	closedDB := newClosedHandlerDB(t)
 	scoreRepo := repo.NewScoreboardRepo(closedDB)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
-	handler := New(handlerCfg, nil, nil, nil, nil, scoreSvc, nil, nil, nil, handlerRedis)
+	handler := New(handlerCfg, nil, nil, nil, nil, scoreSvc, nil, handlerRedis)
 
-	divisionID := int64(1)
-	ctx, rec := newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/leaderboard?division_id=%d", divisionID), nil)
+	ctx, rec := newJSONContext(t, http.MethodGet, "/api/leaderboard", nil)
 	handler.Leaderboard(ctx)
 
 	if rec.Code != http.StatusInternalServerError {
@@ -2196,10 +1783,9 @@ func TestHandlerListChallengesError(t *testing.T) {
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	appConfigRepo := repo.NewAppConfigRepo(closedDB)
 	appConfigSvc := service.NewAppConfigService(appConfigRepo, handlerRedis, handlerCfg.Cache.AppConfigTTL)
-	handler := New(handlerCfg, nil, wargameSvc, appConfigSvc, nil, scoreSvc, nil, nil, nil, handlerRedis)
+	handler := New(handlerCfg, nil, wargameSvc, appConfigSvc, nil, scoreSvc, nil, handlerRedis)
 
-	divisionID := int64(1)
-	ctx, rec := newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/challenges?division_id=%d", divisionID), nil)
+	ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
 	handler.ListChallenges(ctx)
 
 	if rec.Code != http.StatusInternalServerError {
@@ -2215,128 +1801,6 @@ func newClosedHandlerDB(t *testing.T) *bun.DB {
 	}
 	_ = conn.Close()
 	return conn
-}
-
-// Team Handler Tests
-
-func TestHandlerCreateTeam(t *testing.T) {
-	env := setupHandlerTest(t)
-
-	ctx, rec := newJSONContext(t, http.MethodPost, "/api/admin/teams", map[string]any{"name": "Alpha", "division_id": env.defaultDivisionID})
-	env.handler.CreateTeam(ctx)
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("create team status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	var resp struct {
-		ID   int64  `json:"id"`
-		Name string `json:"name"`
-	}
-	decodeJSON(t, rec, &resp)
-	if resp.ID == 0 || resp.Name != "Alpha" {
-		t.Fatalf("unexpected team response: %+v", resp)
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodPost, "/api/admin/teams", map[string]any{})
-	env.handler.CreateTeam(ctx)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rec.Code)
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodPost, "/api/admin/teams", map[string]any{"name": "Alpha", "division_id": env.defaultDivisionID})
-	env.handler.CreateTeam(ctx)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected duplicate 400, got %d", rec.Code)
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodPost, "/api/admin/teams", map[string]any{"name": "Beta", "division_id": env.defaultDivisionID + 999})
-	env.handler.CreateTeam(ctx)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected invalid division 400, got %d", rec.Code)
-	}
-}
-
-func TestHandlerTeams(t *testing.T) {
-	env := setupHandlerTest(t)
-	team := createHandlerTeam(t, env, "Alpha")
-	user := createHandlerUserWithTeam(t, env, "u1@example.com", "u1", "pass", models.UserRole, team.ID)
-
-	challenge := createHandlerChallenge(t, env, "Ch1", 100, "FLAG{1}", true)
-	createHandlerSubmission(t, env, user.ID, challenge.ID, true, time.Now().Add(-time.Minute))
-
-	ctx, rec := newJSONContext(t, http.MethodGet, "/api/teams", nil)
-	env.handler.ListTeams(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("list teams status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	var teams []struct {
-		ID          int64 `json:"id"`
-		MemberCount int   `json:"member_count"`
-		TotalScore  int   `json:"total_score"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &teams); err != nil {
-		t.Fatalf("decode teams: %v", err)
-	}
-
-	if len(teams) != 1 || teams[0].ID != team.ID || teams[0].MemberCount != 1 || teams[0].TotalScore != 100 {
-		t.Fatalf("unexpected teams: %+v", teams)
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodGet, "/api/teams/1", nil)
-	ctx.Params = gin.Params{{Key: "id", Value: "0"}}
-	env.handler.GetTeam(ctx)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("get team invalid status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodGet, "/api/teams/1", nil)
-	ctx.Params = gin.Params{{Key: "id", Value: "1"}}
-	env.handler.GetTeam(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("get team status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodGet, "/api/teams/1/members", nil)
-	ctx.Params = gin.Params{{Key: "id", Value: "1"}}
-	env.handler.ListTeamMembers(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("members status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	ctx, rec = newJSONContext(t, http.MethodGet, "/api/teams/1/solved", nil)
-	ctx.Params = gin.Params{{Key: "id", Value: "1"}}
-	env.handler.ListTeamSolved(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("solved status %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestHandlerListUsersDivisionFilter(t *testing.T) {
-	env := setupHandlerTest(t)
-
-	teamA := createHandlerTeam(t, env, "Alpha")
-	_ = createHandlerUserWithTeam(t, env, "a@example.com", "a", "pass", models.UserRole, teamA.ID)
-
-	divB := createHandlerDivision(t, env, "B")
-	teamB := createHandlerTeamInDivision(t, env, "Beta", divB.ID)
-	userB := createHandlerUserWithTeam(t, env, "b@example.com", "b", "pass", models.UserRole, teamB.ID)
-
-	ctx, rec := newJSONContext(t, http.MethodGet, fmt.Sprintf("/api/users?division_id=%d", divB.ID), nil)
-	env.handler.ListUsers(ctx)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("list users status %d: %s", rec.Code, rec.Body.String())
-	}
-
-	var users []struct {
-		ID         int64 `json:"id"`
-		DivisionID int64 `json:"division_id"`
-	}
-	decodeJSON(t, rec, &users)
-
-	if len(users) != 1 || users[0].ID != userB.ID || users[0].DivisionID != divB.ID {
-		t.Fatalf("unexpected users list: %+v", users)
-	}
 }
 
 // User Handler Tests
@@ -2374,10 +1838,8 @@ func TestHandlerMeUpdateUsers(t *testing.T) {
 	ctx, rec = newJSONContext(t, http.MethodPut, "/api/me", map[string]string{"username": "user2"})
 	ctx.Set("userID", user.ID)
 
-	setCachePayload(t, env, cacheKeyForDivision(env, "leaderboard:users"), []byte(`{"challenges":[],"entries":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "leaderboard:teams"), []byte(`{"challenges":[],"entries":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "timeline:users"), []byte(`{"submissions":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "timeline:teams"), []byte(`{"submissions":[]}`))
+	setCachePayload(t, env, "leaderboard:users", []byte(`{"challenges":[],"entries":[]}`))
+	setCachePayload(t, env, "timeline:users", []byte(`{"submissions":[]}`))
 
 	env.handler.UpdateMe(ctx)
 	if rec.Code != http.StatusOK {
@@ -2401,13 +1863,6 @@ func TestHandlerMeUpdateUsers(t *testing.T) {
 	if updateResp.StackLimit != env.cfg.Stack.MaxPer {
 		t.Fatalf("expected update stack_limit %d, got %d", env.cfg.Stack.MaxPer, updateResp.StackLimit)
 	}
-
-	waitForCacheClear(t, env,
-		cacheKeyForDivision(env, "leaderboard:users"),
-		cacheKeyForDivision(env, "leaderboard:teams"),
-		cacheKeyForDivision(env, "timeline:users"),
-		cacheKeyForDivision(env, "timeline:teams"),
-	)
 
 	ctx, rec = newJSONContext(t, http.MethodPut, "/api/me", "")
 	ctx.Set("userID", user.ID)
@@ -2476,10 +1931,8 @@ func TestHandlerMeUpdateUsers(t *testing.T) {
 func TestHandlerNotifyScoreboardChangedPublishesEvent(t *testing.T) {
 	env := setupHandlerTest(t)
 
-	setCachePayload(t, env, cacheKeyForDivision(env, "leaderboard:users"), []byte(`{"challenges":[],"entries":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "leaderboard:teams"), []byte(`{"challenges":[],"entries":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "timeline:users"), []byte(`{"submissions":[]}`))
-	setCachePayload(t, env, cacheKeyForDivision(env, "timeline:teams"), []byte(`{"submissions":[]}`))
+	setCachePayload(t, env, "leaderboard:users", []byte(`{"challenges":[],"entries":[]}`))
+	setCachePayload(t, env, "timeline:users", []byte(`{"submissions":[]}`))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -2487,13 +1940,11 @@ func TestHandlerNotifyScoreboardChangedPublishesEvent(t *testing.T) {
 	sub := env.redis.Subscribe(ctx, "scoreboard.events")
 	defer sub.Close()
 
-	env.handler.notifyScoreboardChanged(ctx, "test_reason", env.defaultDivisionID)
+	env.handler.notifyScoreboardChanged(ctx, "test_reason")
 
 	waitForCacheClear(t, env,
-		cacheKeyForDivision(env, "leaderboard:users"),
-		cacheKeyForDivision(env, "leaderboard:teams"),
-		cacheKeyForDivision(env, "timeline:users"),
-		cacheKeyForDivision(env, "timeline:teams"),
+		"leaderboard:users",
+		"timeline:users",
 	)
 
 	msg, err := sub.ReceiveMessage(ctx)
@@ -2505,63 +1956,8 @@ func TestHandlerNotifyScoreboardChangedPublishesEvent(t *testing.T) {
 	if err := json.Unmarshal([]byte(msg.Payload), &got); err != nil {
 		t.Fatalf("decode event: %v", err)
 	}
-	if got.Reason != "test_reason" || got.Scope != "division" || len(got.DivisionIDs) != 1 || got.DivisionIDs[0] != env.defaultDivisionID {
+	if got.Reason != "test_reason" || got.Scope != "all" {
 		t.Fatalf("unexpected event: %+v", got)
-	}
-}
-
-func TestHandlerNotifyScoreboardChangedPublishesMultipleDivisions(t *testing.T) {
-	env := setupHandlerTest(t)
-
-	other := models.Division{Name: "Other", CreatedAt: time.Now().UTC()}
-	if err := env.divisionRepo.Create(context.Background(), &other); err != nil {
-		t.Fatalf("create division: %v", err)
-	}
-
-	cacheA := cacheKeyWithDivision("leaderboard:users", &env.defaultDivisionID)
-	cacheB := cacheKeyWithDivision("leaderboard:users", &other.ID)
-	setCachePayload(t, env, cacheA, []byte(`{"challenges":[],"entries":[]}`))
-	setCachePayload(t, env, cacheB, []byte(`{"challenges":[],"entries":[]}`))
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	sub := env.redis.Subscribe(ctx, "scoreboard.events")
-	defer sub.Close()
-
-	env.handler.notifyScoreboardChanged(ctx, "test_multi", env.defaultDivisionID, other.ID, env.defaultDivisionID)
-
-	waitForCacheClear(t, env, cacheA, cacheB)
-
-	msg, err := sub.ReceiveMessage(ctx)
-	if err != nil {
-		t.Fatalf("receive event: %v", err)
-	}
-
-	var got realtime.ScoreboardEvent
-	if err := json.Unmarshal([]byte(msg.Payload), &got); err != nil {
-		t.Fatalf("decode event: %v", err)
-	}
-
-	if got.Scope != "division" || got.Reason != "test_multi" {
-		t.Fatalf("unexpected event: %+v", got)
-	}
-
-	if len(got.DivisionIDs) != 2 {
-		t.Fatalf("expected 2 divisions, got %v", got.DivisionIDs)
-	}
-
-	seen := map[int64]struct{}{}
-	for _, id := range got.DivisionIDs {
-		seen[id] = struct{}{}
-	}
-
-	if _, ok := seen[env.defaultDivisionID]; !ok {
-		t.Fatalf("missing default division id")
-	}
-
-	if _, ok := seen[other.ID]; !ok {
-		t.Fatalf("missing other division id")
 	}
 }
 
@@ -2587,7 +1983,7 @@ func TestOptionalUserID(t *testing.T) {
 			RefreshTTL: time.Hour,
 		},
 	}
-	handler := New(cfg, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	handler := New(cfg, nil, nil, nil, nil, nil, nil, nil)
 
 	token, err := auth.GenerateAccessToken(cfg.JWT, 99, models.UserRole)
 	if err != nil {
@@ -2612,7 +2008,7 @@ func TestOptionalUserIDInvalidHeaders(t *testing.T) {
 			RefreshTTL: time.Hour,
 		},
 	}
-	handler := New(cfg, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	handler := New(cfg, nil, nil, nil, nil, nil, nil, nil)
 
 	ctx, _ := newJSONContext(t, http.MethodGet, "/api/me", nil)
 	if got := handler.optionalUserID(ctx); got != 0 {
@@ -2629,43 +2025,6 @@ func TestOptionalUserIDInvalidHeaders(t *testing.T) {
 	ctx.Request.Header.Set("Authorization", "Bearer not-a-token")
 	if got := handler.optionalUserID(ctx); got != 0 {
 		t.Fatalf("expected 0 for malformed token, got %d", got)
-	}
-}
-
-func TestUniqueDivisionIDs(t *testing.T) {
-	if got := uniqueDivisionIDs(nil); got != nil {
-		t.Fatalf("expected nil for empty input, got %v", got)
-	}
-
-	got := uniqueDivisionIDs([]int64{-1, 0, 3, 3, 2, 0, 2, 1})
-	want := []int64{3, 2, 1}
-	if len(got) != len(want) {
-		t.Fatalf("unexpected length: %v", got)
-	}
-
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("unexpected result: %v", got)
-		}
-	}
-}
-
-func TestParseOptionalPositiveIDQuery(t *testing.T) {
-	ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
-	id, err := parseOptionalPositiveIDQuery(ctx, "division_id")
-	if err != nil || id != nil {
-		t.Fatalf("expected nil id and nil error, got id=%v err=%v", id, err)
-	}
-
-	ctx, _ = newJSONContext(t, http.MethodGet, "/api/challenges?division_id=12", nil)
-	id, err = parseOptionalPositiveIDQuery(ctx, "division_id")
-	if err != nil || id == nil || *id != 12 {
-		t.Fatalf("expected id 12, got id=%v err=%v", id, err)
-	}
-
-	ctx, _ = newJSONContext(t, http.MethodGet, "/api/challenges?division_id=0", nil)
-	if _, err = parseOptionalPositiveIDQuery(ctx, "division_id"); err == nil {
-		t.Fatalf("expected validation error for zero")
 	}
 }
 

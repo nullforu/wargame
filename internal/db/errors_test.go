@@ -21,18 +21,8 @@ func TestIsUniqueViolation(t *testing.T) {
 
 	db := setupDBTest(t)
 	ctx := context.Background()
-	if _, err := db.ExecContext(ctx, "TRUNCATE TABLE users, teams, divisions RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := db.ExecContext(ctx, "TRUNCATE TABLE submissions, stacks, challenges, users, app_configs RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
-	}
-
-	division := &models.Division{Name: "Unique-Division", CreatedAt: time.Now().UTC()}
-	if _, err := db.NewInsert().Model(division).Exec(ctx); err != nil {
-		t.Fatalf("insert division: %v", err)
-	}
-
-	team := &models.Team{Name: "Unique-Team", DivisionID: division.ID, CreatedAt: time.Now().UTC()}
-	if _, err := db.NewInsert().Model(team).Exec(ctx); err != nil {
-		t.Fatalf("insert team: %v", err)
 	}
 
 	now := time.Now().UTC()
@@ -41,7 +31,6 @@ func TestIsUniqueViolation(t *testing.T) {
 		Username:     "dup-user-1",
 		PasswordHash: "hash",
 		Role:         models.UserRole,
-		TeamID:       team.ID,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -54,7 +43,6 @@ func TestIsUniqueViolation(t *testing.T) {
 		Username:     "dup-user-2",
 		PasswordHash: "hash",
 		Role:         models.UserRole,
-		TeamID:       team.ID,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
