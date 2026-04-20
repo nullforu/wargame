@@ -40,6 +40,8 @@ export interface ChallengeDetail {
     level: number
     points: number
     solve_count: number
+    created_by_user_id?: number | null
+    created_by_username?: string
     is_active: boolean
     has_file: boolean
     file_name?: string | null
@@ -57,6 +59,8 @@ export interface LockedChallenge {
     level: number
     points: number
     solve_count: number
+    created_by_user_id?: number | null
+    created_by_username?: string
     is_active: boolean
     previous_challenge_id?: number | null
     previous_challenge_title?: string | null

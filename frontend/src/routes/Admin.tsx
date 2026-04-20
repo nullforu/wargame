@@ -58,11 +58,6 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
 
     return (
         <section className='animate space-y-3'>
-            <div className='border border-border bg-surface p-4'>
-                <h2 className='text-2xl font-semibold text-text'>{t('admin.title')}</h2>
-                <p className='mt-1 text-sm text-text-muted'>{t('admin.communityIntro')}</p>
-            </div>
-
             {!auth.user ? (
                 <div className='border border-warning/40 bg-warning/10 p-4 text-sm text-warning'>{t('admin.loginRequired')}</div>
             ) : auth.user.role !== 'admin' ? (
@@ -70,7 +65,7 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
             ) : (
                 <>
                     <div className='lg:hidden'>
-                        <select className='w-full border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none' value={activeTab} onChange={(event) => setActiveTab(event.target.value as AdminTabId)}>
+                        <select className='w-full border border-border px-3 py-2 text-sm text-text focus:border-accent focus:outline-none' value={activeTab} onChange={(event) => setActiveTab(event.target.value as AdminTabId)}>
                             {adminTabs.map((tab) => (
                                 <option key={tab.id} value={tab.id}>
                                     {tab.label}
@@ -80,11 +75,11 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
                     </div>
 
                     <div className='flex flex-col gap-4 lg:flex-row'>
-                        <nav className='hidden w-64 shrink-0 border border-border bg-surface lg:block'>
+                        <nav className='hidden w-64 shrink-0 lg:block'>
                             {adminTabs.map((tab) => (
                                 <button
                                     key={tab.id}
-                                    className={`flex w-full items-center border-b border-border px-4 py-3 text-left text-sm ${activeTab === tab.id ? 'bg-surface-muted font-semibold text-accent' : 'text-text-muted hover:bg-surface-muted'}`}
+                                    className={`flex w-full items-center rounded-none border-b border-border px-4 py-3 text-left text-sm ${activeTab === tab.id ? 'bg-surface-muted font-semibold text-accent' : 'text-text-muted hover:bg-surface-muted'}`}
                                     onClick={() => setActiveTab(tab.id as AdminTabId)}
                                     type='button'
                                 >

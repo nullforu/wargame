@@ -16,6 +16,7 @@ const PAGE_SIZE = 20
 const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: PAGE_SIZE, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
 
 type SolveFilter = 'all' | 'solved' | 'unsolved'
+type SortFilter = 'latest' | 'oldest' | 'most_solved' | 'least_solved'
 
 const parsePositiveInt = (value: string | null, fallback: number) => {
     const parsed = Number(value)
@@ -25,6 +26,11 @@ const parsePositiveInt = (value: string | null, fallback: number) => {
 const parseSolveFilter = (value: string | null): SolveFilter => {
     if (value === 'solved' || value === 'unsolved') return value
     return 'all'
+}
+
+const parseSortFilter = (value: string | null): SortFilter => {
+    if (value === 'oldest' || value === 'most_solved' || value === 'least_solved') return value
+    return 'latest'
 }
 
 const getDifficultyBadgeClass = (level: number) => {
@@ -75,7 +81,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
 
     const readQueryState = () => {
         if (typeof window === 'undefined') {
-            return { q: '', page: 1, category: 'all', level: 0, solved: 'all' as SolveFilter }
+            return { q: '', page: 1, category: 'all', level: 0, solved: 'all' as SolveFilter, sort: 'latest' as SortFilter }
         }
         const params = new URLSearchParams(window.location.search)
         const categoryParam = params.get('category')
@@ -85,6 +91,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
             category: categoryParam && categoryParam.trim() !== '' ? categoryParam : 'all',
             level: Math.max(0, Math.min(10, parsePositiveInt(params.get('level'), 0))),
             solved: parseSolveFilter(params.get('solved')),
+            sort: parseSortFilter(params.get('sort')),
         }
     }
 
@@ -97,13 +104,16 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
     const [categoryFilter, setCategoryFilter] = useState<string>(initialQueryState.category)
     const [levelFilter, setLevelFilter] = useState<number>(initialQueryState.level)
     const [solveFilter, setSolveFilter] = useState<SolveFilter>(initialQueryState.solved)
+    const [sortFilter, setSortFilter] = useState<SortFilter>(initialQueryState.sort)
 
     const [topUsers, setTopUsers] = useState<ScoreEntry[]>([])
     const [isExtraCategoryOpen, setIsExtraCategoryOpen] = useState(false)
+    const [isSortMenuOpen, setIsSortMenuOpen] = useState(false)
     const extraCategoryMenuRef = useRef<HTMLDivElement | null>(null)
+    const sortMenuRef = useRef<HTMLDivElement | null>(null)
     const isExtraCategorySelected = categoryFilter !== 'all' && !PRIMARY_CATEGORY_SET.has(categoryFilter)
 
-    const pushQueryState = (next: { q: string; page: number; category: string; level: number; solved: SolveFilter }) => {
+    const pushQueryState = (next: { q: string; page: number; category: string; level: number; solved: SolveFilter; sort: SortFilter }) => {
         if (typeof window === 'undefined') return
         const params = new URLSearchParams()
         if (next.q.trim() !== '') params.set('q', next.q.trim())
@@ -111,6 +121,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
         if (next.category !== 'all') params.set('category', next.category)
         if (next.level > 0) params.set('level', String(next.level))
         if (next.solved !== 'all') params.set('solved', next.solved)
+        if (next.sort !== 'latest') params.set('sort', next.sort)
         const query = params.toString()
         const nextURL = query ? `${window.location.pathname}?${query}` : window.location.pathname
         const currentURL = `${window.location.pathname}${window.location.search}`
@@ -128,6 +139,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                 category: categoryFilter === 'all' ? undefined : categoryFilter,
                 level: levelFilter > 0 ? levelFilter : undefined,
                 solved: solveFilter === 'all' ? undefined : solveFilter === 'solved',
+                sort: sortFilter,
             })
             setChallenges(data.challenges)
             setPagination(data.pagination)
@@ -151,7 +163,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
     useEffect(() => {
         if (!auth.user) return
         void Promise.all([loadChallenges(page), loadTopUsers()])
-    }, [auth.user?.id, page, appliedSearch, categoryFilter, levelFilter, solveFilter])
+    }, [auth.user?.id, page, appliedSearch, categoryFilter, levelFilter, solveFilter, sortFilter])
 
     useEffect(() => {
         const onPopState = () => {
@@ -162,6 +174,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
             setCategoryFilter(state.category)
             setLevelFilter(state.level)
             setSolveFilter(state.solved)
+            setSortFilter(state.sort)
         }
         window.addEventListener('popstate', onPopState)
         return () => window.removeEventListener('popstate', onPopState)
@@ -187,6 +200,27 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
             window.removeEventListener('keydown', onKeyDown)
         }
     }, [isExtraCategoryOpen])
+
+    useEffect(() => {
+        if (!isSortMenuOpen) return
+
+        const onPointerDown = (event: MouseEvent) => {
+            if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) {
+                setIsSortMenuOpen(false)
+            }
+        }
+
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setIsSortMenuOpen(false)
+        }
+
+        window.addEventListener('mousedown', onPointerDown)
+        window.addEventListener('keydown', onKeyDown)
+        return () => {
+            window.removeEventListener('mousedown', onPointerDown)
+            window.removeEventListener('keydown', onKeyDown)
+        }
+    }, [isSortMenuOpen])
 
     if (!auth.user) {
         return <LoginRequired title={t('challenges.title')} />
@@ -215,7 +249,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                     const nextQ = searchQuery.trim()
                                     setAppliedSearch(nextQ)
                                     setPage(1)
-                                    pushQueryState({ q: nextQ, page: 1, category: categoryFilter, level: levelFilter, solved: solveFilter })
+                                    pushQueryState({ q: nextQ, page: 1, category: categoryFilter, level: levelFilter, solved: solveFilter, sort: sortFilter })
                                 }}
                             >
                                 {t('common.search')}
@@ -230,7 +264,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                     setCategoryFilter('all')
                                     setPage(1)
                                     setIsExtraCategoryOpen(false)
-                                    pushQueryState({ q: appliedSearch, page: 1, category: 'all', level: levelFilter, solved: solveFilter })
+                                    pushQueryState({ q: appliedSearch, page: 1, category: 'all', level: levelFilter, solved: solveFilter, sort: sortFilter })
                                 }}
                             >
                                 {t('common.all')}
@@ -244,7 +278,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                         setCategoryFilter(category)
                                         setPage(1)
                                         setIsExtraCategoryOpen(false)
-                                        pushQueryState({ q: appliedSearch, page: 1, category, level: levelFilter, solved: solveFilter })
+                                        pushQueryState({ q: appliedSearch, page: 1, category, level: levelFilter, solved: solveFilter, sort: sortFilter })
                                     }}
                                 >
                                     {t(getCategoryKey(category))}
@@ -275,7 +309,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                                     onClick={() => {
                                                         setCategoryFilter(category)
                                                         setPage(1)
-                                                        pushQueryState({ q: appliedSearch, page: 1, category, level: levelFilter, solved: solveFilter })
+                                                        pushQueryState({ q: appliedSearch, page: 1, category, level: levelFilter, solved: solveFilter, sort: sortFilter })
                                                         setIsExtraCategoryOpen(false)
                                                     }}
                                                 >
@@ -296,7 +330,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                 onClick={() => {
                                     setLevelFilter(0)
                                     setPage(1)
-                                    pushQueryState({ q: appliedSearch, page: 1, category: categoryFilter, level: 0, solved: solveFilter })
+                                    pushQueryState({ q: appliedSearch, page: 1, category: categoryFilter, level: 0, solved: solveFilter, sort: sortFilter })
                                 }}
                             >
                                 {t('common.all')}
@@ -314,6 +348,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                             category: categoryFilter,
                                             level,
                                             solved: solveFilter,
+                                            sort: sortFilter,
                                         })
                                     }}
                                     className='transition hover:scale-105'
@@ -333,12 +368,50 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                     onClick={() => {
                                         setSolveFilter(key)
                                         setPage(1)
-                                        pushQueryState({ q: appliedSearch, page: 1, category: categoryFilter, level: levelFilter, solved: key })
+                                        pushQueryState({ q: appliedSearch, page: 1, category: categoryFilter, level: levelFilter, solved: key, sort: sortFilter })
                                     }}
                                 >
                                     {key === 'all' ? t('challenges.filterAll') : key === 'solved' ? t('challenges.filterSolved') : t('challenges.filterUnsolved')}
                                 </button>
                             ))}
+                        </div>
+                    </div>
+
+                    <div className='flex items-center justify-between px-0 py-1 text-sm text-text-muted md:px-4 dark:text-text-muted'>
+                        <span>{t('common.totalCount', { count: pagination.total_count })}</span>
+                        <div className='relative' ref={sortMenuRef}>
+                            <button
+                                type='button'
+                                className='inline-flex min-w-28 items-center justify-between gap-2 rounded-md border border-accent/60 bg-surface px-3 py-1.5 text-xs text-text'
+                                onClick={() => setIsSortMenuOpen((prev) => !prev)}
+                                aria-haspopup='menu'
+                                aria-expanded={isSortMenuOpen}
+                            >
+                                <span>{t(`challenges.sort.${sortFilter}`)}</span>
+                                <svg className={`h-3 w-3 transition-transform ${isSortMenuOpen ? 'rotate-180' : ''}`} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+                                    <path d='m6 9 6 6 6-6' />
+                                </svg>
+                            </button>
+
+                            {isSortMenuOpen ? (
+                                <div className='absolute right-0 top-full z-20 mt-1 min-w-44 rounded-md border border-border bg-surface p-1 shadow-lg'>
+                                    {(['latest', 'oldest', 'most_solved', 'least_solved'] as const).map((key) => (
+                                        <button
+                                            key={key}
+                                            type='button'
+                                            className={`block w-full rounded px-2 py-1.5 text-left text-xs ${sortFilter === key ? 'bg-accent/12 text-accent' : 'text-text-muted hover:bg-surface-muted hover:text-text'}`}
+                                            onClick={() => {
+                                                setSortFilter(key)
+                                                setPage(1)
+                                                setIsSortMenuOpen(false)
+                                                pushQueryState({ q: appliedSearch, page: 1, category: categoryFilter, level: levelFilter, solved: solveFilter, sort: key })
+                                            }}
+                                        >
+                                            {t(`challenges.sort.${key}`)}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : null}
                         </div>
                     </div>
 
@@ -352,30 +425,25 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                         ) : (
                             <div className='overflow-x-auto'>
                                 <div className='min-w-150'>
-                                    <div className='grid grid-cols-[minmax(160px,2fr)_1fr_70px_90px] sm:grid-cols-[minmax(200px,2fr)_1fr_80px_100px] lg:grid-cols-[minmax(220px,2fr)_1fr_90px_110px] bg-surface-muted px-4 py-2 text-[12px] text-text-muted'>
+                                    <div className='grid grid-cols-[minmax(160px,2fr)_1fr_70px_100px] sm:grid-cols-[minmax(200px,2fr)_1fr_80px_110px] lg:grid-cols-[minmax(220px,2fr)_1fr_90px_120px] bg-surface-muted px-4 py-2 text-[12px] text-text-muted'>
                                         <span>{t('challenges.tableProblem')}</span>
                                         <span>{t('common.category')}</span>
                                         <span>{t('challenges.tableSolveCount')}</span>
-                                        <span>{t('common.status')}</span>
+                                        <span>{t('challenges.tableAuthor')}</span>
                                     </div>
 
                                     <div>
                                         {challenges.map((challenge) => {
                                             const category = 'category' in challenge ? challenge.category : t('common.na')
                                             const solveCount = 'solve_count' in challenge ? challenge.solve_count : 0
-                                            const solved = challenge.is_solved === true
-                                            const locked = challenge.is_locked === true
                                             const inactive = challenge.is_active === false
-
-                                            const statusLabel = locked ? t('challenge.lockedLabel') : inactive ? t('challenge.inactiveLabel') : solved ? t('challenge.solvedLabel') : t('challenge.unsolvedLabel')
-
-                                            const statusColor = locked || inactive ? 'text-text-subtle' : solved ? 'text-success' : 'text-warning'
+                                            const author = challenge.created_by_username && challenge.created_by_username.trim() !== '' ? challenge.created_by_username : t('common.na')
 
                                             return (
                                                 <button
                                                     key={challenge.id}
                                                     type='button'
-                                                    className='grid w-full grid-cols-[minmax(160px,2fr)_1fr_70px_90px] sm:grid-cols-[minmax(200px,2fr)_1fr_80px_100px] lg:grid-cols-[minmax(220px,2fr)_1fr_90px_110px] items-center px-4 py-3 text-left transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-70'
+                                                    className='grid w-full grid-cols-[minmax(160px,2fr)_1fr_70px_100px] sm:grid-cols-[minmax(200px,2fr)_1fr_80px_110px] lg:grid-cols-[minmax(220px,2fr)_1fr_90px_120px] items-center px-4 py-3 text-left transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-70'
                                                     disabled={inactive}
                                                     onClick={() => {
                                                         if (!inactive) {
@@ -387,7 +455,14 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                                         <DifficultyBadge level={challenge.level} />
                                                         <div className='flex items-center min-w-0 flex-1'>
                                                             <span className='truncate text-[14px] sm:text-[16px] font-semibold pr-4'>{challenge.title}</span>
-                                                            {challenge.is_solved && (
+                                                            {challenge.is_locked ? (
+                                                                <span className='shrink-0 w-4 h-4 text-warning -ml-1.5' title={t('challenge.lockedLabel')}>
+                                                                    <svg viewBox='0 0 24 24' className='w-full h-full' fill='none' stroke='currentColor' strokeWidth='2'>
+                                                                        <rect x='5' y='11' width='14' height='9' rx='2' />
+                                                                        <path d='M8 11V8a4 4 0 1 1 8 0v3' />
+                                                                    </svg>
+                                                                </span>
+                                                            ) : challenge.is_solved ? (
                                                                 <span className='shrink-0 w-4 h-4 text-accent -ml-1.5'>
                                                                     <svg viewBox='0 0 24 24' className='w-full h-full'>
                                                                         <path d='M5 6.7c.9-.8 2.1-1.2 3.5-1.2 2.7 0 4.6 2.2 8.5.6v8.8c-3.9 1.7-5.8-.9-8.5-.9-1.2 0-2.5.3-3.5.9V6.7Z' fill='currentColor' opacity='0.7' />
@@ -400,13 +475,13 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                                                         />
                                                                     </svg>
                                                                 </span>
-                                                            )}
+                                                            ) : null}
                                                         </div>
                                                     </div>
 
                                                     <span className='text-xs text-text-muted wrap-break-words'>{t(getCategoryKey(category))}</span>
                                                     <span className='text-sm text-text-muted'>{solveCount}</span>
-                                                    <span className={`text-xs font-medium ${statusColor}`}>{statusLabel}</span>
+                                                    <span className='text-xs text-text-muted truncate'>{author}</span>
                                                 </button>
                                             )
                                         })}
@@ -416,8 +491,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                         )}
                     </div>
 
-                    <div className='flex flex-wrap items-center justify-between gap-2 px-0 py-2 text-sm text-text-muted md:px-4 dark:text-text-muted'>
-                        <span>{t('common.totalCount', { count: pagination.total_count })}</span>
+                    <div className='flex flex-wrap items-center justify-end gap-2 px-0 py-2 text-sm text-text-muted md:px-4 dark:text-text-muted'>
                         <div className='flex items-center gap-2'>
                             <button
                                 type='button'
@@ -426,7 +500,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                 onClick={() => {
                                     const nextPage = Math.max(1, page - 1)
                                     setPage(nextPage)
-                                    pushQueryState({ q: appliedSearch, page: nextPage, category: categoryFilter, level: levelFilter, solved: solveFilter })
+                                    pushQueryState({ q: appliedSearch, page: nextPage, category: categoryFilter, level: levelFilter, solved: solveFilter, sort: sortFilter })
                                 }}
                             >
                                 {t('common.previous')}
@@ -441,7 +515,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                 onClick={() => {
                                     const nextPage = page + 1
                                     setPage(nextPage)
-                                    pushQueryState({ q: appliedSearch, page: nextPage, category: categoryFilter, level: levelFilter, solved: solveFilter })
+                                    pushQueryState({ q: appliedSearch, page: nextPage, category: categoryFilter, level: levelFilter, solved: solveFilter, sort: sortFilter })
                                 }}
                             >
                                 {t('common.next')}

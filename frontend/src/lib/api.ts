@@ -133,6 +133,7 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
             category,
             level,
             solved,
+            sort,
         }: {
             q?: string
             page?: number
@@ -140,6 +141,7 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
             category?: string
             level?: number
             solved?: boolean
+            sort?: string
         },
     ) => {
         const params = new URLSearchParams()
@@ -149,6 +151,7 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
         if (typeof category === 'string' && category.trim() !== '') params.set('category', category.trim())
         if (typeof level === 'number') params.set('level', String(level))
         if (typeof solved === 'boolean') params.set('solved', String(solved))
+        if (typeof sort === 'string' && sort.trim() !== '') params.set('sort', sort.trim())
         const query = params.toString()
         return query ? `${path}?${query}` : path
     }
@@ -310,12 +313,13 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
                 category?: string
                 level?: number
                 solved?: boolean
+                sort?: string
             },
         ) => {
             const trimmedQ = q.trim()
             const basePath = trimmedQ === '' ? `/api/challenges` : `/api/challenges/search`
             const data = await request<{ challenges?: Challenge[]; pagination?: PaginationMeta }>(
-                withChallengeFilters(basePath, { q: trimmedQ, page, pageSize, category: filters?.category, level: filters?.level, solved: filters?.solved }),
+                withChallengeFilters(basePath, { q: trimmedQ, page, pageSize, category: filters?.category, level: filters?.level, solved: filters?.solved, sort: filters?.sort }),
                 { auth: true },
             )
             return {

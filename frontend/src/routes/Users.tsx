@@ -94,46 +94,48 @@ const Users = ({ routeParams = {} }: RouteProps) => {
     }
 
     return (
-        <section className='animate space-y-3'>
-            <div className='rounded-none border-0 bg-transparent p-0 shadow-none'>
+        <section className='animate space-y-4'>
+            <div className='space-y-2 bg-transparent shadow-none md:bg-surface md:p-3 dark:bg-surface'>
                 <h2 className='text-2xl font-semibold text-text dark:text-text'>{t('users.title')}</h2>
 
-                <div className='mt-3 flex flex-wrap gap-2'>
+                <div className='mt-1'>
                     <input
                         type='text'
                         placeholder={t('users.searchPlaceholder')}
                         value={searchQuery}
                         onChange={(event) => setSearchQuery(event.target.value)}
-                        className='w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-subtle focus:border-accent focus:outline-none sm:max-w-96 dark:border-border dark:bg-surface dark:text-text dark:placeholder:text-text-subtle'
+                        className='w-full rounded-lg border border-border/70 bg-surface px-3 py-2.5 text-sm text-text placeholder:text-text-subtle focus:border-accent focus:outline-none dark:border-border/70 dark:bg-surface dark:text-text dark:placeholder:text-text-subtle'
                     />
-                    <button
-                        type='button'
-                        className='flex-1 rounded-md border border-accent bg-accent px-4 py-2 text-sm text-white transition hover:bg-accent-strong sm:flex-none'
-                        onClick={() => {
-                            const nextQ = searchQuery.trim()
-                            setAppliedSearch(nextQ)
-                            setPage(1)
-                            pushQueryState({ q: nextQ, page: 1 })
-                        }}
-                    >
-                        {t('common.search')}
-                    </button>
-                    <button
-                        type='button'
-                        className='flex-1 rounded-md border border-border bg-surface px-4 py-2 text-sm text-text-muted transition hover:bg-surface-muted sm:flex-none dark:border-border dark:bg-surface dark:text-text dark:hover:bg-surface-muted'
-                        onClick={() => {
-                            setSearchQuery('')
-                            setAppliedSearch('')
-                            setPage(1)
-                            pushQueryState({ q: '', page: 1 })
-                        }}
-                    >
-                        {t('common.reset')}
-                    </button>
+                    <div className='mt-2 flex flex-wrap gap-2'>
+                        <button
+                            type='button'
+                            className='rounded-md border border-border/70 bg-surface-muted px-4 py-2 text-sm text-text transition hover:bg-surface-subtle'
+                            onClick={() => {
+                                const nextQ = searchQuery.trim()
+                                setAppliedSearch(nextQ)
+                                setPage(1)
+                                pushQueryState({ q: nextQ, page: 1 })
+                            }}
+                        >
+                            {t('common.search')}
+                        </button>
+                        <button
+                            type='button'
+                            className='rounded-md border border-border/70 bg-surface-muted px-4 py-2 text-sm text-text transition hover:bg-surface-subtle dark:border-border/70 dark:hover:bg-surface-muted'
+                            onClick={() => {
+                                setSearchQuery('')
+                                setAppliedSearch('')
+                                setPage(1)
+                                pushQueryState({ q: '', page: 1 })
+                            }}
+                        >
+                            {t('common.reset')}
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div className='overflow-hidden rounded-none border-0 bg-transparent shadow-none md:rounded-xl md:border md:border-border md:bg-surface dark:bg-surface dark:border-border'>
+            <div className='-mx-4 md:mx-0 overflow-hidden rounded-none md:rounded-xl bg-transparent md:bg-surface md:shadow-sm'>
                 {loading ? <p className='px-4 py-8 text-sm text-text-muted dark:text-text-muted'>{t('common.loading')}</p> : null}
                 {!loading && errorMessage ? <p className='px-4 py-8 text-sm text-danger'>{errorMessage}</p> : null}
                 {!loading && !errorMessage ? (
@@ -161,53 +163,41 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                             {sortedUsers.length === 0 ? <p className='px-6 py-8 text-center text-sm text-text-muted'>{appliedSearch ? t('users.noResults') : t('users.noUsers')}</p> : null}
                         </div>
 
-                        <div className='hidden overflow-x-auto md:block'>
-                            <table className='w-full'>
-                                <thead className='border-b border-border bg-surface-muted dark:border-border dark:bg-surface-muted'>
-                                    <tr>
-                                        <th className='px-4 py-2 text-left text-[12px] font-medium text-text-muted dark:text-text-muted'>{t('common.id')}</th>
-                                        <th className='px-4 py-2 text-left text-[12px] font-medium text-text-muted dark:text-text-muted'>{t('common.username')}</th>
-                                        <th className='px-4 py-2 text-left text-[12px] font-medium text-text-muted dark:text-text-muted'>{t('common.role')}</th>
-                                        <th className='px-4 py-2 text-right text-[12px] font-medium text-text-muted dark:text-text-muted'>{t('common.action')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {sortedUsers.map((user) => (
-                                        <tr key={user.id} className='border-b border-border hover:bg-surface-muted dark:border-border dark:hover:bg-surface-muted'>
-                                            <td className='px-4 py-3 text-sm text-text dark:text-text'>{user.id}</td>
-                                            <td className='px-4 py-3 text-sm text-text dark:text-text'>{user.username}</td>
-                                            <td className='px-4 py-3 text-xs text-text-muted dark:text-text-muted'>{t(getRoleKey(user.role))}</td>
-                                            <td className='px-4 py-3 text-right'>
-                                                <button
-                                                    className='rounded-md border border-border bg-surface px-3 py-1 text-xs text-text-muted transition hover:bg-surface-muted dark:border-border dark:bg-surface dark:text-text dark:hover:bg-surface-muted'
-                                                    onClick={() => navigate(`/users/${user.id}${window.location.search}`)}
-                                                    type='button'
-                                                >
-                                                    {t('common.view')}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {sortedUsers.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} className='px-6 py-8 text-center text-sm text-text-muted dark:text-text-muted'>
-                                                {appliedSearch ? t('users.noResults') : t('users.noUsers')}
-                                            </td>
-                                        </tr>
-                                    ) : null}
-                                </tbody>
-                            </table>
+                        <div className='hidden md:block'>
+                            <div className='grid grid-cols-[110px_minmax(0,1fr)_180px_120px] bg-surface-muted px-4 py-3 text-[12px] text-text-muted dark:bg-surface-muted dark:text-text-muted'>
+                                <p className='font-medium'>{t('common.id')}</p>
+                                <p className='font-medium'>{t('common.username')}</p>
+                                <p className='font-medium'>{t('common.role')}</p>
+                                <p className='text-right font-medium'>{t('common.action')}</p>
+                            </div>
+                            {sortedUsers.map((user) => (
+                                <div key={user.id} className='grid grid-cols-[110px_minmax(0,1fr)_180px_120px] items-center px-4 py-4 transition hover:bg-surface-muted/40 dark:hover:bg-surface-muted'>
+                                    <p className='text-sm text-text dark:text-text'>{user.id}</p>
+                                    <p className='truncate pr-3 text-sm text-text dark:text-text'>{user.username}</p>
+                                    <p className='text-xs text-text-muted dark:text-text-muted'>{t(getRoleKey(user.role))}</p>
+                                    <div className='text-right'>
+                                        <button
+                                            className='rounded-md border border-border bg-surface px-3 py-1 text-xs text-text-muted transition hover:bg-surface-muted dark:border-border dark:bg-surface dark:text-text dark:hover:bg-surface-muted'
+                                            onClick={() => navigate(`/users/${user.id}${window.location.search}`)}
+                                            type='button'
+                                        >
+                                            {t('common.view')}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            {sortedUsers.length === 0 ? <p className='px-6 py-8 text-center text-sm text-text-muted dark:text-text-muted'>{appliedSearch ? t('users.noResults') : t('users.noUsers')}</p> : null}
                         </div>
                     </>
                 ) : null}
             </div>
 
-            <div className='flex flex-wrap items-center justify-between gap-2 rounded-none border-0 bg-transparent px-0 py-2 text-sm text-text-muted shadow-none md:rounded-xl md:border md:border-border md:bg-surface md:px-4 dark:bg-surface dark:border-border dark:text-text-muted'>
+            <div className='mt-3 flex flex-wrap items-center justify-between gap-3 px-1 text-xs text-text-muted dark:text-text-muted'>
                 <span>{t('common.totalCount', { count: pagination.total_count })}</span>
                 <div className='flex items-center gap-2'>
                     <button
                         type='button'
-                        className='rounded-md border border-border bg-surface px-3 py-1 text-xs text-text-muted transition hover:bg-surface-muted disabled:opacity-50 dark:border-border dark:bg-surface dark:text-text dark:hover:bg-surface-muted'
+                        className='rounded-md bg-surface-muted px-3 py-1 text-xs text-text transition hover:bg-surface-subtle disabled:opacity-50 dark:text-text dark:hover:bg-surface-muted'
                         disabled={!pagination.has_prev}
                         onClick={() => {
                             const nextPage = Math.max(1, page - 1)
@@ -217,12 +207,12 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                     >
                         {t('common.previous')}
                     </button>
-                    <span className='text-xs'>
+                    <span className='text-xs text-text-muted'>
                         {pagination.page} / {pagination.total_pages || 1}
                     </span>
                     <button
                         type='button'
-                        className='rounded-md border border-border bg-surface px-3 py-1 text-xs text-text-muted transition hover:bg-surface-muted disabled:opacity-50 dark:border-border dark:bg-surface dark:text-text dark:hover:bg-surface-muted'
+                        className='rounded-md bg-surface-muted px-3 py-1 text-xs text-text transition hover:bg-surface-subtle disabled:opacity-50 dark:text-text dark:hover:bg-surface-muted'
                         disabled={!pagination.has_next}
                         onClick={() => {
                             const nextPage = page + 1

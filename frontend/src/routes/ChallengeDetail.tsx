@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ApiError } from '../lib/api'
-import type { Challenge, ChallengeSolver, PaginationMeta } from '../lib/types'
+import type { Challenge, ChallengeSolver, PaginationMeta, Stack } from '../lib/types'
 import { formatApiError, formatDateTime, parseRouteId } from '../lib/utils'
 import { getCategoryKey, getLocaleTag, useLocale, useT } from '../lib/i18n'
 import { navigate } from '../lib/router'
@@ -47,6 +47,9 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
 
     const [downloadLoading, setDownloadLoading] = useState(false)
     const [downloadMessage, setDownloadMessage] = useState('')
+    const [stackInfo, setStackInfo] = useState<Stack | null>(null)
+    const [stackLoading, setStackLoading] = useState(false)
+    const [stackMessage, setStackMessage] = useState('')
 
     const pushSolverPageQuery = (nextPage: number) => {
         if (typeof window === 'undefined') return
@@ -103,10 +106,33 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         void loadChallenge()
     }, [auth.user?.id, challengeId])
 
+    const loadStack = async () => {
+        if (!challengeId || !challenge || challenge.is_locked || !('stack_enabled' in challenge) || challenge.stack_enabled !== true) return
+        setStackLoading(true)
+        setStackMessage('')
+        try {
+            const stack = await api.getStack(challengeId)
+            setStackInfo(stack)
+        } catch (error) {
+            if (error instanceof ApiError && error.status === 404) {
+                setStackInfo(null)
+            } else {
+                setStackMessage(formatApiError(error, t).message)
+            }
+        } finally {
+            setStackLoading(false)
+        }
+    }
+
     useEffect(() => {
         if (!auth.user || !challengeId) return
         void loadSolvers(solverPage)
     }, [auth.user?.id, challengeId, solverPage])
+
+    useEffect(() => {
+        if (!auth.user || !challengeId || !challenge || challenge.is_locked || !('stack_enabled' in challenge) || challenge.stack_enabled !== true) return
+        void loadStack()
+    }, [auth.user?.id, challengeId, challenge?.id, challenge?.is_locked])
 
     useEffect(() => {
         const onPopState = () => {
@@ -162,6 +188,34 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         }
     }
 
+    const createStack = async () => {
+        if (!challengeId || !challenge || challenge.is_locked || !('stack_enabled' in challenge) || challenge.stack_enabled !== true || stackLoading) return
+        setStackLoading(true)
+        setStackMessage('')
+        try {
+            const created = await api.createStack(challengeId)
+            setStackInfo(created)
+        } catch (error) {
+            setStackMessage(formatApiError(error, t).message)
+        } finally {
+            setStackLoading(false)
+        }
+    }
+
+    const deleteStack = async () => {
+        if (!challengeId || !challenge || challenge.is_locked || !('stack_enabled' in challenge) || challenge.stack_enabled !== true || stackLoading) return
+        setStackLoading(true)
+        setStackMessage('')
+        try {
+            await api.deleteStack(challengeId)
+            setStackInfo(null)
+        } catch (error) {
+            setStackMessage(formatApiError(error, t).message)
+        } finally {
+            setStackLoading(false)
+        }
+    }
+
     const formatTimestamp = (value: string) => formatDateTime(value, localeTag)
 
     if (!auth.user) {
@@ -209,20 +263,6 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                 <div className='space-y-3'>
                     <div className='md:p-4'>
                         <h1 className='text-xl sm:text-2xl font-semibold text-text wrap-break-word'>{challenge.title}</h1>
-
-                        <div className='mt-2 flex flex-wrap items-center gap-2 text-xs sm:text-sm text-text-muted'>
-                            <span>{t(getCategoryKey(challenge.category))}</span>
-                            <span>•</span>
-                            <span>{t('challenge.levelLabel', { level: challenge.level })}</span>
-                            <span>•</span>
-                            <span>{t('common.pointsShort', { points: challenge.points })}</span>
-                            <span>•</span>
-                            <span>{t('challenge.solvedCount', { count: challenge.solve_count })}</span>
-
-                            <span className={`ml-auto text-xs font-medium ${!isChallengeActive ? 'text-text-subtle' : challenge.is_solved ? 'text-success' : 'text-warning'}`}>
-                                {!isChallengeActive ? t('challenge.inactiveLabel') : challenge.is_solved ? t('challenge.solvedLabel') : t('challenge.unsolvedLabel')}
-                            </span>
-                        </div>
                     </div>
 
                     <hr className='border-border' />
@@ -266,6 +306,50 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                         </div>
                     )}
 
+                    {!challenge.is_locked && 'stack_enabled' in challenge && challenge.stack_enabled ? (
+                        <div className='rounded-none md:rounded-xl bg-transparent md:bg-surface md:p-4 md:shadow-sm'>
+                            <div className='flex items-center justify-between gap-2'>
+                                <h2 className='text-sm font-semibold text-text'>{t('challenge.stackInstance')}</h2>
+                                <button className='rounded-md bg-surface-muted px-3 py-1 text-xs text-text hover:bg-surface-subtle disabled:opacity-60' onClick={() => void loadStack()} disabled={stackLoading}>
+                                    {t('common.refresh')}
+                                </button>
+                            </div>
+                            {stackInfo ? (
+                                <div className='mt-3 space-y-1 text-xs text-text-muted'>
+                                    <p>
+                                        {t('challenge.stackStatus')} <span className='text-text'>{stackInfo.status}</span>
+                                    </p>
+                                    <p>
+                                        {t('challenge.stackEndpoint')}{' '}
+                                        <span className='text-text'>
+                                            {stackInfo.node_public_ip && stackInfo.ports.length > 0 ? stackInfo.ports.map((port) => `${port.protocol} ${stackInfo.node_public_ip}:${port.node_port}`).join(', ') : t('common.pending')}
+                                        </span>
+                                    </p>
+                                    <p>
+                                        {t('challenge.stackPorts')} <span className='text-text'>{stackInfo.ports.length > 0 ? stackInfo.ports.map((port) => `${port.container_port}/${port.protocol}`).join(', ') : t('common.pending')}</span>
+                                    </p>
+                                    <p>
+                                        {t('challenge.stackTtl')} <span className='text-text'>{stackInfo.ttl_expires_at ? formatTimestamp(stackInfo.ttl_expires_at) : t('common.pending')}</span>
+                                    </p>
+                                </div>
+                            ) : (
+                                <p className='mt-3 text-sm text-text-muted'>{t('challenge.stackNoActive')}</p>
+                            )}
+                            <div className='mt-3 flex gap-2'>
+                                {stackInfo ? (
+                                    <button className='rounded-md border border-danger/30 px-3 py-1 text-xs text-danger hover:border-danger/50 disabled:opacity-60' onClick={deleteStack} disabled={stackLoading}>
+                                        {stackLoading ? t('challenge.stackWorking') : t('challenge.deleteStack')}
+                                    </button>
+                                ) : (
+                                    <button className='rounded-md bg-accent px-3 py-1 text-xs text-white hover:bg-accent-strong disabled:opacity-60' onClick={createStack} disabled={stackLoading || challenge.is_solved}>
+                                        {stackLoading ? t('challenge.stackWorking') : t('challenge.createStack')}
+                                    </button>
+                                )}
+                            </div>
+                            {stackMessage ? <p className='mt-2 text-xs text-danger'>{stackMessage}</p> : null}
+                        </div>
+                    ) : null}
+
                     {!challenge.is_locked && (
                         <form
                             className='rounded-none md:rounded-xl bg-transparent md:bg-surface md:p-4 md:shadow-sm'
@@ -296,6 +380,23 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                 </div>
 
                 <aside className='space-y-3'>
+                    <div className='rounded-none md:rounded-xl bg-transparent md:bg-surface md:p-4 md:shadow-sm border border-border/60'>
+                        <div className='flex items-center gap-2 text-accent text-sm font-semibold'>
+                            <span>{t('challenge.levelLabel', { level: challenge.level })}</span>
+                        </div>
+                        <p className='mt-2 text-2xl font-semibold text-text wrap-break-word'>{challenge.title}</p>
+                        <div className='mt-2 inline-flex rounded bg-surface-muted px-2 py-1 text-xs text-text-muted'>{t(getCategoryKey(challenge.category))}</div>
+                        <div className='mt-3 space-y-1 text-xs text-text-muted'>
+                            <p>{t('common.pointsShort', { points: challenge.points })}</p>
+                            <p>{t('challenge.solvedCount', { count: challenge.solve_count })}</p>
+                        </div>
+                    </div>
+
+                    <div className='rounded-none md:rounded-xl bg-transparent md:bg-surface md:p-4 md:shadow-sm border border-border/60'>
+                        <h2 className='text-sm font-semibold text-text'>{t('challenges.tableAuthor')}</h2>
+                        <p className='mt-2 text-sm text-text'>{challenge.created_by_username && challenge.created_by_username.trim() !== '' ? challenge.created_by_username : t('common.na')}</p>
+                    </div>
+
                     <div className='rounded-none md:rounded-xl bg-transparent md:bg-surface md:p-4 md:shadow-sm'>
                         <h2 className='text-sm font-semibold text-text'>{t('challenge.recentSolversTitle')}</h2>
 
