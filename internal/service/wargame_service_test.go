@@ -55,7 +55,7 @@ func ptrString(value string) *string { return &value }
 func TestWargameServiceCreateListGetChallenge(t *testing.T) {
 	env := setupServiceTest(t)
 
-	created, err := env.wargameSvc.CreateChallenge(context.Background(), "Title", "Desc", "Misc", nil, 100, 80, "FLAG{1}", true, false, nil, nil, nil)
+	created, err := env.wargameSvc.CreateChallenge(context.Background(), "Title", "Desc", "Misc", nil, 100, "FLAG{1}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge: %v", err)
 	}
@@ -82,15 +82,15 @@ func TestWargameServiceCreateListGetChallenge(t *testing.T) {
 
 func TestWargameServiceSearchAndPagination(t *testing.T) {
 	env := setupServiceTest(t)
-	_, err := env.wargameSvc.CreateChallenge(context.Background(), "Web Warmup", "Desc", "Web", nil, 100, 80, "FLAG{1}", true, false, nil, nil, nil)
+	_, err := env.wargameSvc.CreateChallenge(context.Background(), "Web Warmup", "Desc", "Web", nil, 100, "FLAG{1}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge 1: %v", err)
 	}
-	_, err = env.wargameSvc.CreateChallenge(context.Background(), "Web Advanced", "Desc", "Web", nil, 100, 80, "FLAG{2}", true, false, nil, nil, nil)
+	_, err = env.wargameSvc.CreateChallenge(context.Background(), "Web Advanced", "Desc", "Web", nil, 100, "FLAG{2}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge 2: %v", err)
 	}
-	_, err = env.wargameSvc.CreateChallenge(context.Background(), "Crypto Basic", "Desc", "Crypto", nil, 100, 80, "FLAG{3}", true, false, nil, nil, nil)
+	_, err = env.wargameSvc.CreateChallenge(context.Background(), "Crypto Basic", "Desc", "Crypto", nil, 100, "FLAG{3}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge 3: %v", err)
 	}
@@ -119,14 +119,13 @@ func TestWargameServiceUpdateAndDeleteChallenge(t *testing.T) {
 	desc := "New Desc"
 	category := "Crypto"
 	points := 120
-	minimum := 60
 	active := false
 
-	updated, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, &title, &desc, &category, nil, &points, &minimum, nil, &active, nil, nil, nil, nil, false)
+	updated, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, &title, &desc, &category, nil, &points, nil, &active, nil, nil, nil, nil, false)
 	if err != nil {
 		t.Fatalf("UpdateChallenge: %v", err)
 	}
-	if updated.Title != title || updated.Category != category || updated.Points != points || updated.MinimumPoints != minimum || updated.IsActive != active {
+	if updated.Title != title || updated.Category != category || updated.Points != points || updated.IsActive != active {
 		t.Fatalf("unexpected updated challenge: %+v", updated)
 	}
 
@@ -182,11 +181,11 @@ func TestWargameServiceChallengeFiltersAndPagedSolvedAndSolvers(t *testing.T) {
 	user2 := createUser(t, env, "f2@example.com", "f2", "pass", models.UserRole)
 
 	level3 := 3
-	chWeb, err := env.wargameSvc.CreateChallenge(context.Background(), "Web SQL", "Desc", "Web", &level3, 200, 100, "FLAG{WEB}", true, false, nil, nil, nil)
+	chWeb, err := env.wargameSvc.CreateChallenge(context.Background(), "Web SQL", "Desc", "Web", &level3, 200, "FLAG{WEB}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge web: %v", err)
 	}
-	chCrypto, err := env.wargameSvc.CreateChallenge(context.Background(), "Crypto RSA", "Desc", "Crypto", nil, 150, 80, "FLAG{CRYPTO}", true, false, nil, nil, nil)
+	chCrypto, err := env.wargameSvc.CreateChallenge(context.Background(), "Crypto RSA", "Desc", "Crypto", nil, 150, "FLAG{CRYPTO}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge crypto: %v", err)
 	}
@@ -316,19 +315,18 @@ func TestWargameServiceValidationAndNotFound(t *testing.T) {
 		t.Fatalf("expected ErrChallengeNotFound, got %v", err)
 	}
 
-	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "", "", "Nope", nil, -1, 0, "", true, false, nil, nil, nil); err == nil {
+	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "", "", "Nope", nil, -1, "", true, false, nil, nil, nil); err == nil {
 		t.Fatalf("expected create validation error")
 	}
 	badLevel := 11
-	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "BadLevel", "Desc", "Web", &badLevel, 100, 80, "FLAG{L}", true, false, nil, nil, nil); err == nil {
+	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "BadLevel", "Desc", "Web", &badLevel, 100, "FLAG{L}", true, false, nil, nil, nil); err == nil {
 		t.Fatalf("expected level validation error")
 	}
 
-	badMin := 100
 	badPts := 50
 	challenge := createChallenge(t, env, "X", 100, "FLAG{X}", true)
-	if _, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, &badPts, &badMin, nil, nil, nil, nil, nil, nil, false); err == nil {
-		t.Fatalf("expected minimum_points validation error")
+	if _, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, &badPts, nil, nil, nil, nil, nil, nil, false); err != nil {
+		t.Fatalf("unexpected update error in fixed scoring mode: %v", err)
 	}
 }
 
@@ -429,12 +427,12 @@ func TestWargameServiceStackValidationAndSolvedIDsEdge(t *testing.T) {
 	env := setupServiceTest(t)
 	podSpec := "apiVersion: v1\nkind: Pod\nmetadata:\n  name: test\nspec:\n  containers:\n    - name: app\n      image: nginx\n      ports:\n        - containerPort: 80\n"
 
-	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "StackBad", "Desc", "Web", nil, 100, 80, "FLAG{S}", true, true, nil, &podSpec, nil); err == nil {
+	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "StackBad", "Desc", "Web", nil, 100, "FLAG{S}", true, true, nil, &podSpec, nil); err == nil {
 		t.Fatalf("expected missing stack_target_ports validation error")
 	}
 
 	badPorts := stack.TargetPortSpecs{{ContainerPort: 80, Protocol: "ICMP"}}
-	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "StackBad2", "Desc", "Web", nil, 100, 80, "FLAG{S2}", true, true, badPorts, &podSpec, nil); err == nil {
+	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "StackBad2", "Desc", "Web", nil, 100, "FLAG{S2}", true, true, badPorts, &podSpec, nil); err == nil {
 		t.Fatalf("expected invalid protocol validation error")
 	}
 
@@ -475,7 +473,7 @@ func TestWargameServiceUpdateChallengeFlagHashAndPrevious(t *testing.T) {
 	prev := createChallenge(t, env, "Prev", 50, "FLAG{PREV}", true)
 	newFlag := "FLAG{NEW}"
 
-	updated, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, nil, nil, &newFlag, nil, nil, nil, nil, &prev.ID, true)
+	updated, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, nil, &newFlag, nil, nil, nil, nil, &prev.ID, true)
 	if err != nil {
 		t.Fatalf("UpdateChallenge with flag/previous: %v", err)
 	}
@@ -488,12 +486,12 @@ func TestWargameServiceUpdateChallengeFlagHashAndPrevious(t *testing.T) {
 	}
 
 	selfID := challenge.ID
-	if _, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &selfID, true); err == nil {
+	if _, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &selfID, true); err == nil {
 		t.Fatalf("expected self previous_challenge_id validation error")
 	}
 
 	nilPrev := (*int64)(nil)
-	if _, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nilPrev, true); err != nil {
+	if _, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nilPrev, true); err != nil {
 		t.Fatalf("expected previous_challenge_id clear, got %v", err)
 	}
 }

@@ -34,7 +34,6 @@ INSERT INTO challenges (
     description,
     level,
     points,
-    minimum_points,
     category,
     flag_hash,
     previous_challenge_id,
@@ -65,7 +64,6 @@ SELECT
     format('This is dummy challenge #%s. Category rotation, prerequisite chain, and varied points are included for pagination/search/load testing.', g.cid),
     g.level,
     (g.level * 100) + ((g.cid % 3) * 20),
-    GREATEST(50, (g.level * 70) + ((g.cid % 4) * 10)),
     (ARRAY['Web', 'Pwnable', 'Reversing', 'Crypto', 'Forensics', 'Cloud', 'Misc', 'Programming'])[((g.cid - 1) % 8) + 1],
     '$2a$10$bsyMO/LWwVSIFN.LS09qbuPjVxwIvOqC3i79lJ6hzHw722cwLRa4m',
     CASE

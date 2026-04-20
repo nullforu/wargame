@@ -21,7 +21,6 @@ const CreateChallenge = () => {
     const [category, setCategory] = useState<string>(CHALLENGE_CATEGORIES[0])
     const [level, setLevel] = useState(1)
     const [points, setPoints] = useState(100)
-    const [minimumPoints, setMinimumPoints] = useState(100)
     const [flag, setFlag] = useState('')
     const [isActive, setIsActive] = useState(true)
     const [previousChallengeId, setPreviousChallengeId] = useState<number | ''>('')
@@ -81,7 +80,6 @@ const CreateChallenge = () => {
                 category,
                 level: Number(level),
                 points: Number(points),
-                minimum_points: Number(minimumPoints),
                 flag,
                 is_active: isActive,
                 previous_challenge_id: previousChallengeId === '' ? undefined : Number(previousChallengeId),
@@ -116,7 +114,6 @@ const CreateChallenge = () => {
             setCategory(CHALLENGE_CATEGORIES[0])
             setLevel(1)
             setPoints(100)
-            setMinimumPoints(100)
             setFlag('')
             setIsActive(true)
             setPreviousChallengeId('')
@@ -228,24 +225,6 @@ const CreateChallenge = () => {
                             {fieldErrors.points ? (
                                 <p className='mt-2 text-xs text-danger'>
                                     {t('common.points')}: {fieldErrors.points}
-                                </p>
-                            ) : null}
-                        </div>
-                        <div>
-                            <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor='admin-minimum-points'>
-                                {t('common.minimum')}
-                            </label>
-                            <input
-                                id='admin-minimum-points'
-                                className='mt-2 w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text focus:border-accent focus:outline-none'
-                                type='number'
-                                min={0}
-                                value={minimumPoints}
-                                onChange={(event) => setMinimumPoints(Number(event.target.value))}
-                            />
-                            {fieldErrors.minimum_points ? (
-                                <p className='mt-2 text-xs text-danger'>
-                                    {t('common.minimum')}: {fieldErrors.minimum_points}
                                 </p>
                             ) : null}
                         </div>

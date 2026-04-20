@@ -71,7 +71,6 @@ type createChallengeRequest struct {
 	Category            string                    `json:"category" binding:"required"`
 	Level               *int                      `json:"level"`
 	Points              int                       `json:"points" binding:"required"`
-	MinimumPoints       *int                      `json:"minimum_points"`
 	Flag                string                    `json:"flag" binding:"required"`
 	PreviousChallengeID *int64                    `json:"previous_challenge_id"`
 	IsActive            *bool                     `json:"is_active"`
@@ -86,7 +85,6 @@ type updateChallengeRequest struct {
 	Category            optionalString             `json:"category"`
 	Level               *int                       `json:"level"`
 	Points              *int                       `json:"points"`
-	MinimumPoints       *int                       `json:"minimum_points"`
 	Flag                optionalString             `json:"flag"`
 	PreviousChallengeID optionalInt64              `json:"previous_challenge_id"`
 	IsActive            *bool                      `json:"is_active"`
@@ -161,8 +159,6 @@ type challengeResponse struct {
 	Category            string                    `json:"category"`
 	Level               int                       `json:"level"`
 	Points              int                       `json:"points"`
-	InitialPoints       int                       `json:"initial_points"`
-	MinimumPoints       int                       `json:"minimum_points"`
 	SolveCount          int                       `json:"solve_count"`
 	PreviousChallengeID *int64                    `json:"previous_challenge_id,omitempty"`
 	IsActive            bool                      `json:"is_active"`
@@ -180,8 +176,6 @@ type lockedChallengeResponse struct {
 	Category                  string  `json:"category"`
 	Level                     int     `json:"level"`
 	Points                    int     `json:"points"`
-	InitialPoints             int     `json:"initial_points"`
-	MinimumPoints             int     `json:"minimum_points"`
 	SolveCount                int     `json:"solve_count"`
 	PreviousChallengeID       *int64  `json:"previous_challenge_id,omitempty"`
 	PreviousChallengeTitle    *string `json:"previous_challenge_title,omitempty"`
@@ -315,8 +309,6 @@ func newChallengeResponse(challenge *models.Challenge, isSolved bool) challengeR
 		Category:            challenge.Category,
 		Level:               challenge.Level,
 		Points:              challenge.Points,
-		InitialPoints:       challenge.InitialPoints,
-		MinimumPoints:       challenge.MinimumPoints,
 		SolveCount:          challenge.SolveCount,
 		PreviousChallengeID: challenge.PreviousChallengeID,
 		IsActive:            challenge.IsActive,
@@ -342,8 +334,6 @@ func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Ch
 		Category:                  challenge.Category,
 		Level:                     challenge.Level,
 		Points:                    challenge.Points,
-		InitialPoints:             challenge.InitialPoints,
-		MinimumPoints:             challenge.MinimumPoints,
 		SolveCount:                challenge.SolveCount,
 		PreviousChallengeID:       challenge.PreviousChallengeID,
 		PreviousChallengeTitle:    prevTitle,

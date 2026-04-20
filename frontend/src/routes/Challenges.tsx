@@ -385,10 +385,10 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                                 >
                                                     <div className='flex items-center gap-3 min-w-0'>
                                                         <DifficultyBadge level={challenge.level} />
-                                                        <div className='flex items-center gap-2 min-w-0 flex-1'>
-                                                            <span className='truncate text-[18px] sm:text-[20px] font-semibold'>{challenge.title}</span>
+                                                        <div className='flex items-center min-w-0 flex-1'>
+                                                            <span className='truncate text-[14px] sm:text-[16px] font-semibold pr-4'>{challenge.title}</span>
                                                             {challenge.is_solved && (
-                                                                <span className='shrink-0 w-4 h-4 text-accent'>
+                                                                <span className='shrink-0 w-4 h-4 text-accent -ml-1.5'>
                                                                     <svg viewBox='0 0 24 24' className='w-full h-full'>
                                                                         <path d='M5 6.7c.9-.8 2.1-1.2 3.5-1.2 2.7 0 4.6 2.2 8.5.6v8.8c-3.9 1.7-5.8-.9-8.5-.9-1.2 0-2.5.3-3.5.9V6.7Z' fill='currentColor' opacity='0.7' />
                                                                         <path

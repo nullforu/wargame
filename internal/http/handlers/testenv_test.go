@@ -275,13 +275,12 @@ func createHandlerUser(t *testing.T, env handlerEnv, email, username, password, 
 func createHandlerChallenge(t *testing.T, env handlerEnv, title string, points int, flag string, active bool) *models.Challenge {
 	t.Helper()
 	challenge := &models.Challenge{
-		Title:         title,
-		Description:   "desc",
-		Category:      "Misc",
-		Points:        points,
-		MinimumPoints: points,
-		IsActive:      active,
-		CreatedAt:     time.Now().UTC(),
+		Title:       title,
+		Description: "desc",
+		Category:    "Misc",
+		Points:      points,
+		IsActive:    active,
+		CreatedAt:   time.Now().UTC(),
 	}
 
 	hash, err := utils.HashFlag(flag, bcrypt.MinCost)

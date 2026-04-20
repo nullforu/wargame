@@ -8,18 +8,14 @@ import (
 	"wargame/internal/models"
 )
 
-func TestDynamicPointsMapAndSolveCounts(t *testing.T) {
+func TestFixedPointsMapAndSolveCounts(t *testing.T) {
 	env := setupRepoTest(t)
 
 	user1 := createUserForTestUserScope(t, env, "u1@example.com", "u1", "pass", models.UserRole)
 	user2 := createUserForTestUserScope(t, env, "u2@example.com", "u2", "pass", models.UserRole)
 	blocked := createUserForTestUserScope(t, env, "blocked@example.com", "blocked", "pass", models.BlockedRole)
 
-	challenge := createChallenge(t, env, "Dynamic", 500, "FLAG{DYN}", true)
-	challenge.MinimumPoints = 100
-	if err := env.challengeRepo.Update(context.Background(), challenge); err != nil {
-		t.Fatalf("update challenge minimum: %v", err)
-	}
+	challenge := createChallenge(t, env, "Challenge", 500, "FLAG{TEST}", true)
 
 	createSubmission(t, env, user1.ID, challenge.ID, true, time.Now().UTC())
 	createSubmission(t, env, user2.ID, challenge.ID, true, time.Now().UTC())
@@ -34,12 +30,12 @@ func TestDynamicPointsMapAndSolveCounts(t *testing.T) {
 		t.Fatalf("expected solve count 2, got %d", counts[challenge.ID])
 	}
 
-	points, err := dynamicPointsMap(context.Background(), env.db)
+	points, err := fixedPointsMap(context.Background(), env.db)
 	if err != nil {
-		t.Fatalf("dynamicPointsMap: %v", err)
+		t.Fatalf("fixedPointsMap: %v", err)
 	}
-	if points[challenge.ID] < challenge.MinimumPoints || points[challenge.ID] > challenge.Points {
-		t.Fatalf("unexpected dynamic points %d", points[challenge.ID])
+	if points[challenge.ID] != challenge.Points {
+		t.Fatalf("expected fixed points %d, got %d", challenge.Points, points[challenge.ID])
 	}
 }
 

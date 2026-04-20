@@ -614,15 +614,11 @@ func (h *Handler) CreateChallenge(ctx *gin.Context) {
 	if req.IsActive != nil {
 		active = *req.IsActive
 	}
-	minimumPoints := req.Points
-	if req.MinimumPoints != nil {
-		minimumPoints = *req.MinimumPoints
-	}
 	stackEnabled := false
 	if req.StackEnabled != nil {
 		stackEnabled = *req.StackEnabled
 	}
-	challenge, err := h.wargame.CreateChallenge(ctx.Request.Context(), req.Title, req.Description, req.Category, req.Level, req.Points, minimumPoints, req.Flag, active, stackEnabled, stack.TargetPortSpecs(req.StackTargetPorts), req.StackPodSpec, req.PreviousChallengeID)
+	challenge, err := h.wargame.CreateChallenge(ctx.Request.Context(), req.Title, req.Description, req.Category, req.Level, req.Points, req.Flag, active, stackEnabled, stack.TargetPortSpecs(req.StackTargetPorts), req.StackPodSpec, req.PreviousChallengeID)
 	if err != nil {
 		writeError(ctx, err)
 		return
@@ -668,7 +664,7 @@ func (h *Handler) UpdateChallenge(ctx *gin.Context) {
 		previousChallengeID = req.PreviousChallengeID.Value
 	}
 
-	challenge, err := h.wargame.UpdateChallenge(ctx.Request.Context(), challengeID, title, description, category, req.Level, req.Points, req.MinimumPoints, flag, req.IsActive, req.StackEnabled, req.StackTargetPorts, stackPodSpec, previousChallengeID, previousChallengeSet)
+	challenge, err := h.wargame.UpdateChallenge(ctx.Request.Context(), challengeID, title, description, category, req.Level, req.Points, flag, req.IsActive, req.StackEnabled, req.StackTargetPorts, stackPodSpec, previousChallengeID, previousChallengeSet)
 	if err != nil {
 		writeError(ctx, err)
 		return

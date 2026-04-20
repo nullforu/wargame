@@ -443,14 +443,13 @@ func createChallenge(t *testing.T, env testEnv, title string, points int, flag s
 	t.Helper()
 
 	challenge := &models.Challenge{
-		Title:         title,
-		Description:   "desc",
-		Category:      "Misc",
-		Level:         1,
-		Points:        points,
-		MinimumPoints: points,
-		IsActive:      active,
-		CreatedAt:     time.Now().UTC(),
+		Title:       title,
+		Description: "desc",
+		Category:    "Misc",
+		Level:       1,
+		Points:      points,
+		IsActive:    active,
+		CreatedAt:   time.Now().UTC(),
 	}
 
 	hash, err := utils.HashFlag(flag, bcrypt.MinCost)
@@ -472,13 +471,12 @@ func createStackChallenge(t *testing.T, env testEnv, title string) *models.Chall
 	podSpec := "apiVersion: v1\nkind: Pod\nmetadata:\n  name: challenge\nspec:\n  containers:\n    - name: app\n      image: nginx:stable\n      ports:\n        - containerPort: 80\n          protocol: TCP\n"
 
 	challenge := &models.Challenge{
-		Title:         title,
-		Description:   "stack desc",
-		Category:      "Web",
-		Level:         1,
-		Points:        100,
-		MinimumPoints: 100,
-		StackEnabled:  true,
+		Title:        title,
+		Description:  "stack desc",
+		Category:     "Web",
+		Level:        1,
+		Points:       100,
+		StackEnabled: true,
 		StackTargetPorts: stack.TargetPortSpecs{
 			{ContainerPort: 80, Protocol: "TCP"},
 		},

@@ -39,8 +39,6 @@ export interface ChallengeDetail {
     category: string
     level: number
     points: number
-    initial_points: number
-    minimum_points: number
     solve_count: number
     is_active: boolean
     has_file: boolean
@@ -58,8 +56,6 @@ export interface LockedChallenge {
     category: string
     level: number
     points: number
-    initial_points: number
-    minimum_points: number
     solve_count: number
     is_active: boolean
     previous_challenge_id?: number | null
@@ -92,7 +88,6 @@ export interface ChallengeCreatePayload {
     category: string
     level?: number
     points: number
-    minimum_points?: number
     flag: string
     is_active: boolean
     previous_challenge_id?: number | null
@@ -109,7 +104,6 @@ export interface ChallengeUpdatePayload {
     category?: string
     level?: number
     points?: number
-    minimum_points?: number
     flag?: string
     is_active?: boolean
     previous_challenge_id?: number | null

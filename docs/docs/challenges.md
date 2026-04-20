@@ -28,8 +28,6 @@ Response 200
             "category": "Web",
             "level": 3,
             "points": 100,
-            "initial_points": 200,
-            "minimum_points": 50,
             "solve_count": 12,
             "is_active": true,
             "is_locked": false,
@@ -53,7 +51,7 @@ Response 200
 
 Notes:
 
-- `points` is dynamically calculated based on solve count.
+- `points` is fixed and equals the challenge author's configured score.
 - If a challenge is locked by progression, it is returned in a reduced form with `is_locked: true`.
 
 Errors:
@@ -87,8 +85,6 @@ Response 200
             "category": "Web",
             "level": 3,
             "points": 100,
-            "initial_points": 200,
-            "minimum_points": 50,
             "solve_count": 12,
             "is_active": true,
             "is_locked": false,
@@ -130,8 +126,6 @@ Response 200
     "category": "Web",
     "level": 3,
     "points": 100,
-    "initial_points": 200,
-    "minimum_points": 50,
     "solve_count": 12,
     "is_active": true,
     "is_locked": false,

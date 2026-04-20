@@ -93,7 +93,7 @@ func TestScoreboardTimeline(t *testing.T) {
 	}
 }
 
-func TestScoreboardDynamicScoring(t *testing.T) {
+func TestScoreboardFixedScoring(t *testing.T) {
 	env := setupTest(t, testCfg)
 	userA := createUser(t, env, "usera@example.com", "usera", "pass123", models.UserRole)
 	userSolo := createUser(t, env, "solo@example.com", "solo", "pass123", models.UserRole)
@@ -103,11 +103,7 @@ func TestScoreboardDynamicScoring(t *testing.T) {
 		t.Fatalf("block user: %v", err)
 	}
 
-	challenge := createChallenge(t, env, "Dynamic", 500, "flag{dynamic}", true)
-	challenge.MinimumPoints = 100
-	if err := env.challengeRepo.Update(context.Background(), challenge); err != nil {
-		t.Fatalf("update challenge: %v", err)
-	}
+	challenge := createChallenge(t, env, "Fixed", 500, "flag{fixed}", true)
 
 	createSubmission(t, env, userA.ID, challenge.ID, true, time.Now().UTC())
 	createSubmission(t, env, userSolo.ID, challenge.ID, true, time.Now().UTC())
@@ -125,7 +121,7 @@ func TestScoreboardDynamicScoring(t *testing.T) {
 		t.Fatalf("expected 2 rows, got %d", len(resp.Entries))
 	}
 
-	if resp.Entries[0].Score != 100 || resp.Entries[1].Score != 100 {
-		t.Fatalf("expected dynamic scores 100, got %+v", resp.Entries)
+	if resp.Entries[0].Score != 500 || resp.Entries[1].Score != 500 {
+		t.Fatalf("expected fixed scores 500, got %+v", resp.Entries)
 	}
 }

@@ -16,7 +16,6 @@ type Challenge struct {
 	Description         string                `bun:"description,notnull"`
 	Level               int                   `bun:"level,notnull,default:1"`
 	Points              int                   `bun:"points,notnull,default:0"`
-	MinimumPoints       int                   `bun:"minimum_points,notnull,default:0"`
 	Category            string                `bun:"category,notnull"`
 	FlagHash            string                `bun:"flag_hash,notnull"`
 	PreviousChallengeID *int64                `bun:"previous_challenge_id,nullzero"`
@@ -28,6 +27,5 @@ type Challenge struct {
 	StackPodSpec        *string               `bun:"stack_pod_spec,nullzero"`
 	IsActive            bool                  `bun:"is_active,notnull"`
 	CreatedAt           time.Time             `bun:"created_at,nullzero,notnull,default:current_timestamp"`
-	InitialPoints       int                   `bun:"-"`
 	SolveCount          int                   `bun:"-"`
 }

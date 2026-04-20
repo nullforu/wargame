@@ -212,10 +212,9 @@ func TestAdminUpdateChallenge(t *testing.T) {
 	}
 
 	rec = doRequest(t, env.router, http.MethodPut, "/api/admin/challenges/"+itoa(created.ID), map[string]any{
-		"points":         10,
-		"minimum_points": 20,
+		"points": 10,
 	}, authHeader(adminAccess))
-	if rec.Code != http.StatusBadRequest {
+	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
 }

@@ -261,14 +261,13 @@ func createUser(t *testing.T, env serviceEnv, email, username, password, role st
 func createChallenge(t *testing.T, env serviceEnv, title string, points int, flag string, active bool) *models.Challenge {
 	t.Helper()
 	challenge := &models.Challenge{
-		Title:         title,
-		Description:   "desc",
-		Category:      "Misc",
-		Level:         1,
-		Points:        points,
-		MinimumPoints: points,
-		IsActive:      active,
-		CreatedAt:     time.Now().UTC(),
+		Title:       title,
+		Description: "desc",
+		Category:    "Misc",
+		Level:       1,
+		Points:      points,
+		IsActive:    active,
+		CreatedAt:   time.Now().UTC(),
 	}
 
 	hash, err := utils.HashFlag(flag, bcrypt.MinCost)

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"wargame/internal/models"
-	"wargame/internal/scoring"
 
 	"github.com/uptrace/bun"
 )
@@ -20,11 +19,10 @@ func NewScoreboardRepo(db *bun.DB) *ScoreboardRepo {
 }
 
 type leaderboardChallengeRow struct {
-	ID            int64  `bun:"id"`
-	Title         string `bun:"title"`
-	Category      string `bun:"category"`
-	Points        int    `bun:"points"`
-	MinimumPoints int    `bun:"minimum_points"`
+	ID       int64  `bun:"id"`
+	Title    string `bun:"title"`
+	Category string `bun:"category"`
+	Points   int    `bun:"points"`
 }
 
 func (r *ScoreboardRepo) leaderboardChallenges(ctx context.Context) ([]models.LeaderboardChallenge, map[int64]int, error) {
@@ -35,26 +33,15 @@ func (r *ScoreboardRepo) leaderboardChallenges(ctx context.Context) ([]models.Le
 		ColumnExpr("c.title AS title").
 		ColumnExpr("c.category AS category").
 		ColumnExpr("c.points AS points").
-		ColumnExpr("c.minimum_points AS minimum_points").
 		OrderExpr("c.id ASC").
 		Scan(ctx, &rows); err != nil {
 		return nil, nil, wrapError("scoreboardRepo.leaderboardChallenges", err)
 	}
 
-	solveCounts, err := solveCountsByChallenge(ctx, r.db, nil)
-	if err != nil {
-		return nil, nil, wrapError("scoreboardRepo.leaderboardChallenges solve counts", err)
-	}
-
-	decay, err := decayFactor(ctx, r.db)
-	if err != nil {
-		return nil, nil, wrapError("scoreboardRepo.leaderboardChallenges decay", err)
-	}
-
 	pointsMap := make(map[int64]int, len(rows))
 	challenges := make([]models.LeaderboardChallenge, 0, len(rows))
 	for _, row := range rows {
-		points := scoring.DynamicPoints(row.Points, row.MinimumPoints, solveCounts[row.ID], decay)
+		points := row.Points
 		pointsMap[row.ID] = points
 		challenges = append(challenges, models.LeaderboardChallenge{ID: row.ID, Title: row.Title, Category: row.Category, Points: points})
 	}
@@ -150,7 +137,7 @@ func (r *ScoreboardRepo) Leaderboard(ctx context.Context) (models.LeaderboardRes
 }
 
 func (r *ScoreboardRepo) TimelineSubmissions(ctx context.Context, since *time.Time) ([]models.UserTimelineRow, error) {
-	pointsMap, err := dynamicPointsMap(ctx, r.db)
+	pointsMap, err := fixedPointsMap(ctx, r.db)
 	if err != nil {
 		return nil, wrapError("scoreboardRepo.TimelineSubmissions", err)
 	}

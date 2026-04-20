@@ -111,19 +111,19 @@ func (r *ChallengeRepo) Delete(ctx context.Context, challenge *models.Challenge)
 	return nil
 }
 
-func (r *ChallengeRepo) DynamicPoints(ctx context.Context) (map[int64]int, error) {
-	points, err := dynamicPointsMap(ctx, r.db)
+func (r *ChallengeRepo) ChallengePoints(ctx context.Context) (map[int64]int, error) {
+	points, err := fixedPointsMap(ctx, r.db)
 	if err != nil {
-		return nil, wrapError("challengeRepo.DynamicPoints", err)
+		return nil, wrapError("challengeRepo.ChallengePoints", err)
 	}
 
 	return points, nil
 }
 
-func (r *ChallengeRepo) DynamicPointsByIDs(ctx context.Context, challengeIDs []int64) (map[int64]int, error) {
-	points, err := dynamicPointsMapByIDs(ctx, r.db, challengeIDs)
+func (r *ChallengeRepo) ChallengePointsByIDs(ctx context.Context, challengeIDs []int64) (map[int64]int, error) {
+	points, err := fixedPointsMapByIDs(ctx, r.db, challengeIDs)
 	if err != nil {
-		return nil, wrapError("challengeRepo.DynamicPointsByIDs", err)
+		return nil, wrapError("challengeRepo.ChallengePointsByIDs", err)
 	}
 
 	return points, nil

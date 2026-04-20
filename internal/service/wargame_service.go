@@ -130,7 +130,7 @@ func (s *WargameService) ListChallenges(ctx context.Context, page, pageSize int,
 		ptrs = append(ptrs, &challenges[i])
 	}
 
-	if err := s.applyDynamicPoints(ctx, ptrs); err != nil {
+	if err := s.applyChallengePoints(ctx, ptrs); err != nil {
 		return nil, models.Pagination{}, fmt.Errorf("wargame.ListChallenges score: %w", err)
 	}
 
@@ -161,14 +161,14 @@ func (s *WargameService) GetChallengeByID(ctx context.Context, id int64) (*model
 		return nil, fmt.Errorf("wargame.GetChallengeByID: %w", err)
 	}
 
-	if err := s.applyDynamicPoints(ctx, []*models.Challenge{challenge}); err != nil {
+	if err := s.applyChallengePoints(ctx, []*models.Challenge{challenge}); err != nil {
 		return nil, fmt.Errorf("wargame.GetChallengeByID score: %w", err)
 	}
 
 	return challenge, nil
 }
 
-func (s *WargameService) CreateChallenge(ctx context.Context, title, description, category string, level *int, points int, minimumPoints int, flag string, active bool, stackEnabled bool, stackTargetPorts stack.TargetPortSpecs, stackPodSpec *string, previousChallengeID *int64) (*models.Challenge, error) {
+func (s *WargameService) CreateChallenge(ctx context.Context, title, description, category string, level *int, points int, flag string, active bool, stackEnabled bool, stackTargetPorts stack.TargetPortSpecs, stackPodSpec *string, previousChallengeID *int64) (*models.Challenge, error) {
 	title = normalizeTrim(title)
 	description = normalizeTrim(description)
 	category = normalizeTrim(category)
@@ -189,13 +189,8 @@ func (s *WargameService) CreateChallenge(ctx context.Context, title, description
 	}
 
 	validator.NonNegative("points", points)
-	validator.NonNegative("minimum_points", minimumPoints)
 	if previousChallengeID != nil {
 		validator.PositiveID("previous_challenge_id", *previousChallengeID)
-	}
-
-	if minimumPoints > points {
-		validator.fields = append(validator.fields, FieldError{Field: "minimum_points", Reason: "must be <= points"})
 	}
 
 	if _, ok := challengeCategories[category]; category != "" && !ok {
@@ -237,7 +232,6 @@ func (s *WargameService) CreateChallenge(ctx context.Context, title, description
 		Category:            category,
 		Level:               challengeLevel,
 		Points:              points,
-		MinimumPoints:       minimumPoints,
 		PreviousChallengeID: previousChallengeID,
 		StackEnabled:        stackEnabled,
 		StackTargetPorts:    stackTargetPorts,
@@ -257,14 +251,14 @@ func (s *WargameService) CreateChallenge(ctx context.Context, title, description
 		return nil, fmt.Errorf("wargame.CreateChallenge: %w", err)
 	}
 
-	if err := s.applyDynamicPoints(ctx, []*models.Challenge{challenge}); err != nil {
+	if err := s.applyChallengePoints(ctx, []*models.Challenge{challenge}); err != nil {
 		return nil, fmt.Errorf("wargame.CreateChallenge score: %w", err)
 	}
 
 	return challenge, nil
 }
 
-func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, description, category *string, level *int, points *int, minimumPoints *int, flag *string, active *bool, stackEnabled *bool, stackTargetPorts *[]stack.TargetPortSpec, stackPodSpec *string, previousChallengeID *int64, previousChallengeSet bool) (*models.Challenge, error) {
+func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, description, category *string, level *int, points *int, flag *string, active *bool, stackEnabled *bool, stackTargetPorts *[]stack.TargetPortSpec, stackPodSpec *string, previousChallengeID *int64, previousChallengeSet bool) (*models.Challenge, error) {
 	validator := newFieldValidator()
 	validator.PositiveID("id", id)
 
@@ -315,10 +309,6 @@ func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, d
 		validator.fields = append(validator.fields, FieldError{Field: "level", Reason: "must be between 1 and 10"})
 	}
 
-	if minimumPoints != nil {
-		validator.NonNegative("minimum_points", *minimumPoints)
-	}
-
 	if previousChallengeSet && previousChallengeID != nil {
 		validator.PositiveID("previous_challenge_id", *previousChallengeID)
 	}
@@ -367,10 +357,6 @@ func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, d
 
 	if level != nil {
 		challenge.Level = *level
-	}
-
-	if minimumPoints != nil {
-		challenge.MinimumPoints = *minimumPoints
 	}
 
 	if previousChallengeSet {
@@ -434,15 +420,11 @@ func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, d
 		}
 	}
 
-	if challenge.MinimumPoints > challenge.Points {
-		return nil, NewValidationError(FieldError{Field: "minimum_points", Reason: "must be <= points"})
-	}
-
 	if err := s.challengeRepo.Update(ctx, challenge); err != nil {
 		return nil, fmt.Errorf("wargame.UpdateChallenge update: %w", err)
 	}
 
-	if err := s.applyDynamicPoints(ctx, []*models.Challenge{challenge}); err != nil {
+	if err := s.applyChallengePoints(ctx, []*models.Challenge{challenge}); err != nil {
 		return nil, fmt.Errorf("wargame.UpdateChallenge score: %w", err)
 	}
 
@@ -700,7 +682,7 @@ func (s *WargameService) SolvedChallenges(ctx context.Context, userID int64) ([]
 		return nil, fmt.Errorf("wargame.SolvedChallenges: %w", err)
 	}
 
-	pointsMap, err := s.challengeRepo.DynamicPoints(ctx)
+	pointsMap, err := s.challengeRepo.ChallengePoints(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("wargame.SolvedChallenges score: %w", err)
 	}
@@ -723,7 +705,7 @@ func (s *WargameService) SolvedChallengesPage(ctx context.Context, userID int64,
 		return nil, models.Pagination{}, fmt.Errorf("wargame.SolvedChallengesPage: %w", err)
 	}
 
-	pointsMap, err := s.challengeRepo.DynamicPoints(ctx)
+	pointsMap, err := s.challengeRepo.ChallengePoints(ctx)
 	if err != nil {
 		return nil, models.Pagination{}, fmt.Errorf("wargame.SolvedChallengesPage score: %w", err)
 	}
@@ -770,7 +752,7 @@ func (s *WargameService) ListAllSubmissions(ctx context.Context) ([]models.Submi
 	return rows, nil
 }
 
-func (s *WargameService) applyDynamicPoints(ctx context.Context, challenges []*models.Challenge) error {
+func (s *WargameService) applyChallengePoints(ctx context.Context, challenges []*models.Challenge) error {
 	if len(challenges) == 0 {
 		return nil
 	}
@@ -780,7 +762,7 @@ func (s *WargameService) applyDynamicPoints(ctx context.Context, challenges []*m
 		ids = append(ids, challenge.ID)
 	}
 
-	pointsMap, err := s.challengeRepo.DynamicPointsByIDs(ctx, ids)
+	pointsMap, err := s.challengeRepo.ChallengePointsByIDs(ctx, ids)
 	if err != nil {
 		return err
 	}
@@ -791,7 +773,6 @@ func (s *WargameService) applyDynamicPoints(ctx context.Context, challenges []*m
 	}
 
 	for _, challenge := range challenges {
-		challenge.InitialPoints = challenge.Points
 		if points, ok := pointsMap[challenge.ID]; ok {
 			challenge.Points = points
 		}

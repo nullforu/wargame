@@ -19,12 +19,11 @@ func createStackChallenge(t *testing.T, env serviceEnv, title string) *models.Ch
 	t.Helper()
 	podSpec := "apiVersion: v1\nkind: Pod\nmetadata:\n  name: test\nspec:\n  containers:\n    - name: app\n      image: nginx\n      ports:\n        - containerPort: 80\n"
 	challenge := &models.Challenge{
-		Title:         title,
-		Description:   "desc",
-		Category:      "Web",
-		Points:        100,
-		MinimumPoints: 100,
-		StackEnabled:  true,
+		Title:        title,
+		Description:  "desc",
+		Category:     "Web",
+		Points:       100,
+		StackEnabled: true,
 		StackTargetPorts: stack.TargetPortSpecs{
 			{ContainerPort: 80, Protocol: "TCP"},
 		},

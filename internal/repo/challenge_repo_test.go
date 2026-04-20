@@ -142,17 +142,13 @@ func TestChallengeRepoNotFound(t *testing.T) {
 	}
 }
 
-func TestChallengeRepoDynamicPointsAndSolveCounts(t *testing.T) {
+func TestChallengeRepoPointsAndSolveCounts(t *testing.T) {
 	env := setupRepoTest(t)
 
 	user1 := createUserForTestUserScope(t, env, "usera@example.com", "usera", "pass", models.UserRole)
 	userSolo := createUserForTestUserScope(t, env, "solo@example.com", "solo", "pass", models.UserRole)
 
-	challenge := createChallenge(t, env, "Dynamic", 500, "FLAG{DYN}", true)
-	challenge.MinimumPoints = 100
-	if err := env.challengeRepo.Update(context.Background(), challenge); err != nil {
-		t.Fatalf("update challenge minimum: %v", err)
-	}
+	challenge := createChallenge(t, env, "Fixed", 500, "FLAG{DYN}", true)
 
 	other := createChallenge(t, env, "Static", 200, "FLAG{STATIC}", true)
 
@@ -160,13 +156,13 @@ func TestChallengeRepoDynamicPointsAndSolveCounts(t *testing.T) {
 	createSubmission(t, env, user1.ID, challenge.ID, true, now.Add(-time.Minute))
 	createSubmission(t, env, userSolo.ID, challenge.ID, true, now)
 
-	points, err := env.challengeRepo.DynamicPoints(context.Background())
+	points, err := env.challengeRepo.ChallengePoints(context.Background())
 	if err != nil {
-		t.Fatalf("DynamicPoints: %v", err)
+		t.Fatalf("ChallengePoints: %v", err)
 	}
 
-	if points[challenge.ID] != 100 {
-		t.Fatalf("expected dynamic challenge to be 100, got %d", points[challenge.ID])
+	if points[challenge.ID] != 500 {
+		t.Fatalf("expected fixed challenge to be 500, got %d", points[challenge.ID])
 	}
 
 	if points[other.ID] != other.Points {
@@ -186,12 +182,12 @@ func TestChallengeRepoDynamicPointsAndSolveCounts(t *testing.T) {
 		t.Fatalf("expected no solve count entry for unsolved challenge")
 	}
 
-	pointsByIDs, err := env.challengeRepo.DynamicPointsByIDs(context.Background(), []int64{challenge.ID})
+	pointsByIDs, err := env.challengeRepo.ChallengePointsByIDs(context.Background(), []int64{challenge.ID})
 	if err != nil {
-		t.Fatalf("DynamicPointsByIDs: %v", err)
+		t.Fatalf("ChallengePointsByIDs: %v", err)
 	}
 
-	if len(pointsByIDs) != 1 || pointsByIDs[challenge.ID] != 100 {
+	if len(pointsByIDs) != 1 || pointsByIDs[challenge.ID] != 500 {
 		t.Fatalf("unexpected points by ids: %+v", pointsByIDs)
 	}
 
@@ -205,7 +201,7 @@ func TestChallengeRepoDynamicPointsAndSolveCounts(t *testing.T) {
 	}
 }
 
-func TestChallengeRepoDynamicPointsError(t *testing.T) {
+func TestChallengeRepoChallengePointsError(t *testing.T) {
 	if skipRepoIntegration {
 		t.Skip("integration tests disabled via WARGAME_SKIP_INTEGRATION")
 	}
@@ -213,8 +209,8 @@ func TestChallengeRepoDynamicPointsError(t *testing.T) {
 	closedDB := newClosedRepoDB(t)
 	repo := NewChallengeRepo(closedDB)
 
-	if _, err := repo.DynamicPoints(context.Background()); err == nil {
-		t.Fatalf("expected error from DynamicPoints")
+	if _, err := repo.ChallengePoints(context.Background()); err == nil {
+		t.Fatalf("expected error from ChallengePoints")
 	}
 }
 

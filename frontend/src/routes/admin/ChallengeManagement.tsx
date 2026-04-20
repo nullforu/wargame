@@ -20,13 +20,12 @@ const ChallengeManagement = () => {
     const [expandedChallengeId, setExpandedChallengeId] = useState<number | null>(null)
     const [manageLoading, setManageLoading] = useState(false)
     const [manageFieldErrors, setManageFieldErrors] = useState<FieldErrors>({})
-    const [editingField, setEditingField] = useState<'title' | 'description' | 'category' | 'level' | 'points' | 'minimum_points' | 'previous_challenge_id' | 'flag' | 'is_active' | 'stack' | null>(null)
+    const [editingField, setEditingField] = useState<'title' | 'description' | 'category' | 'level' | 'points' | 'previous_challenge_id' | 'flag' | 'is_active' | 'stack' | null>(null)
     const [editTitle, setEditTitle] = useState('')
     const [editDescription, setEditDescription] = useState('')
     const [editCategory, setEditCategory] = useState<string>(CHALLENGE_CATEGORIES[0])
     const [editLevel, setEditLevel] = useState(1)
     const [editPoints, setEditPoints] = useState(100)
-    const [editMinimumPoints, setEditMinimumPoints] = useState(100)
     const [editPreviousChallengeId, setEditPreviousChallengeId] = useState<number | ''>('')
     const [editFlag, setEditFlag] = useState('')
     const [editIsActive, setEditIsActive] = useState(true)
@@ -130,8 +129,7 @@ const ChallengeManagement = () => {
         setEditDescription('description' in challenge ? challenge.description : '')
         setEditCategory('category' in challenge ? challenge.category : CHALLENGE_CATEGORIES[0])
         setEditLevel('level' in challenge ? challenge.level : 1)
-        setEditPoints(challenge.initial_points)
-        setEditMinimumPoints(challenge.minimum_points)
+        setEditPoints(challenge.points)
         setEditIsActive(challenge.is_active)
         setEditPreviousChallengeId('previous_challenge_id' in challenge && challenge.previous_challenge_id !== undefined ? (challenge.previous_challenge_id ?? '') : '')
         setLoadedPreviousChallengeId('previous_challenge_id' in challenge ? (challenge.previous_challenge_id ?? null) : null)
@@ -148,8 +146,7 @@ const ChallengeManagement = () => {
             setEditDescription(detail.description)
             setEditCategory(detail.category)
             setEditLevel(detail.level)
-            setEditPoints(detail.initial_points)
-            setEditMinimumPoints(detail.minimum_points)
+            setEditPoints(detail.points)
             setEditIsActive(detail.is_active)
             setEditPreviousChallengeId(detail.previous_challenge_id ?? '')
             setLoadedPreviousChallengeId(detail.previous_challenge_id ?? null)
@@ -185,8 +182,7 @@ const ChallengeManagement = () => {
         if (field === 'description') setEditDescription(detail?.description ?? '')
         if (field === 'category') setEditCategory(detail?.category ?? CHALLENGE_CATEGORIES[0])
         if (field === 'level') setEditLevel(detail?.level ?? 1)
-        if (field === 'points') setEditPoints(detail?.initial_points ?? challenge.points)
-        if (field === 'minimum_points') setEditMinimumPoints(detail?.minimum_points ?? 0)
+        if (field === 'points') setEditPoints(detail?.points ?? challenge.points)
         if (field === 'previous_challenge_id') setEditPreviousChallengeId(loadedPreviousChallengeId ?? '')
         if (field === 'flag') setEditFlag('')
         if (field === 'is_active') setEditIsActive(detail?.is_active ?? true)
@@ -240,19 +236,11 @@ const ChallengeManagement = () => {
         }
 
         if (field === 'points') {
-            if (detail && Number(editPoints) === detail.initial_points) {
+            if (detail && Number(editPoints) === detail.points) {
                 setEditingField(null)
                 return
             }
             payload.points = Number(editPoints)
-        }
-
-        if (field === 'minimum_points') {
-            if (detail && Number(editMinimumPoints) === detail.minimum_points) {
-                setEditingField(null)
-                return
-            }
-            payload.minimum_points = Number(editMinimumPoints)
         }
 
         if (field === 'previous_challenge_id') {
@@ -322,8 +310,7 @@ const ChallengeManagement = () => {
             setEditDescription(updated.description)
             setEditCategory(updated.category)
             setEditLevel(updated.level)
-            setEditPoints(updated.initial_points)
-            setEditMinimumPoints(updated.minimum_points)
+            setEditPoints(updated.points)
             setEditIsActive(updated.is_active)
             setEditPreviousChallengeId(updated.previous_challenge_id ?? '')
             setLoadedPreviousChallengeId(updated.previous_challenge_id ?? null)
@@ -479,9 +466,7 @@ const ChallengeManagement = () => {
                                     <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>{t('common.title')}</th>
                                     <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>{t('common.category')}</th>
                                     <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>LEVEL</th>
-                                    <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>{t('admin.manage.initial')}</th>
                                     <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>{t('common.points')}</th>
-                                    <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>{t('common.minimum')}</th>
                                     <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>{t('challenges.solvedLabel')}</th>
                                     <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>{t('common.status')}</th>
                                     <th className='px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-text-muted'>{t('common.action')}</th>
@@ -491,8 +476,6 @@ const ChallengeManagement = () => {
                                 {challenges.map((challenge) => {
                                     const isActive = 'is_active' in challenge ? challenge.is_active !== false : true
                                     const categoryLabel = 'category' in challenge ? t(getCategoryKey(challenge.category)) : t('common.na')
-                                    const initialPoints = challenge.initial_points
-                                    const minimumPoints = challenge.minimum_points
                                     const solveCount = challenge.solve_count
                                     const hasFile = 'has_file' in challenge && challenge.has_file
                                     const fileName = 'file_name' in challenge ? challenge.file_name : null
@@ -505,8 +488,6 @@ const ChallengeManagement = () => {
                                                 <td className='px-6 py-4 text-sm text-text'>{categoryLabel}</td>
                                                 <td className='px-6 py-4 text-sm text-text'>{challenge.level}</td>
                                                 <td className='px-6 py-4 text-sm text-text'>{challenge.points}</td>
-                                                <td className='px-6 py-4 text-sm text-text'>{initialPoints}</td>
-                                                <td className='px-6 py-4 text-sm text-text'>{minimumPoints}</td>
                                                 <td className='px-6 py-4 text-sm text-text'>{solveCount}</td>
                                                 <td className='px-6 py-4 text-sm'>
                                                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium uppercase ${isActive ? 'bg-accent/20 text-accent-strong' : 'bg-surface-subtle text-text'}`}>
@@ -526,7 +507,7 @@ const ChallengeManagement = () => {
                                             </tr>
                                             {expandedChallengeId === challenge.id ? (
                                                 <tr className='bg-surface/70'>
-                                                    <td colSpan={10} className='px-6 py-6'>
+                                                    <td colSpan={8} className='px-6 py-6'>
                                                         <div className='space-y-5'>
                                                             <div>
                                                                 <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor={`manage-title-${challenge.id}`}>
@@ -786,59 +767,6 @@ const ChallengeManagement = () => {
                                                                     {manageFieldErrors.points ? (
                                                                         <p className='mt-2 text-xs text-danger'>
                                                                             {t('common.points')}: {manageFieldErrors.points}
-                                                                        </p>
-                                                                    ) : null}
-                                                                </div>
-                                                                <div>
-                                                                    <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor={`manage-minimum-points-${challenge.id}`}>
-                                                                        {t('common.minimum')}
-                                                                    </label>
-                                                                    {editingField === 'minimum_points' ? (
-                                                                        <div className='mt-2 space-y-2'>
-                                                                            <input
-                                                                                id={`manage-minimum-points-${challenge.id}`}
-                                                                                className='w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text focus:border-accent focus:outline-none'
-                                                                                type='number'
-                                                                                min={0}
-                                                                                value={editMinimumPoints}
-                                                                                onChange={(event) => setEditMinimumPoints(Number(event.target.value))}
-                                                                                disabled={manageLoading}
-                                                                            />
-                                                                            <div className='flex flex-wrap items-center gap-3'>
-                                                                                <button
-                                                                                    className='rounded-lg bg-accent px-3 py-2 text-xs font-medium text-contrast-foreground transition hover:bg-accent-strong disabled:opacity-60 cursor-pointer'
-                                                                                    type='button'
-                                                                                    onClick={() => saveField(challenge, 'minimum_points')}
-                                                                                    disabled={manageLoading}
-                                                                                >
-                                                                                    {manageLoading ? t('admin.site.saving') : t('common.save')}
-                                                                                </button>
-                                                                                <button
-                                                                                    className='rounded-lg border border-border px-3 py-2 text-xs text-text transition hover:border-border disabled:opacity-60 cursor-pointer'
-                                                                                    type='button'
-                                                                                    onClick={() => cancelEdit('minimum_points', challenge)}
-                                                                                    disabled={manageLoading}
-                                                                                >
-                                                                                    {t('common.cancel')}
-                                                                                </button>
-                                                                            </div>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className='mt-2 flex items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text'>
-                                                                            <span>{editMinimumPoints}</span>
-                                                                            <button
-                                                                                className='text-xs text-accent hover:underline cursor-pointer disabled:opacity-60'
-                                                                                type='button'
-                                                                                onClick={() => beginEdit('minimum_points')}
-                                                                                disabled={manageLoading || editingField !== null}
-                                                                            >
-                                                                                {t('common.edit')}
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                    {manageFieldErrors.minimum_points ? (
-                                                                        <p className='mt-2 text-xs text-danger'>
-                                                                            {t('common.minimum')}: {manageFieldErrors.minimum_points}
                                                                         </p>
                                                                     ) : null}
                                                                 </div>
