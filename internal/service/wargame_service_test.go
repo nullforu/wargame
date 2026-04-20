@@ -364,6 +364,38 @@ func TestWargameServiceChallengeSortValidationAndOrder(t *testing.T) {
 	}
 }
 
+func TestWargameServiceUpdateChallengeCreator(t *testing.T) {
+	env := setupServiceTest(t)
+	challenge := createChallenge(t, env, "Creator Challenge", 100, "FLAG{CREATOR}", true)
+	user := createUser(t, env, "creator@example.com", "creator-user", "pass", models.UserRole)
+
+	t.Run("invalid input", func(t *testing.T) {
+		if err := env.wargameSvc.UpdateChallengeCreator(context.Background(), 0, user.ID); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("expected ErrInvalidInput, got %v", err)
+		}
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		if err := env.wargameSvc.UpdateChallengeCreator(context.Background(), 999999, user.ID); !errors.Is(err, ErrChallengeNotFound) {
+			t.Fatalf("expected ErrChallengeNotFound, got %v", err)
+		}
+	})
+
+	t.Run("success", func(t *testing.T) {
+		if err := env.wargameSvc.UpdateChallengeCreator(context.Background(), challenge.ID, user.ID); err != nil {
+			t.Fatalf("UpdateChallengeCreator: %v", err)
+		}
+
+		updated, err := env.wargameSvc.GetChallengeByID(context.Background(), challenge.ID)
+		if err != nil {
+			t.Fatalf("GetChallengeByID: %v", err)
+		}
+		if updated.CreatedByUserID == nil || *updated.CreatedByUserID != user.ID {
+			t.Fatalf("expected created_by_user_id=%d, got %+v", user.ID, updated.CreatedByUserID)
+		}
+	})
+}
+
 func TestWargameServiceListAllSubmissions(t *testing.T) {
 	env := setupServiceTest(t)
 	user := createUser(t, env, "sub@example.com", "sub", "pass", models.UserRole)
