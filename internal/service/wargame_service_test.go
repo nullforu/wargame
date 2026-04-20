@@ -166,12 +166,15 @@ func TestWargameServiceSubmitFlagAndSolvedQueries(t *testing.T) {
 		t.Fatalf("expected challenge id in solved set")
 	}
 
-	solved, err := env.wargameSvc.SolvedChallenges(context.Background(), user.ID)
+	solvedPageRows, solvedPagination, err := env.wargameSvc.SolvedChallengesPage(context.Background(), user.ID, 1, 10)
 	if err != nil {
-		t.Fatalf("SolvedChallenges: %v", err)
+		t.Fatalf("SolvedChallengesPage: %v", err)
 	}
-	if len(solved) != 1 || solved[0].ChallengeID != challenge.ID {
-		t.Fatalf("unexpected solved list: %+v", solved)
+	if len(solvedPageRows) != 1 || solvedPageRows[0].ChallengeID != challenge.ID {
+		t.Fatalf("unexpected solved page rows: %+v", solvedPageRows)
+	}
+	if solvedPagination.TotalCount != 1 {
+		t.Fatalf("unexpected solved pagination: %+v", solvedPagination)
 	}
 }
 

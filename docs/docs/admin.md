@@ -93,6 +93,7 @@ Request
     "title": "New Challenge",
     "description": "...",
     "category": "Web",
+    "level": 3,
     "points": 200,
     "flag": "flag{...}",
     "previous_challenge_id": 1,
@@ -108,6 +109,10 @@ Request
 }
 ```
 
+Parameters
+
+- `level`: difficulty level from `1` to `10` (default: `1`)
+
 Response 201
 
 ```json
@@ -116,6 +121,7 @@ Response 201
     "title": "New Challenge",
     "description": "...",
     "category": "Web",
+    "level": 3,
     "points": 200,
     "solve_count": 0,
     "previous_challenge_id": 1,
@@ -152,6 +158,7 @@ All fields are optional. Omitted fields are unchanged.
 ```json
 {
     "title": "Updated Challenge",
+    "level": 4,
     "points": 250,
     "flag": "flag{rotated}",
     "is_active": false,
@@ -174,6 +181,7 @@ Response 200
     "title": "Updated Challenge",
     "description": "...",
     "category": "Crypto",
+    "level": 4,
     "points": 250,
     "solve_count": 12,
     "is_active": false,
@@ -217,6 +225,7 @@ Response 200
     "title": "Updated Challenge",
     "description": "...",
     "category": "Crypto",
+    "level": 4,
     "points": 250,
     "solve_count": 12,
     "is_active": false,
@@ -378,6 +387,7 @@ Response 200
         "title": "New Challenge",
         "description": "...",
         "category": "Web",
+        "level": 3,
         "points": 200,
         "solve_count": 0,
         "is_active": true,
@@ -426,6 +436,7 @@ Response 200
     "title": "New Challenge",
     "description": "...",
     "category": "Web",
+    "level": 3,
     "points": 200,
     "solve_count": 0,
     "is_active": true,

@@ -24,7 +24,7 @@ func TestSubmissionRepoCreateAndHasCorrect(t *testing.T) {
 	}
 }
 
-func TestSubmissionRepoSolvedChallengesAndIDs(t *testing.T) {
+func TestSubmissionRepoSolvedChallengesPageAndIDs(t *testing.T) {
 	env := setupRepoTest(t)
 	user := createUserForTestUserScope(t, env, "u1@example.com", "u1", "pass", models.UserRole)
 	ch1 := createChallenge(t, env, "ch1", 100, "FLAG{1}", true)
@@ -33,12 +33,15 @@ func TestSubmissionRepoSolvedChallengesAndIDs(t *testing.T) {
 	createSubmission(t, env, user.ID, ch1.ID, true, time.Now().Add(-2*time.Minute))
 	createSubmission(t, env, user.ID, ch2.ID, true, time.Now().Add(-time.Minute))
 
-	rows, err := env.submissionRepo.SolvedChallenges(context.Background(), user.ID)
+	rows, totalCount, err := env.submissionRepo.SolvedChallengesPage(context.Background(), user.ID, 1, 20)
 	if err != nil {
-		t.Fatalf("SolvedChallenges: %v", err)
+		t.Fatalf("SolvedChallengesPage: %v", err)
 	}
 	if len(rows) != 2 {
 		t.Fatalf("expected 2 rows, got %d", len(rows))
+	}
+	if totalCount != 2 {
+		t.Fatalf("expected total count 2, got %d", totalCount)
 	}
 
 	ids, err := env.submissionRepo.SolvedChallengeIDs(context.Background(), user.ID)
@@ -114,12 +117,15 @@ func TestSubmissionRepoCreateCorrectFalsePath(t *testing.T) {
 func TestSubmissionRepoEmptyAndErrorPaths(t *testing.T) {
 	env := setupRepoTest(t)
 
-	rows, err := env.submissionRepo.SolvedChallenges(context.Background(), 999999)
+	rows, totalCount, err := env.submissionRepo.SolvedChallengesPage(context.Background(), 999999, 1, 20)
 	if err != nil {
-		t.Fatalf("SolvedChallenges empty: %v", err)
+		t.Fatalf("SolvedChallengesPage empty: %v", err)
 	}
 	if len(rows) != 0 {
 		t.Fatalf("expected empty solved rows, got %+v", rows)
+	}
+	if totalCount != 0 {
+		t.Fatalf("expected total count 0, got %d", totalCount)
 	}
 
 	ids, err := env.submissionRepo.SolvedChallengeIDs(context.Background(), 999999)

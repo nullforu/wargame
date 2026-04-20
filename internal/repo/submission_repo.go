@@ -162,11 +162,6 @@ func (r *SubmissionRepo) HasCorrect(ctx context.Context, userID, challengeID int
 	return count > 0, nil
 }
 
-func (r *SubmissionRepo) SolvedChallenges(ctx context.Context, userID int64) ([]models.SolvedChallenge, error) {
-	rows, _, err := r.SolvedChallengesPage(ctx, userID, 1, 10000)
-	return rows, err
-}
-
 func (r *SubmissionRepo) SolvedChallengesPage(ctx context.Context, userID int64, page, pageSize int) ([]models.SolvedChallenge, int, error) {
 	rows := make([]models.SolvedChallenge, 0)
 	base := r.solvedChallengesQuery(r.db).Where("s.user_id = ?", userID).GroupExpr("s.challenge_id, c.title, c.points")

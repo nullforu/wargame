@@ -706,25 +706,6 @@ func (s *WargameService) DeleteChallengeFile(ctx context.Context, id int64) (*mo
 
 	return challenge, nil
 }
-
-func (s *WargameService) SolvedChallenges(ctx context.Context, userID int64) ([]models.SolvedChallenge, error) {
-	rows, err := s.submissionRepo.SolvedChallenges(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("wargame.SolvedChallenges: %w", err)
-	}
-
-	pointsMap, err := s.challengeRepo.ChallengePoints(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("wargame.SolvedChallenges score: %w", err)
-	}
-
-	for i := range rows {
-		rows[i].Points = pointsMap[rows[i].ChallengeID]
-	}
-
-	return rows, nil
-}
-
 func (s *WargameService) SolvedChallengesPage(ctx context.Context, userID int64, page, pageSize int) ([]models.SolvedChallenge, models.Pagination, error) {
 	params, err := NormalizePagination(page, pageSize)
 	if err != nil {

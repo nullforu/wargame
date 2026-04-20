@@ -81,9 +81,15 @@ func (r *ChallengeRepo) ListActiveFiltered(ctx context.Context, filter Challenge
 	case "oldest":
 		listQuery = listQuery.Order("challenge.id ASC")
 	case "most_solved":
-		listQuery = listQuery.OrderExpr("(SELECT COUNT(*) FROM submissions s JOIN users u ON u.id = s.user_id WHERE s.correct = true AND s.challenge_id = challenge.id AND u.role NOT IN ('blocked', 'admin')) DESC NULLS LAST").Order("challenge.id DESC")
+		listQuery = listQuery.
+			Join("LEFT JOIN (SELECT s.challenge_id, COUNT(*) AS solve_count FROM submissions s JOIN users u ON u.id = s.user_id WHERE s.correct = true AND u.role NOT IN ('blocked', 'admin') GROUP BY s.challenge_id) AS solve_stats ON solve_stats.challenge_id = challenge.id").
+			OrderExpr("COALESCE(solve_stats.solve_count, 0) DESC").
+			Order("challenge.id DESC")
 	case "least_solved":
-		listQuery = listQuery.OrderExpr("(SELECT COUNT(*) FROM submissions s JOIN users u ON u.id = s.user_id WHERE s.correct = true AND s.challenge_id = challenge.id AND u.role NOT IN ('blocked', 'admin')) ASC NULLS FIRST").Order("challenge.id DESC")
+		listQuery = listQuery.
+			Join("LEFT JOIN (SELECT s.challenge_id, COUNT(*) AS solve_count FROM submissions s JOIN users u ON u.id = s.user_id WHERE s.correct = true AND u.role NOT IN ('blocked', 'admin') GROUP BY s.challenge_id) AS solve_stats ON solve_stats.challenge_id = challenge.id").
+			OrderExpr("COALESCE(solve_stats.solve_count, 0) ASC").
+			Order("challenge.id DESC")
 	default:
 		listQuery = listQuery.Order("challenge.id DESC")
 	}

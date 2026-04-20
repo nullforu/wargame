@@ -197,7 +197,7 @@ const CreateChallenge = () => {
                         </div>
                         <div>
                             <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor='admin-level'>
-                                LEVEL
+                                {t('common.level')}
                             </label>
                             <input
                                 id='admin-level'
@@ -208,7 +208,11 @@ const CreateChallenge = () => {
                                 value={level}
                                 onChange={(event) => setLevel(Number(event.target.value))}
                             />
-                            {fieldErrors.level ? <p className='mt-2 text-xs text-danger'>LEVEL: {fieldErrors.level}</p> : null}
+                            {fieldErrors.level ? (
+                                <p className='mt-2 text-xs text-danger'>
+                                    {t('common.level')}: {fieldErrors.level}
+                                </p>
+                            ) : null}
                         </div>
                         <div>
                             <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor='admin-points'>
