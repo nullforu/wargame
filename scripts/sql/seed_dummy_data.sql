@@ -36,6 +36,7 @@ INSERT INTO challenges (
     points,
     category,
     flag_hash,
+    created_by_user_id,
     previous_challenge_id,
     file_key,
     file_name,
@@ -66,6 +67,7 @@ SELECT
     (g.level * 100) + ((g.cid % 3) * 20),
     (ARRAY['Web', 'Pwnable', 'Reversing', 'Crypto', 'Forensics', 'Cloud', 'Misc', 'Programming'])[((g.cid - 1) % 8) + 1],
     '$2a$10$bsyMO/LWwVSIFN.LS09qbuPjVxwIvOqC3i79lJ6hzHw722cwLRa4m',
+    ((g.cid % 20) + 4),
     CASE
         WHEN g.cid % 9 = 0 THEN g.cid - 1
         WHEN g.cid % 13 = 0 THEN g.cid - 2

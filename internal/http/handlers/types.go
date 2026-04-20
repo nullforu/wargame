@@ -160,6 +160,8 @@ type challengeResponse struct {
 	Level               int                       `json:"level"`
 	Points              int                       `json:"points"`
 	SolveCount          int                       `json:"solve_count"`
+	CreatedByUserID     *int64                    `json:"created_by_user_id,omitempty"`
+	CreatedByUsername   string                    `json:"created_by_username,omitempty"`
 	PreviousChallengeID *int64                    `json:"previous_challenge_id,omitempty"`
 	IsActive            bool                      `json:"is_active"`
 	IsLocked            bool                      `json:"is_locked"`
@@ -177,6 +179,8 @@ type lockedChallengeResponse struct {
 	Level                     int     `json:"level"`
 	Points                    int     `json:"points"`
 	SolveCount                int     `json:"solve_count"`
+	CreatedByUserID           *int64  `json:"created_by_user_id,omitempty"`
+	CreatedByUsername         string  `json:"created_by_username,omitempty"`
 	PreviousChallengeID       *int64  `json:"previous_challenge_id,omitempty"`
 	PreviousChallengeTitle    *string `json:"previous_challenge_title,omitempty"`
 	PreviousChallengeCategory *string `json:"previous_challenge_category,omitempty"`
@@ -310,6 +314,8 @@ func newChallengeResponse(challenge *models.Challenge, isSolved bool) challengeR
 		Level:               challenge.Level,
 		Points:              challenge.Points,
 		SolveCount:          challenge.SolveCount,
+		CreatedByUserID:     challenge.CreatedByUserID,
+		CreatedByUsername:   challenge.CreatedByUsername,
 		PreviousChallengeID: challenge.PreviousChallengeID,
 		IsActive:            challenge.IsActive,
 		IsLocked:            false,
@@ -335,6 +341,8 @@ func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Ch
 		Level:                     challenge.Level,
 		Points:                    challenge.Points,
 		SolveCount:                challenge.SolveCount,
+		CreatedByUserID:           challenge.CreatedByUserID,
+		CreatedByUsername:         challenge.CreatedByUsername,
 		PreviousChallengeID:       challenge.PreviousChallengeID,
 		PreviousChallengeTitle:    prevTitle,
 		PreviousChallengeCategory: prevCategory,

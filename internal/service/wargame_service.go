@@ -90,6 +90,7 @@ type ChallengeQueryFilter struct {
 	Level    *int
 	Solved   *bool
 	UserID   int64
+	Sort     string
 }
 
 func NewWargameService(cfg config.Config, challengeRepo *repo.ChallengeRepo, submissionRepo *repo.SubmissionRepo, redis *redis.Client, fileStore storage.ChallengeFileStore) *WargameService {
@@ -106,6 +107,7 @@ func (s *WargameService) ListChallenges(ctx context.Context, page, pageSize int,
 		Query:    strings.TrimSpace(filter.Query),
 		Category: strings.TrimSpace(filter.Category),
 		Level:    filter.Level,
+		Sort:     strings.TrimSpace(filter.Sort),
 	}
 	if filter.Solved != nil {
 		if filter.UserID <= 0 {
@@ -118,6 +120,13 @@ func (s *WargameService) ListChallenges(ctx context.Context, page, pageSize int,
 
 	if queryFilter.Level != nil && (*queryFilter.Level < 1 || *queryFilter.Level > 10) {
 		return nil, models.Pagination{}, NewValidationError(FieldError{Field: "level", Reason: "must be between 1 and 10"})
+	}
+	if queryFilter.Sort != "" {
+		switch queryFilter.Sort {
+		case "latest", "oldest", "most_solved", "least_solved":
+		default:
+			return nil, models.Pagination{}, NewValidationError(FieldError{Field: "sort", Reason: "invalid"})
+		}
 	}
 
 	challenges, totalCount, err := s.challengeRepo.ListActiveFiltered(ctx, queryFilter, params.Page, params.PageSize)
@@ -442,6 +451,28 @@ func (s *WargameService) DeleteChallenge(ctx context.Context, id int64) error {
 
 	if err := s.challengeRepo.Delete(ctx, challenge); err != nil {
 		return fmt.Errorf("wargame.DeleteChallenge delete: %w", err)
+	}
+
+	return nil
+}
+
+func (s *WargameService) UpdateChallengeCreator(ctx context.Context, challengeID, userID int64) error {
+	if challengeID <= 0 || userID <= 0 {
+		return ErrInvalidInput
+	}
+
+	challenge, err := s.challengeRepo.GetByID(ctx, challengeID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return ErrChallengeNotFound
+		}
+
+		return fmt.Errorf("wargame.UpdateChallengeCreator lookup: %w", err)
+	}
+
+	challenge.CreatedByUserID = &userID
+	if err := s.challengeRepo.Update(ctx, challenge); err != nil {
+		return fmt.Errorf("wargame.UpdateChallengeCreator update: %w", err)
 	}
 
 	return nil

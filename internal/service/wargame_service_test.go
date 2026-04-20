@@ -288,6 +288,82 @@ func TestWargameServiceChallengeFiltersAndPagedSolvedAndSolvers(t *testing.T) {
 	}
 }
 
+func TestWargameServiceChallengeSortValidationAndOrder(t *testing.T) {
+	env := setupServiceTest(t)
+	user1 := createUser(t, env, "sort1@example.com", "sort1", "pass", models.UserRole)
+	user2 := createUser(t, env, "sort2@example.com", "sort2", "pass", models.UserRole)
+	blocked := createUser(t, env, "sortblocked@example.com", "sortblocked", "pass", models.BlockedRole)
+	adminUser := createUser(t, env, "sortadmin@example.com", "sortadmin", "pass", models.AdminRole)
+
+	chA, err := env.wargameSvc.CreateChallenge(context.Background(), "Sort A", "Desc", "Web", nil, 100, "FLAG{A}", true, false, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateChallenge A: %v", err)
+	}
+
+	chB, err := env.wargameSvc.CreateChallenge(context.Background(), "Sort B", "Desc", "Web", nil, 100, "FLAG{B}", true, false, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateChallenge B: %v", err)
+	}
+
+	chC, err := env.wargameSvc.CreateChallenge(context.Background(), "Sort C", "Desc", "Web", nil, 100, "FLAG{C}", true, false, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateChallenge C: %v", err)
+	}
+
+	chD, err := env.wargameSvc.CreateChallenge(context.Background(), "Sort D", "Desc", "Web", nil, 100, "FLAG{D}", true, false, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateChallenge D: %v", err)
+	}
+
+	now := time.Now().UTC()
+	createSubmission(t, env, user1.ID, chA.ID, true, now.Add(-5*time.Minute))
+	createSubmission(t, env, user2.ID, chA.ID, true, now.Add(-4*time.Minute))
+	createSubmission(t, env, user1.ID, chB.ID, true, now.Add(-3*time.Minute))
+	createSubmission(t, env, user2.ID, chD.ID, true, now.Add(-150*time.Second))
+	createSubmission(t, env, blocked.ID, chC.ID, true, now.Add(-2*time.Minute))
+	createSubmission(t, env, adminUser.ID, chC.ID, true, now.Add(-1*time.Minute))
+
+	assertOrder := func(rows []models.Challenge, want []int64) {
+		if len(rows) < len(want) {
+			t.Fatalf("rows too short: got=%d want=%d", len(rows), len(want))
+		}
+
+		for i := range want {
+			if rows[i].ID != want[i] {
+				t.Fatalf("unexpected order at %d: got=%d want=%d", i, rows[i].ID, want[i])
+			}
+		}
+	}
+
+	latest, _, err := env.wargameSvc.ListChallenges(context.Background(), 1, 20, ChallengeQueryFilter{Sort: "latest"})
+	if err != nil {
+		t.Fatalf("ListChallenges latest: %v", err)
+	}
+	assertOrder(latest, []int64{chD.ID, chC.ID, chB.ID, chA.ID})
+
+	oldest, _, err := env.wargameSvc.ListChallenges(context.Background(), 1, 20, ChallengeQueryFilter{Sort: "oldest"})
+	if err != nil {
+		t.Fatalf("ListChallenges oldest: %v", err)
+	}
+	assertOrder(oldest, []int64{chA.ID, chB.ID, chC.ID, chD.ID})
+
+	most, _, err := env.wargameSvc.SearchChallenges(context.Background(), "Sort", 1, 20, ChallengeQueryFilter{Sort: "most_solved"})
+	if err != nil {
+		t.Fatalf("SearchChallenges most_solved: %v", err)
+	}
+	assertOrder(most, []int64{chA.ID, chD.ID, chB.ID, chC.ID})
+
+	least, _, err := env.wargameSvc.SearchChallenges(context.Background(), "Sort", 1, 20, ChallengeQueryFilter{Sort: "least_solved"})
+	if err != nil {
+		t.Fatalf("SearchChallenges least_solved: %v", err)
+	}
+	assertOrder(least, []int64{chC.ID, chD.ID, chB.ID, chA.ID})
+
+	if _, _, err := env.wargameSvc.ListChallenges(context.Background(), 1, 20, ChallengeQueryFilter{Sort: "invalid"}); err == nil {
+		t.Fatalf("expected invalid sort validation error")
+	}
+}
+
 func TestWargameServiceListAllSubmissions(t *testing.T) {
 	env := setupServiceTest(t)
 	user := createUser(t, env, "sub@example.com", "sub", "pass", models.UserRole)

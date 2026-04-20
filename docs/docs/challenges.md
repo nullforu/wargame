@@ -13,6 +13,7 @@ Query parameters:
 - `category` (optional, exact category)
 - `level` (optional, integer `1..10`)
 - `solved` (optional, `true`/`false`, requires authenticated user context)
+- `sort` (optional, one of `latest`, `oldest`, `most_solved`, `least_solved`; default `latest`)
 - `page` (optional, default `1`)
 - `page_size` (optional, default `20`, max `100`)
 
@@ -29,6 +30,8 @@ Response 200
             "level": 3,
             "points": 100,
             "solve_count": 12,
+            "created_by_user_id": 1,
+            "created_by_username": "admin",
             "is_active": true,
             "is_locked": false,
             "is_solved": true,
@@ -70,6 +73,7 @@ Query parameters:
 - `category` (optional, exact category)
 - `level` (optional, integer `1..10`)
 - `solved` (optional, `true`/`false`, requires authenticated user context)
+- `sort` (optional, one of `latest`, `oldest`, `most_solved`, `least_solved`; default `latest`)
 - `page` (optional, default `1`)
 - `page_size` (optional, default `20`, max `100`)
 
@@ -86,6 +90,8 @@ Response 200
             "level": 3,
             "points": 100,
             "solve_count": 12,
+            "created_by_user_id": 1,
+            "created_by_username": "admin",
             "is_active": true,
             "is_locked": false,
             "is_solved": true,
@@ -127,6 +133,8 @@ Response 200
     "level": 3,
     "points": 100,
     "solve_count": 12,
+    "created_by_user_id": 1,
+    "created_by_username": "admin",
     "is_active": true,
     "is_locked": false,
     "is_solved": true,

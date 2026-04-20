@@ -77,7 +77,7 @@ func TestChallengeRepoListActiveAndSearchPagination(t *testing.T) {
 		t.Fatalf("expected total_count 3, got %d", totalCount)
 	}
 
-	if len(pageRows) != 1 || pageRows[0].Title != "Crypto One" {
+	if len(pageRows) != 1 || pageRows[0].Title != "Web Warmup" {
 		t.Fatalf("unexpected page rows: %+v", pageRows)
 	}
 
@@ -131,6 +131,63 @@ func TestChallengeRepoListActiveFiltered(t *testing.T) {
 
 	if total != 1 || len(rows) != 1 || rows[0].ID != web.ID {
 		t.Fatalf("unexpected filtered rows: total=%d rows=%+v", total, rows)
+	}
+}
+
+func TestChallengeRepoListActiveFilteredSort(t *testing.T) {
+	env := setupRepoTest(t)
+	solver1 := createUserForTestUserScope(t, env, "solver1@example.com", "solver1", "pass", models.UserRole)
+	solver2 := createUserForTestUserScope(t, env, "solver2@example.com", "solver2", "pass", models.UserRole)
+	blocked := createUserForTestUserScope(t, env, "blocked@example.com", "blocked", "pass", models.BlockedRole)
+	admin := createUserForTestUserScope(t, env, "admin@example.com", "admin", "pass", models.AdminRole)
+
+	ch1 := createChallenge(t, env, "Challenge A", 100, "FLAG{A}", true)
+	ch2 := createChallenge(t, env, "Challenge B", 200, "FLAG{B}", true)
+	ch3 := createChallenge(t, env, "Challenge C", 300, "FLAG{C}", true)
+	ch4 := createChallenge(t, env, "Challenge D", 400, "FLAG{D}", true)
+
+	now := time.Now().UTC()
+	createSubmission(t, env, solver1.ID, ch1.ID, true, now.Add(-5*time.Minute))
+	createSubmission(t, env, solver2.ID, ch1.ID, true, now.Add(-4*time.Minute))
+	createSubmission(t, env, solver1.ID, ch2.ID, true, now.Add(-3*time.Minute))
+	createSubmission(t, env, solver2.ID, ch4.ID, true, now.Add(-250*time.Second))
+	createSubmission(t, env, blocked.ID, ch3.ID, true, now.Add(-2*time.Minute))
+	createSubmission(t, env, admin.ID, ch3.ID, true, now.Add(-1*time.Minute))
+
+	latestRows, _, err := env.challengeRepo.ListActiveFiltered(context.Background(), ChallengeListFilter{Sort: "latest"}, 1, 10)
+	if err != nil {
+		t.Fatalf("latest sort: %v", err)
+	}
+
+	if len(latestRows) != 4 || latestRows[0].ID != ch4.ID || latestRows[1].ID != ch3.ID || latestRows[2].ID != ch2.ID || latestRows[3].ID != ch1.ID {
+		t.Fatalf("unexpected latest order: %+v", latestRows)
+	}
+
+	oldestRows, _, err := env.challengeRepo.ListActiveFiltered(context.Background(), ChallengeListFilter{Sort: "oldest"}, 1, 10)
+	if err != nil {
+		t.Fatalf("oldest sort: %v", err)
+	}
+
+	if len(oldestRows) != 4 || oldestRows[0].ID != ch1.ID || oldestRows[1].ID != ch2.ID || oldestRows[2].ID != ch3.ID || oldestRows[3].ID != ch4.ID {
+		t.Fatalf("unexpected oldest order: %+v", oldestRows)
+	}
+
+	mostRows, _, err := env.challengeRepo.ListActiveFiltered(context.Background(), ChallengeListFilter{Sort: "most_solved"}, 1, 10)
+	if err != nil {
+		t.Fatalf("most_solved sort: %v", err)
+	}
+
+	if len(mostRows) != 4 || mostRows[0].ID != ch1.ID || mostRows[1].ID != ch4.ID || mostRows[2].ID != ch2.ID || mostRows[3].ID != ch3.ID {
+		t.Fatalf("unexpected most_solved order: %+v", mostRows)
+	}
+
+	leastRows, _, err := env.challengeRepo.ListActiveFiltered(context.Background(), ChallengeListFilter{Sort: "least_solved"}, 1, 10)
+	if err != nil {
+		t.Fatalf("least_solved sort: %v", err)
+	}
+
+	if len(leastRows) != 4 || leastRows[0].ID != ch3.ID || leastRows[1].ID != ch4.ID || leastRows[2].ID != ch2.ID || leastRows[3].ID != ch1.ID {
+		t.Fatalf("unexpected least_solved order: %+v", leastRows)
 	}
 }
 

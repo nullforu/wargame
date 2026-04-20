@@ -18,6 +18,8 @@ type Challenge struct {
 	Points              int                   `bun:"points,notnull,default:0"`
 	Category            string                `bun:"category,notnull"`
 	FlagHash            string                `bun:"flag_hash,notnull"`
+	CreatedByUserID     *int64                `bun:"created_by_user_id,nullzero"`
+	CreatedByUsername   string                `bun:"created_by_username,scanonly"`
 	PreviousChallengeID *int64                `bun:"previous_challenge_id,nullzero"`
 	FileKey             *string               `bun:"file_key,nullzero"`
 	FileName            *string               `bun:"file_name,nullzero"`

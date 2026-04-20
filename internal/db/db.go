@@ -93,6 +93,7 @@ func ensureColumns(ctx context.Context, db *bun.DB) error {
 		query string
 	}{
 		{name: "challenges.level", query: "ALTER TABLE challenges ADD COLUMN IF NOT EXISTS level integer NOT NULL DEFAULT 1"},
+		{name: "challenges.created_by_user_id", query: "ALTER TABLE challenges ADD COLUMN IF NOT EXISTS created_by_user_id bigint NULL REFERENCES users(id) ON DELETE SET NULL"},
 	}
 
 	for _, q := range queries {

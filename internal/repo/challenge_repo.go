@@ -19,6 +19,7 @@ type ChallengeListFilter struct {
 	Level          *int
 	SolvedByUserID *int64
 	Solved         *bool
+	Sort           string
 }
 
 func NewChallengeRepo(db *bun.DB) *ChallengeRepo {
@@ -36,7 +37,10 @@ func (r *ChallengeRepo) SearchActive(ctx context.Context, query string, page, pa
 func (r *ChallengeRepo) ListActiveFiltered(ctx context.Context, filter ChallengeListFilter, page, pageSize int) ([]models.Challenge, int, error) {
 	challenges := make([]models.Challenge, 0, pageSize)
 	countQuery := r.db.NewSelect().Model((*models.Challenge)(nil))
-	listQuery := r.db.NewSelect().Model(&challenges)
+	listQuery := r.db.NewSelect().Model(&challenges).
+		Join("LEFT JOIN users AS author ON author.id = challenge.created_by_user_id").
+		ColumnExpr("challenge.*").
+		ColumnExpr("author.username AS created_by_username")
 
 	query := strings.TrimSpace(filter.Query)
 	if query != "" {
@@ -71,7 +75,20 @@ func (r *ChallengeRepo) ListActiveFiltered(ctx context.Context, filter Challenge
 	}
 
 	offset := (page - 1) * pageSize
-	if err := listQuery.Order("id ASC").Limit(pageSize).Offset(offset).Scan(ctx); err != nil {
+	switch strings.TrimSpace(filter.Sort) {
+	case "", "latest":
+		listQuery = listQuery.Order("challenge.id DESC")
+	case "oldest":
+		listQuery = listQuery.Order("challenge.id ASC")
+	case "most_solved":
+		listQuery = listQuery.OrderExpr("(SELECT COUNT(*) FROM submissions s JOIN users u ON u.id = s.user_id WHERE s.correct = true AND s.challenge_id = challenge.id AND u.role NOT IN ('blocked', 'admin')) DESC NULLS LAST").Order("challenge.id DESC")
+	case "least_solved":
+		listQuery = listQuery.OrderExpr("(SELECT COUNT(*) FROM submissions s JOIN users u ON u.id = s.user_id WHERE s.correct = true AND s.challenge_id = challenge.id AND u.role NOT IN ('blocked', 'admin')) ASC NULLS FIRST").Order("challenge.id DESC")
+	default:
+		listQuery = listQuery.Order("challenge.id DESC")
+	}
+
+	if err := listQuery.Limit(pageSize).Offset(offset).Scan(ctx); err != nil {
 		return nil, 0, wrapError("challengeRepo.ListActiveFiltered list", err)
 	}
 
@@ -80,7 +97,13 @@ func (r *ChallengeRepo) ListActiveFiltered(ctx context.Context, filter Challenge
 
 func (r *ChallengeRepo) GetByID(ctx context.Context, id int64) (*models.Challenge, error) {
 	challenge := new(models.Challenge)
-	if err := r.db.NewSelect().Model(challenge).Where("id = ?", id).Scan(ctx); err != nil {
+	if err := r.db.NewSelect().
+		Model(challenge).
+		Join("LEFT JOIN users AS author ON author.id = challenge.created_by_user_id").
+		ColumnExpr("challenge.*").
+		ColumnExpr("author.username AS created_by_username").
+		Where("challenge.id = ?", id).
+		Scan(ctx); err != nil {
 		return nil, wrapNotFound("challengeRepo.GetByID", err)
 	}
 

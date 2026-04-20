@@ -391,9 +391,9 @@ func TestParseSearchQuery(t *testing.T) {
 
 func TestParseChallengeFilters(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges?category=Web&level=3&solved=true", nil)
+		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges?category=Web&level=3&solved=true&sort=most_solved", nil)
 		filters, ok := parseChallengeFilters(ctx)
-		if !ok || filters.Category != "Web" || filters.Level == nil || *filters.Level != 3 || filters.Solved == nil || !*filters.Solved {
+		if !ok || filters.Category != "Web" || filters.Level == nil || *filters.Level != 3 || filters.Solved == nil || !*filters.Solved || filters.Sort != "most_solved" {
 			t.Fatalf("unexpected filters: ok=%v filters=%+v", ok, filters)
 		}
 	})
@@ -412,6 +412,18 @@ func TestParseChallengeFilters(t *testing.T) {
 
 	t.Run("invalid solved", func(t *testing.T) {
 		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges?solved=maybe", nil)
+		_, ok := parseChallengeFilters(ctx)
+		if ok {
+			t.Fatalf("expected parse failure")
+		}
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("invalid sort", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges?sort=random", nil)
 		_, ok := parseChallengeFilters(ctx)
 		if ok {
 			t.Fatalf("expected parse failure")
