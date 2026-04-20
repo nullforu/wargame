@@ -26,7 +26,36 @@ func dynamicPointsMap(ctx context.Context, db *bun.DB) (map[int64]int, error) {
 		return nil, err
 	}
 
-	solveCounts, err := solveCountsByChallenge(ctx, db)
+	solveCounts, err := solveCountsByChallenge(ctx, db, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	decay, err := decayFactor(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+
+	points := make(map[int64]int, len(challenges))
+	for _, ch := range challenges {
+		solves := solveCounts[ch.ID]
+		points[ch.ID] = scoring.DynamicPoints(ch.Points, ch.MinimumPoints, solves, decay)
+	}
+
+	return points, nil
+}
+
+func dynamicPointsMapByIDs(ctx context.Context, db *bun.DB, challengeIDs []int64) (map[int64]int, error) {
+	if len(challengeIDs) == 0 {
+		return map[int64]int{}, nil
+	}
+
+	challenges, err := listChallengesForScoringByIDs(ctx, db, challengeIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	solveCounts, err := solveCountsByChallenge(ctx, db, challengeIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +88,22 @@ func listChallengesForScoring(ctx context.Context, db *bun.DB) ([]challengeScore
 	return rows, nil
 }
 
-func solveCountsByChallenge(ctx context.Context, db *bun.DB) (map[int64]int, error) {
+func listChallengesForScoringByIDs(ctx context.Context, db *bun.DB, challengeIDs []int64) ([]challengeScoreRow, error) {
+	rows := make([]challengeScoreRow, 0, len(challengeIDs))
+	if err := db.NewSelect().
+		TableExpr("challenges").
+		ColumnExpr("id").
+		ColumnExpr("points").
+		ColumnExpr("minimum_points").
+		Where("id IN (?)", bun.In(challengeIDs)).
+		Scan(ctx, &rows); err != nil {
+		return nil, wrapError("score.listChallengesByIDs", err)
+	}
+
+	return rows, nil
+}
+
+func solveCountsByChallenge(ctx context.Context, db *bun.DB, challengeIDs []int64) (map[int64]int, error) {
 	rows := make([]challengeSolveCountRow, 0)
 	query := db.NewSelect().
 		TableExpr("submissions AS s").
@@ -69,6 +113,9 @@ func solveCountsByChallenge(ctx context.Context, db *bun.DB) (map[int64]int, err
 		Where("s.correct = true").
 		Where("u.role NOT IN (?)", bun.In([]string{models.BlockedRole, models.AdminRole})).
 		GroupExpr("challenge_id")
+	if len(challengeIDs) > 0 {
+		query = query.Where("s.challenge_id IN (?)", bun.In(challengeIDs))
+	}
 
 	if err := query.Scan(ctx, &rows); err != nil {
 		return nil, wrapError("score.solveCountsByChallenge", err)
@@ -83,7 +130,20 @@ func solveCountsByChallenge(ctx context.Context, db *bun.DB) (map[int64]int, err
 }
 
 func challengeSolveCounts(ctx context.Context, db *bun.DB) (map[int64]int, error) {
-	counts, err := solveCountsByChallenge(ctx, db)
+	counts, err := solveCountsByChallenge(ctx, db, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return counts, nil
+}
+
+func challengeSolveCountsByIDs(ctx context.Context, db *bun.DB, challengeIDs []int64) (map[int64]int, error) {
+	if len(challengeIDs) == 0 {
+		return map[int64]int{}, nil
+	}
+
+	counts, err := solveCountsByChallenge(ctx, db, challengeIDs)
 	if err != nil {
 		return nil, err
 	}

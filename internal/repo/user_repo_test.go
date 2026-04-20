@@ -56,17 +56,57 @@ func TestUserRepoGetByEmailOrUsername(t *testing.T) {
 func TestUserRepoList(t *testing.T) {
 	env := setupRepoTest(t)
 	userA := createUserForTestUserScope(t, env, "a@example.com", "user-a", "pass", "user")
-	_ = createUserForTestUserScope(t, env, "b@example.com", "user-b", "pass", "user")
+	userB := createUserForTestUserScope(t, env, "b@example.com", "user-b", "pass", "user")
+	_ = createUserForTestUserScope(t, env, "c@example.com", "user-c", "pass", "user")
 
-	allUsers, err := env.userRepo.List(context.Background())
+	firstPage, totalCount, err := env.userRepo.List(context.Background(), 1, 2)
 	if err != nil {
 		t.Fatalf("list users: %v", err)
 	}
-	if len(allUsers) != 2 {
-		t.Fatalf("expected 2 users, got %d", len(allUsers))
+
+	if totalCount != 3 {
+		t.Fatalf("expected total_count 3, got %d", totalCount)
 	}
-	if allUsers[0].ID != userA.ID {
-		t.Fatalf("expected ordered users by id, got %+v", allUsers)
+
+	if len(firstPage) != 2 {
+		t.Fatalf("expected 2 users in first page, got %d", len(firstPage))
+	}
+
+	if firstPage[0].ID != userA.ID || firstPage[1].ID != userB.ID {
+		t.Fatalf("expected ordered users by id, got %+v", firstPage)
+	}
+}
+
+func TestUserRepoSearch(t *testing.T) {
+	env := setupRepoTest(t)
+	_ = createUserForTestUserScope(t, env, "alpha@example.com", "alpha-user", "pass", "user")
+	_ = createUserForTestUserScope(t, env, "beta@example.com", "beta-user", "pass", "user")
+	_ = createUserForTestUserScope(t, env, "gamma@example.com", "alpha-second", "pass", "user")
+
+	rows, totalCount, err := env.userRepo.Search(context.Background(), "alpha", 1, 10)
+	if err != nil {
+		t.Fatalf("search users: %v", err)
+	}
+
+	if totalCount != 2 {
+		t.Fatalf("expected total_count 2, got %d", totalCount)
+	}
+
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 matched users, got %d", len(rows))
+	}
+
+	pagedRows, pagedTotalCount, err := env.userRepo.Search(context.Background(), "user", 2, 1)
+	if err != nil {
+		t.Fatalf("search users paged: %v", err)
+	}
+
+	if pagedTotalCount != 2 {
+		t.Fatalf("expected paged total_count 2, got %d", pagedTotalCount)
+	}
+
+	if len(pagedRows) != 1 || pagedRows[0].Username != "beta-user" {
+		t.Fatalf("unexpected paged rows: %+v", pagedRows)
 	}
 }
 
@@ -76,9 +116,11 @@ func TestUserRepoNotFoundCases(t *testing.T) {
 	if _, err := env.userRepo.GetByID(context.Background(), 123456); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected GetByID not found, got %v", err)
 	}
+
 	if _, err := env.userRepo.GetByEmail(context.Background(), "missing@example.com"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected GetByEmail not found, got %v", err)
 	}
+
 	if _, err := env.userRepo.GetByEmailOrUsername(context.Background(), "missing@example.com", "missing"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected GetByEmailOrUsername not found, got %v", err)
 	}

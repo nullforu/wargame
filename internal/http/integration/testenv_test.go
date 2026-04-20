@@ -244,7 +244,7 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, testRedis, fileStore)
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, testRedis, testLogger, nil)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, testRedis, testLogger)
 
 	env := testEnv{
 		cfg:            cfg,
@@ -446,6 +446,7 @@ func createChallenge(t *testing.T, env testEnv, title string, points int, flag s
 		Title:         title,
 		Description:   "desc",
 		Category:      "Misc",
+		Level:         1,
 		Points:        points,
 		MinimumPoints: points,
 		IsActive:      active,
@@ -474,6 +475,7 @@ func createStackChallenge(t *testing.T, env testEnv, title string) *models.Chall
 		Title:         title,
 		Description:   "stack desc",
 		Category:      "Web",
+		Level:         1,
 		Points:        100,
 		MinimumPoints: 100,
 		StackEnabled:  true,
@@ -518,7 +520,7 @@ func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testE
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, testRedis, fileStore)
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, mockClient, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, testRedis, testLogger, nil)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, testRedis, testLogger)
 
 	return testEnv{
 		cfg:            cfg,

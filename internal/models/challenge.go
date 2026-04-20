@@ -14,6 +14,7 @@ type Challenge struct {
 	ID                  int64                 `bun:"id,pk,autoincrement"`
 	Title               string                `bun:"title,notnull"`
 	Description         string                `bun:"description,notnull"`
+	Level               int                   `bun:"level,notnull,default:1"`
 	Points              int                   `bun:"points,notnull,default:0"`
 	MinimumPoints       int                   `bun:"minimum_points,notnull,default:0"`
 	Category            string                `bun:"category,notnull"`

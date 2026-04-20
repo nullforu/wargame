@@ -8,7 +8,6 @@ import (
 	"wargame/internal/http/middleware"
 	"wargame/internal/logging"
 	"wargame/internal/models"
-	"wargame/internal/realtime"
 	"wargame/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +15,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, userSvc *service.UserService, scoreSvc *service.ScoreboardService, stackSvc *service.StackService, redis *redis.Client, logger *logging.Logger, sse *realtime.SSEHub) *gin.Engine {
+func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, userSvc *service.UserService, scoreSvc *service.ScoreboardService, stackSvc *service.StackService, redis *redis.Client, logger *logging.Logger) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -27,7 +26,6 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 	r.Use(middleware.CORS(cfg.AppEnv != "production", cfg.CORS.AllowedOrigins))
 
 	h := handlers.New(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, redis)
-	sseHandler := handlers.NewSSEHandler(sse)
 
 	r.GET("/healthz", func(ctx *gin.Context) { ctx.JSON(nethttp.StatusOK, gin.H{"status": "ok"}) })
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
@@ -40,10 +38,13 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		api.POST("/auth/logout", h.Logout)
 
 		api.GET("/challenges", h.ListChallenges)
-		api.GET("/scoreboard/stream", sseHandler.ScoreboardStream)
+		api.GET("/challenges/search", h.SearchChallenges)
+		api.GET("/challenges/:id", h.GetChallenge)
+		api.GET("/challenges/:id/solvers", h.ChallengeSolvers)
 		api.GET("/leaderboard", h.Leaderboard)
 		api.GET("/timeline", h.Timeline)
 		api.GET("/users", h.ListUsers)
+		api.GET("/users/search", h.SearchUsers)
 		api.GET("/users/:id", h.GetUser)
 		api.GET("/users/:id/solved", h.GetUserSolved)
 

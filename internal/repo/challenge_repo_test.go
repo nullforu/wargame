@@ -26,9 +26,13 @@ func TestChallengeRepoCRUD(t *testing.T) {
 		t.Fatalf("unexpected title: %s", got.Title)
 	}
 
-	list, err := env.challengeRepo.ListActive(context.Background())
+	list, totalCount, err := env.challengeRepo.ListActive(context.Background(), 1, 20)
 	if err != nil {
 		t.Fatalf("ListActive: %v", err)
+	}
+
+	if totalCount != 1 {
+		t.Fatalf("expected total_count 1, got %d", totalCount)
 	}
 
 	if len(list) != 1 {
@@ -55,6 +59,78 @@ func TestChallengeRepoCRUD(t *testing.T) {
 
 	if _, err := env.challengeRepo.GetByID(context.Background(), ch.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestChallengeRepoListActiveAndSearchPagination(t *testing.T) {
+	env := setupRepoTest(t)
+	_ = createChallenge(t, env, "Web Warmup", 100, "FLAG{1}", true)
+	_ = createChallenge(t, env, "Web Advanced", 200, "FLAG{2}", true)
+	_ = createChallenge(t, env, "Crypto One", 150, "FLAG{3}", true)
+
+	pageRows, totalCount, err := env.challengeRepo.ListActive(context.Background(), 2, 2)
+	if err != nil {
+		t.Fatalf("ListActive page: %v", err)
+	}
+
+	if totalCount != 3 {
+		t.Fatalf("expected total_count 3, got %d", totalCount)
+	}
+
+	if len(pageRows) != 1 || pageRows[0].Title != "Crypto One" {
+		t.Fatalf("unexpected page rows: %+v", pageRows)
+	}
+
+	searchRows, searchCount, err := env.challengeRepo.SearchActive(context.Background(), "Web", 1, 10)
+	if err != nil {
+		t.Fatalf("SearchActive: %v", err)
+	}
+
+	if searchCount != 2 {
+		t.Fatalf("expected search total_count 2, got %d", searchCount)
+	}
+
+	if len(searchRows) != 2 {
+		t.Fatalf("expected 2 search rows, got %d", len(searchRows))
+	}
+}
+
+func TestChallengeRepoListActiveFiltered(t *testing.T) {
+	env := setupRepoTest(t)
+	user := createUserForTestUserScope(t, env, "solver@example.com", "solver", "pass", models.UserRole)
+
+	web := createChallenge(t, env, "Web Warmup", 300, "FLAG{1}", true)
+	web.Level = 3
+	web.Category = "Web"
+	if err := env.challengeRepo.Update(context.Background(), web); err != nil {
+		t.Fatalf("update web: %v", err)
+	}
+
+	crypto := createChallenge(t, env, "Crypto Warmup", 700, "FLAG{2}", true)
+	crypto.Level = 7
+	crypto.Category = "Crypto"
+	if err := env.challengeRepo.Update(context.Background(), crypto); err != nil {
+		t.Fatalf("update crypto: %v", err)
+	}
+
+	createSubmission(t, env, user.ID, web.ID, true, time.Now().UTC())
+
+	level := 3
+	solved := true
+	userID := user.ID
+	rows, total, err := env.challengeRepo.ListActiveFiltered(context.Background(), ChallengeListFilter{
+		Query:          "Warmup",
+		Category:       "Web",
+		Level:          &level,
+		Solved:         &solved,
+		SolvedByUserID: &userID,
+	}, 1, 20)
+	if err != nil {
+		t.Fatalf("ListActiveFiltered: %v", err)
+	}
+
+	if total != 1 || len(rows) != 1 || rows[0].ID != web.ID {
+		t.Fatalf("unexpected filtered rows: total=%d rows=%+v", total, rows)
 	}
 }
 
@@ -109,9 +185,31 @@ func TestChallengeRepoDynamicPointsAndSolveCounts(t *testing.T) {
 	if _, ok := solveCounts[other.ID]; ok {
 		t.Fatalf("expected no solve count entry for unsolved challenge")
 	}
+
+	pointsByIDs, err := env.challengeRepo.DynamicPointsByIDs(context.Background(), []int64{challenge.ID})
+	if err != nil {
+		t.Fatalf("DynamicPointsByIDs: %v", err)
+	}
+
+	if len(pointsByIDs) != 1 || pointsByIDs[challenge.ID] != 100 {
+		t.Fatalf("unexpected points by ids: %+v", pointsByIDs)
+	}
+
+	solveCountsByIDs, err := env.challengeRepo.SolveCountsByIDs(context.Background(), []int64{challenge.ID})
+	if err != nil {
+		t.Fatalf("SolveCountsByIDs: %v", err)
+	}
+
+	if solveCountsByIDs[challenge.ID] != 2 {
+		t.Fatalf("expected solve count by ids 2, got %d", solveCountsByIDs[challenge.ID])
+	}
 }
 
 func TestChallengeRepoDynamicPointsError(t *testing.T) {
+	if skipRepoIntegration {
+		t.Skip("integration tests disabled via WARGAME_SKIP_INTEGRATION")
+	}
+
 	closedDB := newClosedRepoDB(t)
 	repo := NewChallengeRepo(closedDB)
 

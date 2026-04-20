@@ -95,6 +95,79 @@ func parseIDParamOrError(ctx *gin.Context, name string) (int64, bool) {
 	return id, true
 }
 
+func parsePaginationParams(ctx *gin.Context) (int, int, bool) {
+	pageRaw := strings.TrimSpace(ctx.Query("page"))
+	pageSizeRaw := strings.TrimSpace(ctx.Query("page_size"))
+
+	page := 0
+	if pageRaw != "" {
+		parsed, err := strconv.Atoi(pageRaw)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorResponse{Error: service.ErrInvalidInput.Error(), Details: []service.FieldError{{Field: "page", Reason: "invalid"}}})
+			return 0, 0, false
+		}
+		page = parsed
+	}
+
+	pageSize := 0
+	if pageSizeRaw != "" {
+		parsed, err := strconv.Atoi(pageSizeRaw)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorResponse{Error: service.ErrInvalidInput.Error(), Details: []service.FieldError{{Field: "page_size", Reason: "invalid"}}})
+			return 0, 0, false
+		}
+		pageSize = parsed
+	}
+
+	return page, pageSize, true
+}
+
+func parseSearchQuery(ctx *gin.Context) (string, bool) {
+	query := strings.TrimSpace(ctx.Query("q"))
+	if query == "" {
+		ctx.JSON(http.StatusBadRequest, errorResponse{Error: service.ErrInvalidInput.Error(), Details: []service.FieldError{{Field: "q", Reason: "required"}}})
+		return "", false
+	}
+
+	return query, true
+}
+
+type challengeQueryFilters struct {
+	Category string
+	Level    *int
+	Solved   *bool
+}
+
+func parseChallengeFilters(ctx *gin.Context) (challengeQueryFilters, bool) {
+	category := strings.TrimSpace(ctx.Query("category"))
+
+	var level *int
+	if levelRaw := strings.TrimSpace(ctx.Query("level")); levelRaw != "" {
+		parsed, err := strconv.Atoi(levelRaw)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorResponse{Error: service.ErrInvalidInput.Error(), Details: []service.FieldError{{Field: "level", Reason: "invalid"}}})
+			return challengeQueryFilters{}, false
+		}
+		level = &parsed
+	}
+
+	var solved *bool
+	if solvedRaw := strings.TrimSpace(ctx.Query("solved")); solvedRaw != "" {
+		parsed, err := strconv.ParseBool(solvedRaw)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, errorResponse{Error: service.ErrInvalidInput.Error(), Details: []service.FieldError{{Field: "solved", Reason: "invalid"}}})
+			return challengeQueryFilters{}, false
+		}
+		solved = &parsed
+	}
+
+	return challengeQueryFilters{
+		Category: category,
+		Level:    level,
+		Solved:   solved,
+	}, true
+}
+
 func (h *Handler) optionalUserID(ctx *gin.Context) int64 {
 	authHeader := ctx.GetHeader("Authorization")
 	if authHeader == "" {
@@ -120,6 +193,23 @@ func isChallengeLocked(challenge models.Challenge, solved map[int64]struct{}, us
 	}
 	_, ok := solved[*challenge.PreviousChallengeID]
 	return !ok
+}
+
+func (h *Handler) previousChallengeForResponse(ctx context.Context, byID map[int64]*models.Challenge, previousChallengeID *int64) *models.Challenge {
+	if previousChallengeID == nil {
+		return nil
+	}
+
+	if previous, ok := byID[*previousChallengeID]; ok {
+		return previous
+	}
+
+	previous, err := h.wargame.GetChallengeByID(ctx, *previousChallengeID)
+	if err != nil {
+		return nil
+	}
+
+	return previous
 }
 
 func (h *Handler) Register(ctx *gin.Context) {
@@ -205,22 +295,29 @@ func (h *Handler) UpdateMe(ctx *gin.Context) {
 }
 
 func (h *Handler) ListChallenges(ctx *gin.Context) {
-	challenges, err := h.wargame.ListChallenges(ctx.Request.Context())
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+	filters, ok := parseChallengeFilters(ctx)
+	if !ok {
+		return
+	}
+
+	userID := h.optionalUserID(ctx)
+	challenges, pagination, err := h.wargame.ListChallenges(ctx.Request.Context(), page, pageSize, service.ChallengeQueryFilter{
+		Category: filters.Category,
+		Level:    filters.Level,
+		Solved:   filters.Solved,
+		UserID:   userID,
+	})
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
 
-	userID := h.optionalUserID(ctx)
 	solved := map[int64]struct{}{}
-	hasPrereq := false
-	for i := range challenges {
-		if challenges[i].PreviousChallengeID != nil && *challenges[i].PreviousChallengeID > 0 {
-			hasPrereq = true
-			break
-		}
-	}
-	if userID > 0 && hasPrereq {
+	if userID > 0 {
 		solved, err = h.wargame.SolvedChallengeIDs(ctx.Request.Context(), userID)
 		if err != nil {
 			writeError(ctx, err)
@@ -235,18 +332,131 @@ func (h *Handler) ListChallenges(ctx *gin.Context) {
 	}
 	for _, challenge := range challenges {
 		ch := challenge
+		_, isSolved := solved[ch.ID]
 		if isChallengeLocked(ch, solved, userID) {
-			var previous *models.Challenge
-			if ch.PreviousChallengeID != nil {
-				previous = byID[*ch.PreviousChallengeID]
-			}
-			resp = append(resp, newLockedChallengeResponse(&ch, previous))
+			previous := h.previousChallengeForResponse(ctx.Request.Context(), byID, ch.PreviousChallengeID)
+			resp = append(resp, newLockedChallengeResponse(&ch, previous, isSolved))
 			continue
 		}
-		resp = append(resp, newChallengeResponse(&ch))
+		resp = append(resp, newChallengeResponse(&ch, isSolved))
 	}
 
-	ctx.JSON(http.StatusOK, challengesListResponse{Challenges: resp})
+	ctx.JSON(http.StatusOK, challengesListResponse{Challenges: resp, Pagination: pagination})
+}
+
+func (h *Handler) SearchChallenges(ctx *gin.Context) {
+	query, ok := parseSearchQuery(ctx)
+	if !ok {
+		return
+	}
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+	filters, ok := parseChallengeFilters(ctx)
+	if !ok {
+		return
+	}
+
+	userID := h.optionalUserID(ctx)
+	challenges, pagination, err := h.wargame.SearchChallenges(ctx.Request.Context(), query, page, pageSize, service.ChallengeQueryFilter{
+		Query:    query,
+		Category: filters.Category,
+		Level:    filters.Level,
+		Solved:   filters.Solved,
+		UserID:   userID,
+	})
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	solved := map[int64]struct{}{}
+	if userID > 0 {
+		solved, err = h.wargame.SolvedChallengeIDs(ctx.Request.Context(), userID)
+		if err != nil {
+			writeError(ctx, err)
+			return
+		}
+	}
+
+	resp := make([]any, 0, len(challenges))
+	byID := make(map[int64]*models.Challenge, len(challenges))
+	for i := range challenges {
+		byID[challenges[i].ID] = &challenges[i]
+	}
+	for _, challenge := range challenges {
+		ch := challenge
+		_, isSolved := solved[ch.ID]
+		if isChallengeLocked(ch, solved, userID) {
+			previous := h.previousChallengeForResponse(ctx.Request.Context(), byID, ch.PreviousChallengeID)
+			resp = append(resp, newLockedChallengeResponse(&ch, previous, isSolved))
+			continue
+		}
+		resp = append(resp, newChallengeResponse(&ch, isSolved))
+	}
+
+	ctx.JSON(http.StatusOK, challengesListResponse{Challenges: resp, Pagination: pagination})
+}
+
+func (h *Handler) GetChallenge(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+	challenge, err := h.wargame.GetChallengeByID(ctx.Request.Context(), challengeID)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	userID := h.optionalUserID(ctx)
+	solved := map[int64]struct{}{}
+	if userID > 0 {
+		solved, err = h.wargame.SolvedChallengeIDs(ctx.Request.Context(), userID)
+		if err != nil {
+			writeError(ctx, err)
+			return
+		}
+	}
+	_, isSolved := solved[challenge.ID]
+
+	if isChallengeLocked(*challenge, solved, userID) {
+		previous := h.previousChallengeForResponse(ctx.Request.Context(), map[int64]*models.Challenge{}, challenge.PreviousChallengeID)
+		ctx.JSON(http.StatusOK, newLockedChallengeResponse(challenge, previous, isSolved))
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, isSolved))
+}
+
+func (h *Handler) ChallengeSolvers(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	rows, pagination, err := h.wargame.ChallengeSolversPage(ctx.Request.Context(), challengeID, page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	solvers := make([]challengeSolverResponse, 0, len(rows))
+	for _, row := range rows {
+		solvers = append(solvers, challengeSolverResponse{
+			UserID:       row.UserID,
+			Username:     row.Username,
+			SolvedAt:     row.SolvedAt.UTC(),
+			IsFirstBlood: row.IsFirstBlood,
+		})
+	}
+
+	ctx.JSON(http.StatusOK, challengeSolversResponse{Solvers: solvers, Pagination: pagination})
 }
 
 func (h *Handler) SubmitFlag(ctx *gin.Context) {
@@ -412,13 +622,13 @@ func (h *Handler) CreateChallenge(ctx *gin.Context) {
 	if req.StackEnabled != nil {
 		stackEnabled = *req.StackEnabled
 	}
-	challenge, err := h.wargame.CreateChallenge(ctx.Request.Context(), req.Title, req.Description, req.Category, req.Points, minimumPoints, req.Flag, active, stackEnabled, stack.TargetPortSpecs(req.StackTargetPorts), req.StackPodSpec, req.PreviousChallengeID)
+	challenge, err := h.wargame.CreateChallenge(ctx.Request.Context(), req.Title, req.Description, req.Category, req.Level, req.Points, minimumPoints, req.Flag, active, stackEnabled, stack.TargetPortSpecs(req.StackTargetPorts), req.StackPodSpec, req.PreviousChallengeID)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
 	h.notifyScoreboardChanged(ctx.Request.Context(), "challenge_created")
-	ctx.JSON(http.StatusCreated, newChallengeResponse(challenge))
+	ctx.JSON(http.StatusCreated, newChallengeResponse(challenge, false))
 }
 
 func (h *Handler) UpdateChallenge(ctx *gin.Context) {
@@ -458,14 +668,14 @@ func (h *Handler) UpdateChallenge(ctx *gin.Context) {
 		previousChallengeID = req.PreviousChallengeID.Value
 	}
 
-	challenge, err := h.wargame.UpdateChallenge(ctx.Request.Context(), challengeID, title, description, category, req.Points, req.MinimumPoints, flag, req.IsActive, req.StackEnabled, req.StackTargetPorts, stackPodSpec, previousChallengeID, previousChallengeSet)
+	challenge, err := h.wargame.UpdateChallenge(ctx.Request.Context(), challengeID, title, description, category, req.Level, req.Points, req.MinimumPoints, flag, req.IsActive, req.StackEnabled, req.StackTargetPorts, stackPodSpec, previousChallengeID, previousChallengeSet)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
 
 	h.notifyScoreboardChanged(ctx.Request.Context(), "challenge_updated")
-	ctx.JSON(http.StatusOK, newChallengeResponse(challenge))
+	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, false))
 }
 
 func requireNonNullOptionalString(field string, value optionalString) (*string, error) {
@@ -499,7 +709,7 @@ func (h *Handler) AdminGetChallenge(ctx *gin.Context) {
 		writeError(ctx, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, adminChallengeResponse{challengeResponse: newChallengeResponse(challenge), StackPodSpec: challenge.StackPodSpec})
+	ctx.JSON(http.StatusOK, adminChallengeResponse{challengeResponse: newChallengeResponse(challenge, false), StackPodSpec: challenge.StackPodSpec})
 }
 
 func (h *Handler) DeleteChallenge(ctx *gin.Context) {
@@ -530,7 +740,7 @@ func (h *Handler) RequestChallengeFileUpload(ctx *gin.Context) {
 		writeError(ctx, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, challengeFileUploadResponse{Challenge: newChallengeResponse(challenge), Upload: presignedPostResponse{URL: upload.URL, Fields: upload.Fields, ExpiresAt: upload.ExpiresAt}})
+	ctx.JSON(http.StatusOK, challengeFileUploadResponse{Challenge: newChallengeResponse(challenge, false), Upload: presignedPostResponse{URL: upload.URL, Fields: upload.Fields, ExpiresAt: upload.ExpiresAt}})
 }
 
 func (h *Handler) RequestChallengeFileDownload(ctx *gin.Context) {
@@ -556,7 +766,7 @@ func (h *Handler) DeleteChallengeFile(ctx *gin.Context) {
 		writeError(ctx, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, newChallengeResponse(challenge))
+	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, false))
 }
 
 func (h *Handler) Leaderboard(ctx *gin.Context) {
@@ -589,7 +799,37 @@ func (h *Handler) Timeline(ctx *gin.Context) {
 }
 
 func (h *Handler) ListUsers(ctx *gin.Context) {
-	users, err := h.users.List(ctx.Request.Context())
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	users, pagination, err := h.users.ListPage(ctx.Request.Context(), page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]userDetailResponse, 0, len(users))
+	for _, user := range users {
+		u := user
+		resp = append(resp, newUserDetailResponse(&u))
+	}
+
+	ctx.JSON(http.StatusOK, usersListResponse{Users: resp, Pagination: pagination})
+}
+
+func (h *Handler) SearchUsers(ctx *gin.Context) {
+	query, ok := parseSearchQuery(ctx)
+	if !ok {
+		return
+	}
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	users, pagination, err := h.users.Search(ctx.Request.Context(), query, page, pageSize)
 	if err != nil {
 		writeError(ctx, err)
 		return
@@ -599,7 +839,7 @@ func (h *Handler) ListUsers(ctx *gin.Context) {
 		u := user
 		resp = append(resp, newUserDetailResponse(&u))
 	}
-	ctx.JSON(http.StatusOK, resp)
+	ctx.JSON(http.StatusOK, usersListResponse{Users: resp, Pagination: pagination})
 }
 
 func (h *Handler) GetUser(ctx *gin.Context) {
@@ -620,16 +860,21 @@ func (h *Handler) GetUserSolved(ctx *gin.Context) {
 	if !ok {
 		return
 	}
+
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
 	if _, err := h.users.GetByID(ctx.Request.Context(), userID); err != nil {
 		writeError(ctx, err)
 		return
 	}
-	rows, err := h.wargame.SolvedChallenges(ctx.Request.Context(), userID)
+	rows, pagination, err := h.wargame.SolvedChallengesPage(ctx.Request.Context(), userID, page, pageSize)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, rows)
+	ctx.JSON(http.StatusOK, userSolvedListResponse{Solved: rows, Pagination: pagination})
 }
 
 func (h *Handler) AdminBlockUser(ctx *gin.Context) {

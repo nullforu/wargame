@@ -244,18 +244,20 @@ func TestMeSolved(t *testing.T) {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var solved []models.SolvedChallenge
+	var solved struct {
+		Solved []models.SolvedChallenge `json:"solved"`
+	}
 	decodeJSON(t, rec, &solved)
 
-	if len(solved) != 1 {
-		t.Fatalf("expected 1 solved, got %d", len(solved))
+	if len(solved.Solved) != 1 {
+		t.Fatalf("expected 1 solved, got %d", len(solved.Solved))
 	}
 
-	if solved[0].ChallengeID != challenge.ID || solved[0].Points != 100 || solved[0].Title != "Warmup" {
-		t.Fatalf("unexpected solved entry: %+v", solved[0])
+	if solved.Solved[0].ChallengeID != challenge.ID || solved.Solved[0].Points != 100 || solved.Solved[0].Title != "Warmup" {
+		t.Fatalf("unexpected solved entry: %+v", solved.Solved[0])
 	}
 
-	if solved[0].ChallengeID == 0 || solved[0].SolvedAt.IsZero() {
-		t.Fatalf("expected solved timestamp and id, got %+v for user %d", solved[0], userID)
+	if solved.Solved[0].ChallengeID == 0 || solved.Solved[0].SolvedAt.IsZero() {
+		t.Fatalf("expected solved timestamp and id, got %+v for user %d", solved.Solved[0], userID)
 	}
 }

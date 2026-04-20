@@ -32,8 +32,7 @@ func newTestBus(t *testing.T, score ScoreboardReader) (*ScoreboardBus, *redis.Cl
 
 	cfg := config.Config{Cache: config.CacheConfig{LeaderboardTTL: time.Minute, TimelineTTL: time.Minute}}
 
-	hub := NewSSEHub()
-	bus := NewScoreboardBus(client, cfg, score, logger, hub)
+	bus := NewScoreboardBus(client, cfg, score, logger)
 
 	cleanup := func() {
 		_ = client.Close()
@@ -95,31 +94,6 @@ func TestScoreboardBusAcquireReleaseLock(t *testing.T) {
 	}
 }
 
-func TestScoreboardBusRebuiltBroadcast(t *testing.T) {
-	bus, client, cleanup := newTestBus(t, nil)
-	defer cleanup()
-
-	ctx := t.Context()
-	bus.Start(ctx)
-
-	ch, unsubscribe := bus.hub.Subscribe(1)
-	defer unsubscribe()
-
-	payload := "{\"scope\":\"all\",\"reason\":\"rebuilt\"}"
-	if err := client.Publish(ctx, scoreboardRebuiltChannel, payload).Err(); err != nil {
-		t.Fatalf("publish rebuilt: %v", err)
-	}
-
-	select {
-	case msg := <-ch:
-		if msg != payload {
-			t.Fatalf("unexpected payload: %q", msg)
-		}
-	case <-time.After(500 * time.Millisecond):
-		t.Fatalf("timeout waiting for broadcast")
-	}
-}
-
 func TestScoreboardBusHandleEventSkipsWhenLocked(t *testing.T) {
 	bus, client, cleanup := newTestBus(t, nil)
 	defer cleanup()
@@ -129,15 +103,11 @@ func TestScoreboardBusHandleEventSkipsWhenLocked(t *testing.T) {
 		t.Fatalf("seed lock: %v", err)
 	}
 
-	sub := client.Subscribe(ctx, scoreboardRebuiltChannel)
-	defer sub.Close()
-
 	bus.handleEvent(ctx, ScoreboardEvent{Scope: "all"})
-
-	select {
-	case <-sub.Channel():
-		t.Fatalf("unexpected rebuilt event")
-	case <-time.After(150 * time.Millisecond):
+	if exists, err := client.Exists(ctx, "leaderboard:users").Result(); err != nil {
+		t.Fatalf("check leaderboard cache: %v", err)
+	} else if exists != 0 {
+		t.Fatalf("expected no leaderboard cache to be rebuilt while locked")
 	}
 }
 
@@ -156,7 +126,7 @@ func (f *fakeScoreboard) UserTimeline(ctx context.Context, since *time.Time) ([]
 	return f.userTimeline, f.userTimelineErr
 }
 
-func TestScoreboardBusHandleEventRebuildsAndPublishes(t *testing.T) {
+func TestScoreboardBusHandleEventRebuildsCaches(t *testing.T) {
 	score := &fakeScoreboard{
 		leaderboard:  models.LeaderboardResponse{Challenges: []models.LeaderboardChallenge{}, Entries: []models.LeaderboardEntry{}},
 		userTimeline: []models.TimelineSubmission{},
@@ -165,19 +135,7 @@ func TestScoreboardBusHandleEventRebuildsAndPublishes(t *testing.T) {
 	defer cleanup()
 
 	ctx := context.Background()
-	sub := client.Subscribe(ctx, scoreboardRebuiltChannel)
-	defer sub.Close()
-
 	bus.handleEvent(ctx, ScoreboardEvent{Scope: "all", Reason: "test"})
-
-	msg, err := sub.ReceiveMessage(ctx)
-	if err != nil {
-		t.Fatalf("receive rebuilt: %v", err)
-	}
-
-	if msg.Payload == "" {
-		t.Fatalf("expected rebuilt payload")
-	}
 
 	if _, err := client.Get(ctx, "leaderboard:users").Result(); err != nil {
 		t.Fatalf("expected leaderboard cache, got %v", err)
@@ -196,15 +154,11 @@ func TestScoreboardBusHandleEventRebuildFails(t *testing.T) {
 	defer cleanup()
 
 	ctx := context.Background()
-	sub := client.Subscribe(ctx, scoreboardRebuiltChannel)
-	defer sub.Close()
-
 	bus.handleEvent(ctx, ScoreboardEvent{Scope: "all", Reason: "test"})
-
-	select {
-	case <-sub.Channel():
-		t.Fatalf("unexpected rebuilt message on failure")
-	case <-time.After(200 * time.Millisecond):
+	if exists, err := client.Exists(ctx, "leaderboard:users").Result(); err != nil {
+		t.Fatalf("check leaderboard cache: %v", err)
+	} else if exists != 0 {
+		t.Fatalf("unexpected leaderboard cache on rebuild failure")
 	}
 }
 
@@ -242,9 +196,6 @@ func TestScoreboardBusRunDebounce(t *testing.T) {
 	ctx := t.Context()
 	bus.Start(ctx)
 
-	sub := client.Subscribe(ctx, scoreboardRebuiltChannel)
-	defer sub.Close()
-
 	if err := client.Publish(ctx, scoreboardEventsChannel, `{"scope":"all","reason":"a"}`).Err(); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
@@ -252,13 +203,19 @@ func TestScoreboardBusRunDebounce(t *testing.T) {
 	if err := client.Publish(ctx, scoreboardEventsChannel, `{"scope":"all","reason":"b"}`).Err(); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
+	waitForRedisKey(t, client, "leaderboard:users", time.Second)
+}
 
-	msg, err := sub.ReceiveMessage(ctx)
-	if err != nil {
-		t.Fatalf("receive rebuilt: %v", err)
+func waitForRedisKey(t *testing.T, client *redis.Client, key string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	ctx := context.Background()
+	for time.Now().Before(deadline) {
+		exists, err := client.Exists(ctx, key).Result()
+		if err == nil && exists == 1 {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
-
-	if msg.Payload == "" {
-		t.Fatalf("expected rebuilt payload")
-	}
+	t.Fatalf("timeout waiting for key %q", key)
 }

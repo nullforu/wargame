@@ -41,7 +41,7 @@ func (r *ScoreboardRepo) leaderboardChallenges(ctx context.Context) ([]models.Le
 		return nil, nil, wrapError("scoreboardRepo.leaderboardChallenges", err)
 	}
 
-	solveCounts, err := solveCountsByChallenge(ctx, r.db)
+	solveCounts, err := solveCountsByChallenge(ctx, r.db, nil)
 	if err != nil {
 		return nil, nil, wrapError("scoreboardRepo.leaderboardChallenges solve counts", err)
 	}

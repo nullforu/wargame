@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"strings"
 
 	"wargame/internal/models"
 
@@ -51,13 +52,37 @@ func (r *UserRepo) GetByID(ctx context.Context, id int64) (*models.User, error) 
 	return user, nil
 }
 
-func (r *UserRepo) List(ctx context.Context) ([]models.User, error) {
-	users := make([]models.User, 0)
-	if err := r.db.NewSelect().Model(&users).OrderExpr("id ASC").Scan(ctx); err != nil {
-		return nil, wrapError("userRepo.List", err)
+func (r *UserRepo) List(ctx context.Context, page, pageSize int) ([]models.User, int, error) {
+	return r.listWithQuery(ctx, "", page, pageSize)
+}
+
+func (r *UserRepo) Search(ctx context.Context, query string, page, pageSize int) ([]models.User, int, error) {
+	return r.listWithQuery(ctx, query, page, pageSize)
+}
+
+func (r *UserRepo) listWithQuery(ctx context.Context, query string, page, pageSize int) ([]models.User, int, error) {
+	users := make([]models.User, 0, pageSize)
+	countQuery := r.db.NewSelect().Model((*models.User)(nil))
+	listQuery := r.db.NewSelect().Model(&users)
+
+	query = strings.TrimSpace(query)
+	if query != "" {
+		pattern := "%" + query + "%"
+		countQuery = countQuery.Where("username ILIKE ?", pattern)
+		listQuery = listQuery.Where("username ILIKE ?", pattern)
 	}
 
-	return users, nil
+	totalCount, err := countQuery.Count(ctx)
+	if err != nil {
+		return nil, 0, wrapError("userRepo.listWithQuery count", err)
+	}
+
+	offset := (page - 1) * pageSize
+	if err := listQuery.OrderExpr("id ASC").Limit(pageSize).Offset(offset).Scan(ctx); err != nil {
+		return nil, 0, wrapError("userRepo.listWithQuery list", err)
+	}
+
+	return users, totalCount, nil
 }
 
 func (r *UserRepo) Update(ctx context.Context, user *models.User) error {

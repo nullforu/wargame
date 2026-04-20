@@ -70,44 +70,7 @@ Notes:
 
 ---
 
-## Scoreboard Stream (SSE)
+## Cache Refresh Behavior
 
-`GET /api/scoreboard/stream`
-
-Opens a Server-Sent Events stream that notifies clients when leaderboard/timeline caches are rebuilt.
-
-### Events
-
-- `ready`: sent immediately after connection.
-- `scoreboard`: sent after cache rebuild.
-
-Payload schema:
-
-```json
-{
-    "scope": "all",
-    "reason": "submission_correct",
-    "ts": "2026-02-27T18:00:00Z"
-}
-```
-
-### Scoreboard-Affecting APIs
-
-| Action             | API                                 | Reason               |
-| ------------------ | ----------------------------------- | -------------------- |
-| Correct submission | `POST /api/challenges/{id}/submit`  | `submission_correct` |
-| Challenge created  | `POST /api/admin/challenges`        | `challenge_created`  |
-| Challenge updated  | `PUT /api/admin/challenges/{id}`    | `challenge_updated`  |
-| Challenge deleted  | `DELETE /api/admin/challenges/{id}` | `challenge_deleted`  |
-| Block user         | `POST /api/admin/users/{id}/block`  | `user_blocked`       |
-| Unblock user       | `POST /api/admin/users/{id}/unblock`| `user_unblocked`     |
-
-Example stream:
-
-```
-event: ready
-data: {}
-
-event: scoreboard
-data: {"scope":"all","reason":"submission_correct","ts":"2026-02-27T18:00:00Z"}
-```
+Leaderboard and timeline caches are invalidated and rebuilt asynchronously when scoreboard-affecting actions occur (for example correct submissions or admin challenge/user status changes).  
+The API no longer provides an SSE stream endpoint.

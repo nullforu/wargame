@@ -192,6 +192,7 @@ func createChallenge(t *testing.T, env repoEnv, title string, points int, flag s
 		Title:         title,
 		Description:   "desc",
 		Category:      "Misc",
+		Level:         1,
 		Points:        points,
 		MinimumPoints: points,
 		IsActive:      active,

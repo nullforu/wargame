@@ -264,6 +264,7 @@ func createChallenge(t *testing.T, env serviceEnv, title string, points int, fla
 		Title:         title,
 		Description:   "desc",
 		Category:      "Misc",
+		Level:         1,
 		Points:        points,
 		MinimumPoints: points,
 		IsActive:      active,

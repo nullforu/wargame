@@ -25,10 +25,11 @@ func TestDynamicPointsMapAndSolveCounts(t *testing.T) {
 	createSubmission(t, env, user2.ID, challenge.ID, true, time.Now().UTC())
 	createSubmission(t, env, blocked.ID, challenge.ID, true, time.Now().UTC())
 
-	counts, err := solveCountsByChallenge(context.Background(), env.db)
+	counts, err := solveCountsByChallenge(context.Background(), env.db, nil)
 	if err != nil {
 		t.Fatalf("solveCountsByChallenge: %v", err)
 	}
+
 	if counts[challenge.ID] != 2 {
 		t.Fatalf("expected solve count 2, got %d", counts[challenge.ID])
 	}

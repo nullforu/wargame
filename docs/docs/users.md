@@ -79,26 +79,85 @@ Errors:
 
 `GET /api/users`
 
+Query parameters:
+
+- `page` (optional, default `1`)
+- `page_size` (optional, default `20`, max `100`)
+
 Response 200
 
 ```json
-[
-    {
-        "id": 1,
-        "username": "user1",
-        "role": "user",
-        "blocked_reason": null,
-        "blocked_at": null
-    },
-    {
-        "id": 2,
-        "username": "admin",
-        "role": "admin",
-        "blocked_reason": null,
-        "blocked_at": null
+{
+    "users": [
+        {
+            "id": 1,
+            "username": "user1",
+            "role": "user",
+            "blocked_reason": null,
+            "blocked_at": null
+        },
+        {
+            "id": 2,
+            "username": "admin",
+            "role": "admin",
+            "blocked_reason": null,
+            "blocked_at": null
+        }
+    ],
+    "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total_count": 2,
+        "total_pages": 1,
+        "has_prev": false,
+        "has_next": false
     }
-]
+}
 ```
+
+Errors:
+
+- 400 `invalid input`
+
+---
+
+## Search Users
+
+`GET /api/users/search`
+
+Query parameters:
+
+- `q` (required, username keyword)
+- `page` (optional, default `1`)
+- `page_size` (optional, default `20`, max `100`)
+
+Response 200
+
+```json
+{
+    "users": [
+        {
+            "id": 1,
+            "username": "user1",
+            "role": "user",
+            "blocked_reason": null,
+            "blocked_at": null
+        }
+    ],
+    "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total_count": 1,
+        "total_pages": 1,
+        "has_prev": false,
+        "has_next": false
+    }
+}
+```
+
+Errors:
+
+- 400 `invalid input`
 
 ---
 
@@ -129,17 +188,32 @@ Errors:
 
 `GET /api/users/{id}/solved`
 
+Query parameters:
+
+- `page` (optional, default `1`)
+- `page_size` (optional, default `20`, max `100`)
+
 Response 200
 
 ```json
-[
-    {
-        "challenge_id": 1,
-        "title": "Warmup",
-        "points": 100,
-        "solved_at": "2026-01-24T12:00:00Z"
+{
+    "solved": [
+        {
+            "challenge_id": 1,
+            "title": "Warmup",
+            "points": 100,
+            "solved_at": "2026-01-24T12:00:00Z"
+        }
+    ],
+    "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total_count": 1,
+        "total_pages": 1,
+        "has_prev": false,
+        "has_next": false
     }
-]
+}
 ```
 
 Errors:
