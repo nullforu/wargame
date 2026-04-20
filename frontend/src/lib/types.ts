@@ -37,6 +37,7 @@ export interface ChallengeDetail {
     title: string
     description: string
     category: string
+    level: number
     points: number
     initial_points: number
     minimum_points: number
@@ -48,12 +49,14 @@ export interface ChallengeDetail {
     stack_target_ports: TargetPortSpec[]
     previous_challenge_id?: number | null
     is_locked?: false
+    is_solved: boolean
 }
 
 export interface LockedChallenge {
     id: number
     title: string
     category: string
+    level: number
     points: number
     initial_points: number
     minimum_points: number
@@ -63,6 +66,7 @@ export interface LockedChallenge {
     previous_challenge_title?: string | null
     previous_challenge_category?: string | null
     is_locked: true
+    is_solved: boolean
 }
 
 export type Challenge = ChallengeDetail | LockedChallenge
@@ -86,6 +90,7 @@ export interface ChallengeCreatePayload {
     title: string
     description: string
     category: string
+    level?: number
     points: number
     minimum_points?: number
     flag: string
@@ -102,6 +107,7 @@ export interface ChallengeUpdatePayload {
     title?: string
     description?: string
     category?: string
+    level?: number
     points?: number
     minimum_points?: number
     flag?: string
@@ -161,6 +167,7 @@ export interface FlagSubmissionPayload {
 
 export interface ChallengesResponse {
     challenges: Challenge[]
+    pagination: PaginationMeta
 }
 
 export interface StacksResponse {
@@ -185,6 +192,23 @@ export interface SolvedChallenge {
     title: string
     points: number
     solved_at: string
+}
+
+export interface UserSolvedResponse {
+    solved: SolvedChallenge[]
+    pagination: PaginationMeta
+}
+
+export interface ChallengeSolver {
+    user_id: number
+    username: string
+    solved_at: string
+    is_first_blood: boolean
+}
+
+export interface ChallengeSolversResponse {
+    solvers: ChallengeSolver[]
+    pagination: PaginationMeta
 }
 
 export interface LeaderboardChallenge {
@@ -238,4 +262,18 @@ export interface UserDetail {
     role: string
     blocked_reason: string | null
     blocked_at: string | null
+}
+
+export interface PaginationMeta {
+    page: number
+    page_size: number
+    total_count: number
+    total_pages: number
+    has_prev: boolean
+    has_next: boolean
+}
+
+export interface UsersResponse {
+    users: UserListItem[]
+    pagination: PaginationMeta
 }

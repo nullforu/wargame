@@ -19,6 +19,7 @@ const CreateChallenge = () => {
     const [title, setTitle] = useState('Example title: Enter a concise and clear title')
     const [description, setDescription] = useState('')
     const [category, setCategory] = useState<string>(CHALLENGE_CATEGORIES[0])
+    const [level, setLevel] = useState(1)
     const [points, setPoints] = useState(100)
     const [minimumPoints, setMinimumPoints] = useState(100)
     const [flag, setFlag] = useState('')
@@ -38,6 +39,7 @@ const CreateChallenge = () => {
     const [challengeFileUploading, setChallengeFileUploading] = useState(false)
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
     const [availableChallenges, setAvailableChallenges] = useState<Challenge[]>([])
+    const [challengeSearch, setChallengeSearch] = useState('')
     const fileInputRef = useRef<HTMLInputElement | null>(null)
     const sortedChallenges = [...availableChallenges].sort((a, b) => a.id - b.id)
     const formatChallengeOption = (challenge: Challenge) => {
@@ -48,7 +50,8 @@ const CreateChallenge = () => {
     useEffect(() => {
         const loadChallenges = async () => {
             try {
-                const data = await api.challenges()
+                const keyword = challengeSearch.trim()
+                const data = keyword ? await api.searchChallenges(keyword, 1, 20) : await api.challenges(1, 20)
                 setAvailableChallenges(data.challenges)
             } catch (error) {
                 const formatted = formatApiError(error, t)
@@ -57,7 +60,7 @@ const CreateChallenge = () => {
         }
 
         void loadChallenges()
-    }, [api, t])
+    }, [api, t, challengeSearch])
 
     const submit = async () => {
         setLoading(true)
@@ -76,6 +79,7 @@ const CreateChallenge = () => {
                 title,
                 description,
                 category,
+                level: Number(level),
                 points: Number(points),
                 minimum_points: Number(minimumPoints),
                 flag,
@@ -110,6 +114,7 @@ const CreateChallenge = () => {
             setTitle('')
             setDescription('')
             setCategory(CHALLENGE_CATEGORIES[0])
+            setLevel(1)
             setPoints(100)
             setMinimumPoints(100)
             setFlag('')
@@ -170,7 +175,7 @@ const CreateChallenge = () => {
                             </p>
                         ) : null}
                     </div>
-                    <div className='grid gap-4 md:grid-cols-3'>
+                    <div className='grid gap-4 md:grid-cols-4'>
                         <div>
                             <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor='admin-category'>
                                 {t('common.category')}
@@ -192,6 +197,21 @@ const CreateChallenge = () => {
                                     {t('common.category')}: {fieldErrors.category}
                                 </p>
                             ) : null}
+                        </div>
+                        <div>
+                            <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor='admin-level'>
+                                LEVEL
+                            </label>
+                            <input
+                                id='admin-level'
+                                className='mt-2 w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text focus:border-accent focus:outline-none'
+                                type='number'
+                                min={1}
+                                max={10}
+                                value={level}
+                                onChange={(event) => setLevel(Number(event.target.value))}
+                            />
+                            {fieldErrors.level ? <p className='mt-2 text-xs text-danger'>LEVEL: {fieldErrors.level}</p> : null}
                         </div>
                         <div>
                             <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor='admin-points'>
@@ -250,6 +270,13 @@ const CreateChallenge = () => {
                             <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor='admin-previous-challenge'>
                                 {t('admin.create.previousChallenge')}
                             </label>
+                            <input
+                                className='mt-2 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-text focus:border-accent focus:outline-none'
+                                type='text'
+                                value={challengeSearch}
+                                onChange={(event) => setChallengeSearch(event.target.value)}
+                                placeholder={t('common.search')}
+                            />
                             <select
                                 id='admin-previous-challenge'
                                 className='mt-2 w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text focus:border-accent focus:outline-none'

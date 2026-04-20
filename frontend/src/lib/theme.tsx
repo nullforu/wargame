@@ -38,6 +38,17 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
         persistTheme(theme)
     }, [theme])
 
+    useEffect(() => {
+        if (typeof document === 'undefined') return
+        const root = document.documentElement
+        root.dataset.theme = theme
+        if (theme === 'dark') {
+            root.classList.add('dark')
+        } else {
+            root.classList.remove('dark')
+        }
+    }, [theme])
+
     const setTheme = useCallback((value: Theme) => {
         setThemeState(value)
     }, [])

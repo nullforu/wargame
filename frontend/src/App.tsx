@@ -4,6 +4,7 @@ import Home from './routes/Home'
 import Login from './routes/Login'
 import Register from './routes/Register'
 import Challenges from './routes/Challenges'
+import ChallengeDetail from './routes/ChallengeDetail'
 import Scoreboard from './routes/Scoreboard'
 import Users from './routes/Users'
 import UserProfile from './routes/UserProfile'
@@ -12,7 +13,6 @@ import NotFound from './routes/NotFound'
 import { useAuth } from './lib/auth'
 import { useApi } from './lib/useApi'
 import { useLocale, useT } from './lib/i18n'
-import { useTheme } from './lib/theme'
 import { SITE_CONFIG } from './lib/siteConfig'
 import './index.css'
 
@@ -39,6 +39,14 @@ const dynamicRoutes: Array<{
     extractParams: (path: string) => Record<string, string>
 }> = [
     {
+        pattern: /^\/challenges\/(\d+)$/,
+        component: ChallengeDetail,
+        extractParams: (path) => {
+            const match = path.match(/^\/challenges\/(\d+)$/)
+            return match ? { id: match[1] } : { id: '' }
+        },
+    },
+    {
         pattern: /^\/users\/(\d+)$/,
         component: UserProfile,
         extractParams: (path) => {
@@ -55,7 +63,6 @@ const normalizePath = (path: string) => {
 const App = () => {
     const t = useT()
     const { state: auth, setAuthUser, clearAuth } = useAuth()
-    const { theme } = useTheme()
     const locale = useLocale()
     const api = useApi()
 
@@ -102,7 +109,7 @@ const App = () => {
     useEffect(() => {
         updateRoute()
         window.addEventListener('popstate', updateRoute)
-        loadSession()
+        void loadSession()
         return () => window.removeEventListener('popstate', updateRoute)
     }, [])
 
@@ -118,31 +125,19 @@ const App = () => {
         }
     }, [t])
 
-    useEffect(() => {
-        if (typeof document !== 'undefined') {
-            if (theme === 'dark') {
-                document.documentElement.classList.add('dark')
-            } else {
-                document.documentElement.classList.remove('dark')
-            }
-        }
-    }, [theme])
-
     const content = useMemo(() => {
         if (booting) {
-            return <div className='rounded-2xl border border-border bg-surface p-8 text-center text-text-muted'>{t('app.checkingSession')}</div>
+            return <div className='rounded-xl border border-border bg-surface px-6 py-10 text-center text-sm text-text-muted'>{t('app.checkingSession')}</div>
         }
         return <RouteComponent routeParams={routeParams} />
     }, [RouteComponent, booting, routeParams, t])
 
-    const isAdminPage = RouteComponent === Admin
-
     return (
-        <div className='min-h-screen'>
+        <div className='min-h-screen bg-background flex flex-col overflow-x-hidden'>
             <Header user={auth.user} />
-            <main className={`mx-auto w-full ${isAdminPage ? 'max-w-400' : 'max-w-6xl'} px-6 py-10`}>{content}</main>
-            <footer className='border-t border-border py-6 text-center text-xs text-text-subtle'>
-                <p>{t('footer.copyright')}</p>
+            <main className='mx-auto w-full max-w-7xl flex-1 overflow-x-hidden px-4 py-5 md:px-6 md:py-6'>{content}</main>
+            <footer className='border-t border-border bg-surface-muted py-5 text-center text-xs text-text-subtle dark:border-border dark:bg-surface dark:text-text-muted'>
+                <p className='mx-auto max-w-7xl px-4 md:px-6'>{t('footer.copyright')}</p>
             </footer>
         </div>
     )

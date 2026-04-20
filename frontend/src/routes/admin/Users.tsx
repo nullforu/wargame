@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { AuthUser, UserListItem } from '../../lib/types'
+import type { AuthUser, PaginationMeta, UserListItem } from '../../lib/types'
 import { useApi } from '../../lib/useApi'
 import { formatApiError, formatDateTime } from '../../lib/utils'
 import { getLocaleTag, getRoleKey, useLocale, useT } from '../../lib/i18n'
@@ -14,18 +14,39 @@ const AdminUsers = () => {
     const [loading, setLoading] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
     const [successMessage, setSuccessMessage] = useState('')
-    const [searchQuery, setSearchQuery] = useState('')
+    const readQueryState = useCallback(() => {
+        if (typeof window === 'undefined') return { q: '', page: 1 }
+        const params = new URLSearchParams(window.location.search)
+        const parsedPage = Number(params.get('page'))
+        return {
+            q: (params.get('q') ?? '').trim(),
+            page: Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1,
+        }
+    }, [])
+    const initialQueryState = readQueryState()
+    const [searchQuery, setSearchQuery] = useState(initialQueryState.q)
+    const [appliedSearch, setAppliedSearch] = useState(initialQueryState.q)
+    const [page, setPage] = useState(initialQueryState.page)
+    const [pagination, setPagination] = useState<PaginationMeta>({ page: 1, page_size: 20, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
     const [blockReasons, setBlockReasons] = useState<Record<number, string>>({})
     const [rowErrors, setRowErrors] = useState<Record<number, string>>({})
     const [blockingUserId, setBlockingUserId] = useState<number | null>(null)
     const [unblockingUserId, setUnblockingUserId] = useState<number | null>(null)
 
-    const normalizedQuery = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery])
-    const filteredUsers = useMemo(() => {
-        const sorted = [...users].sort((a, b) => a.id - b.id)
-        if (!normalizedQuery) return sorted
-        return sorted.filter((user) => user.username.toLowerCase().includes(normalizedQuery) || user.id.toString().includes(normalizedQuery))
-    }, [normalizedQuery, users])
+    const filteredUsers = useMemo(() => [...users].sort((a, b) => a.id - b.id), [users])
+
+    const pushQueryState = useCallback((next: { q: string; page: number }) => {
+        if (typeof window === 'undefined') return
+        const params = new URLSearchParams()
+        if (next.q.trim() !== '') params.set('q', next.q.trim())
+        if (next.page > 1) params.set('page', String(next.page))
+        const query = params.toString()
+        const nextURL = query ? `${window.location.pathname}?${query}` : window.location.pathname
+        const currentURL = `${window.location.pathname}${window.location.search}`
+        if (nextURL !== currentURL) {
+            window.history.pushState({}, '', nextURL)
+        }
+    }, [])
 
     const formatOptionalDate = useCallback((value?: string | null) => (value ? formatDateTime(value, localeTag) : t('common.na')), [localeTag, t])
 
@@ -36,14 +57,16 @@ const AdminUsers = () => {
         setRowErrors({})
 
         try {
-            const userRows = await api.users()
-            setUsers(userRows)
+            const response = appliedSearch ? await api.searchUsers(appliedSearch, page, 20) : await api.users(page, 20)
+            setUsers(response.users)
+            setPagination(response.pagination)
         } catch (error) {
             setErrorMessage(formatApiError(error, t).message)
+            setPagination({ page: 1, page_size: 20, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
         } finally {
             setLoading(false)
         }
-    }, [api, t])
+    }, [api, t, appliedSearch, page])
 
     const updateUserRow = useCallback((updated: AuthUser) => {
         setUsers((prev) => prev.map((user) => (user.id === updated.id ? { ...user, ...updated } : user)))
@@ -106,6 +129,17 @@ const AdminUsers = () => {
         loadData()
     }, [loadData])
 
+    useEffect(() => {
+        const onPopState = () => {
+            const state = readQueryState()
+            setSearchQuery(state.q)
+            setAppliedSearch(state.q)
+            setPage(state.page)
+        }
+        window.addEventListener('popstate', onPopState)
+        return () => window.removeEventListener('popstate', onPopState)
+    }, [readQueryState])
+
     return (
         <section className='space-y-4'>
             <div className='flex items-center justify-between'>
@@ -122,6 +156,32 @@ const AdminUsers = () => {
                     onChange={(event) => setSearchQuery(event.target.value)}
                     className='w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-text placeholder-text-subtle transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20'
                 />
+                <div className='mt-2 flex gap-2'>
+                    <button
+                        type='button'
+                        className='rounded-lg border border-border bg-surface px-4 py-2 text-sm text-text transition hover:border-accent/40 hover:text-accent'
+                        onClick={() => {
+                            const nextQ = searchQuery.trim()
+                            setAppliedSearch(nextQ)
+                            setPage(1)
+                            pushQueryState({ q: nextQ, page: 1 })
+                        }}
+                    >
+                        {t('common.search')}
+                    </button>
+                    <button
+                        type='button'
+                        className='rounded-lg border border-border bg-surface px-4 py-2 text-sm text-text transition hover:border-accent/40 hover:text-accent'
+                        onClick={() => {
+                            setSearchQuery('')
+                            setAppliedSearch('')
+                            setPage(1)
+                            pushQueryState({ q: '', page: 1 })
+                        }}
+                    >
+                        {t('common.reset')}
+                    </button>
+                </div>
             </div>
 
             {errorMessage ? <FormMessage variant='error' message={errorMessage} /> : null}
@@ -232,6 +292,35 @@ const AdminUsers = () => {
                     </div>
                 </div>
             )}
+            <div className='mt-2 flex items-center justify-end gap-2'>
+                <button
+                    type='button'
+                    className='rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text transition hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50'
+                    disabled={!pagination.has_prev}
+                    onClick={() => {
+                        const nextPage = Math.max(1, page - 1)
+                        setPage(nextPage)
+                        pushQueryState({ q: appliedSearch, page: nextPage })
+                    }}
+                >
+                    {t('common.previous')}
+                </button>
+                <span className='text-sm text-text-muted'>
+                    {pagination.page} / {pagination.total_pages || 1}
+                </span>
+                <button
+                    type='button'
+                    className='rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text transition hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50'
+                    disabled={!pagination.has_next}
+                    onClick={() => {
+                        const nextPage = page + 1
+                        setPage(nextPage)
+                        pushQueryState({ q: appliedSearch, page: nextPage })
+                    }}
+                >
+                    {t('common.next')}
+                </button>
+            </div>
         </section>
     )
 }

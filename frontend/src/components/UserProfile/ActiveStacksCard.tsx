@@ -26,7 +26,7 @@ const ActiveStacksCard = ({ activeStacks, stacksError, stacksLoading, stackDelet
     }
 
     return (
-        <div className='mt-6 rounded-2xl border border-border bg-surface p-6'>
+        <div className='mt-6 rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-2xl md:border md:border-border md:bg-surface md:p-6'>
             <div className='flex flex-wrap items-center justify-between gap-4'>
                 <h3 className='text-lg text-text'>{t('profile.activeStacks')}</h3>
                 <button className='text-xs uppercase tracking-wide text-text-subtle hover:text-text disabled:opacity-60 cursor-pointer' onClick={onRefresh} disabled={stacksLoading}>
@@ -35,25 +35,25 @@ const ActiveStacksCard = ({ activeStacks, stacksError, stacksLoading, stackDelet
             </div>
 
             {stacksError ? (
-                <p className='mt-4 rounded-xl border border-danger/40 bg-danger/10 px-4 py-2 text-xs text-danger'>{stacksError}</p>
+                <p className='mt-4 rounded-none border-0 bg-danger/10 px-3 py-2 text-xs text-danger md:rounded-xl md:border md:border-danger/40 md:px-4'>{stacksError}</p>
             ) : activeStacks.length === 0 ? (
-                <div className='mt-4 rounded-xl border border-border bg-surface-muted p-5 text-center'>
+                <div className='mt-4 rounded-none border-0 bg-surface-muted p-4 text-center md:rounded-xl md:border md:border-border md:p-5'>
                     <p className='text-sm text-text-muted'>{t('profile.noActiveStacks')}</p>
                 </div>
             ) : (
-                <div className='mt-4 space-y-3'>
+                <div className='mt-4 divide-y divide-border/50 md:divide-y-0 md:space-y-3'>
                     {activeStacks.map((stack) => (
-                        <div key={stack.challenge_id} className='rounded-xl border border-border bg-surface-muted p-5'>
-                            <div className='flex flex-wrap items-center justify-between gap-3'>
+                        <div key={stack.challenge_id} className='rounded-none border-0 bg-transparent p-3 md:rounded-xl md:border md:border-border md:bg-surface-muted md:p-5'>
+                            <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
                                 <div>
                                     <p className='text-sm font-medium text-text'>{formatChallengeTitle(stack)}</p>
                                     <p className='mt-1 text-xs text-text-subtle'>{t('profile.statusLabel', { status: stack.status })}</p>
                                     <p className='mt-1 text-xs text-text-subtle'>{t('profile.createdBy', { username: stack.created_by_username || t('common.na') })}</p>
                                 </div>
-                                <div className='flex flex-wrap items-center gap-3 text-xs text-text-muted'>
-                                    <span>{formatEndpoints(stack)}</span>
+                                <div className='flex w-full flex-col gap-2 text-xs text-text-muted sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-3'>
+                                    <span className='break-all'>{formatEndpoints(stack)}</span>
                                     <button
-                                        className='rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-medium text-danger transition hover:border-danger/50 hover:text-danger-strong disabled:opacity-60 cursor-pointer'
+                                        className='w-full rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-medium text-danger transition hover:border-danger/50 hover:text-danger-strong disabled:opacity-60 sm:w-auto cursor-pointer'
                                         type='button'
                                         onClick={() => onDelete(stack.challenge_id)}
                                         disabled={stackDeletingId === stack.challenge_id || stacksLoading}

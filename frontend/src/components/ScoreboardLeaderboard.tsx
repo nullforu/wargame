@@ -69,7 +69,7 @@ const ScoreboardLeaderboard = ({ refreshTrigger = 0 }: ScoreboardLeaderboardProp
     const gridTemplate = (count: number) => `${fixedCols} repeat(${count}, ${flagSize}px)`
 
     return (
-        <div className='min-w-0 rounded-2xl border border-border bg-surface p-4 sm:p-6'>
+        <div className='min-w-0 rounded-xl border border-border bg-surface p-4'>
             <div className='flex items-center justify-between'>
                 <h3 className='text-lg text-text'>{t('leaderboard.title')}</h3>
                 <span className='text-xs text-text-subtle'>{t('leaderboard.challengesCount', { count: challenges.length })}</span>
@@ -103,7 +103,7 @@ const ScoreboardLeaderboard = ({ refreshTrigger = 0 }: ScoreboardLeaderboardProp
                             {scores.map((entry, index) => (
                                 <button
                                     key={`entry-${entry.username}-${index}`}
-                                    className='grid w-full items-center gap-3 px-3 py-3 text-left transition hover:bg-surface-muted cursor-pointer'
+                                    className='grid w-full items-center gap-3 rounded-md px-3 py-3 text-left transition hover:bg-surface-muted cursor-pointer'
                                     style={{ gridTemplateColumns: gridTemplate(challenges.length) }}
                                     onClick={() => navigate(`/users/${entry.user_id}`)}
                                 >

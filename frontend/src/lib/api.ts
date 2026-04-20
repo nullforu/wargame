@@ -18,12 +18,14 @@ import type {
     Stack,
     StacksResponse,
     LoginPayload,
+    PaginationMeta,
     RegisterPayload,
     RegisterResponse,
-    SolvedChallenge,
+    UserSolvedResponse,
+    ChallengeSolversResponse,
     TimelineResponse,
-    UserListItem,
     UserDetail,
+    UsersResponse,
 } from './types'
 import type { AuthState } from './auth'
 
@@ -83,6 +85,74 @@ const extractRateLimit = (response: Response, data: any): RateLimitInfo | undefi
 }
 
 export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, translate }: ApiDeps) => {
+    const defaultPagination = (): PaginationMeta => ({
+        page: 1,
+        page_size: 20,
+        total_count: 0,
+        total_pages: 0,
+        has_prev: false,
+        has_next: false,
+    })
+
+    const normalizePagination = (pagination?: PaginationMeta): PaginationMeta => {
+        if (!pagination || typeof pagination !== 'object') return defaultPagination()
+        return {
+            page: typeof pagination.page === 'number' ? pagination.page : 1,
+            page_size: typeof pagination.page_size === 'number' ? pagination.page_size : 20,
+            total_count: typeof pagination.total_count === 'number' ? pagination.total_count : 0,
+            total_pages: typeof pagination.total_pages === 'number' ? pagination.total_pages : 0,
+            has_prev: Boolean(pagination.has_prev),
+            has_next: Boolean(pagination.has_next),
+        }
+    }
+
+    const nonAdminUsers = (users: UsersResponse['users']) => users.filter((user) => String(user?.role ?? '').toLowerCase() !== 'admin')
+
+    const withPagination = (path: string, page?: number, pageSize?: number) => {
+        const params = new URLSearchParams()
+        if (typeof page === 'number') params.set('page', String(page))
+        if (typeof pageSize === 'number') params.set('page_size', String(pageSize))
+        const query = params.toString()
+        return query ? `${path}?${query}` : path
+    }
+
+    const withSearchAndPagination = (path: string, q: string, page?: number, pageSize?: number) => {
+        const params = new URLSearchParams()
+        params.set('q', q)
+        if (typeof page === 'number') params.set('page', String(page))
+        if (typeof pageSize === 'number') params.set('page_size', String(pageSize))
+        return `${path}?${params.toString()}`
+    }
+
+    const withChallengeFilters = (
+        path: string,
+        {
+            q,
+            page,
+            pageSize,
+            category,
+            level,
+            solved,
+        }: {
+            q?: string
+            page?: number
+            pageSize?: number
+            category?: string
+            level?: number
+            solved?: boolean
+        },
+    ) => {
+        const params = new URLSearchParams()
+        if (typeof q === 'string' && q.trim() !== '') params.set('q', q.trim())
+        if (typeof page === 'number') params.set('page', String(page))
+        if (typeof pageSize === 'number') params.set('page_size', String(pageSize))
+        if (typeof category === 'string' && category.trim() !== '') params.set('category', category.trim())
+        if (typeof level === 'number') params.set('level', String(level))
+        if (typeof solved === 'boolean') params.set('solved', String(solved))
+        const query = params.toString()
+        return query ? `${path}?${query}` : path
+    }
+
     const buildHeaders = (withAuth: boolean, tokenOverride?: string) => {
         const headers: Record<string, string> = { Accept: 'application/json' }
 
@@ -225,11 +295,41 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
         },
         me: () => request<AuthUser>(`/api/me`, { auth: true }),
         updateMe: (username: string) => request<AuthUser>(`/api/me`, { method: 'PUT', body: { username }, auth: true }),
-        challenges: async () => {
-            const data = await request<{ challenges?: Challenge[] }>(`/api/challenges`, { auth: true })
+        challenges: async (page?: number, pageSize?: number) => {
+            const data = await request<{ challenges?: Challenge[]; pagination?: PaginationMeta }>(withPagination(`/api/challenges`, page, pageSize), { auth: true })
             return {
                 challenges: Array.isArray(data?.challenges) ? data.challenges : [],
+                pagination: normalizePagination(data?.pagination),
             } as ChallengesResponse
+        },
+        searchChallenges: async (
+            q: string,
+            page?: number,
+            pageSize?: number,
+            filters?: {
+                category?: string
+                level?: number
+                solved?: boolean
+            },
+        ) => {
+            const trimmedQ = q.trim()
+            const basePath = trimmedQ === '' ? `/api/challenges` : `/api/challenges/search`
+            const data = await request<{ challenges?: Challenge[]; pagination?: PaginationMeta }>(
+                withChallengeFilters(basePath, { q: trimmedQ, page, pageSize, category: filters?.category, level: filters?.level, solved: filters?.solved }),
+                { auth: true },
+            )
+            return {
+                challenges: Array.isArray(data?.challenges) ? data.challenges : [],
+                pagination: normalizePagination(data?.pagination),
+            } as ChallengesResponse
+        },
+        challenge: (id: number) => request<Challenge>(`/api/challenges/${id}`, { auth: true }),
+        challengeSolvers: async (id: number, page?: number, pageSize?: number) => {
+            const data = await request<Partial<ChallengeSolversResponse>>(withPagination(`/api/challenges/${id}/solvers`, page, pageSize))
+            return {
+                solvers: Array.isArray(data?.solvers) ? data.solvers : [],
+                pagination: normalizePagination(data?.pagination),
+            } as ChallengeSolversResponse
         },
         submitFlag: (id: number, flag: string) =>
             request<FlagSubmissionResult>(`/api/challenges/${id}/submit`, {
@@ -237,8 +337,19 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
                 body: { flag },
                 auth: true,
             }),
-        leaderboard: () => request<LeaderboardResponse>(`/api/leaderboard`),
-        timeline: () => request<TimelineResponse>(`/api/timeline`, { auth: true }),
+        leaderboard: async () => {
+            const data = await request<Partial<LeaderboardResponse>>(`/api/leaderboard`)
+            return {
+                challenges: Array.isArray(data?.challenges) ? data.challenges : [],
+                entries: Array.isArray(data?.entries) ? data.entries : [],
+            } as LeaderboardResponse
+        },
+        timeline: async () => {
+            const data = await request<Partial<TimelineResponse>>(`/api/timeline`, { auth: true })
+            return {
+                submissions: Array.isArray(data?.submissions) ? data.submissions : [],
+            } as TimelineResponse
+        },
         createChallenge: (payload: ChallengeCreatePayload) => request<ChallengeCreateResponse>(`/api/admin/challenges`, { method: 'POST', body: payload, auth: true }),
         adminChallenge: (id: number) => request<AdminChallengeDetail>(`/api/admin/challenges/${id}`, { auth: true }),
         updateChallenge: (id: number, payload: ChallengeUpdatePayload) => request<ChallengeDetail>(`/api/admin/challenges/${id}`, { method: 'PUT', body: payload, auth: true }),
@@ -274,12 +385,28 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
         deleteAdminStack: (stackId: string) => request<AdminStackDeleteResponse>(`/api/admin/stacks/${stackId}`, { method: 'DELETE', auth: true }),
         blockUser: (id: number, reason: string) => request<AuthUser>(`/api/admin/users/${id}/block`, { method: 'POST', body: { reason }, auth: true }),
         unblockUser: (id: number) => request<AuthUser>(`/api/admin/users/${id}/unblock`, { method: 'POST', auth: true }),
-        users: async () => {
-            const data = await request<UserListItem[]>(`/api/users`)
-            return data.filter((user) => user.role.toLowerCase() !== 'admin')
+        users: async (page?: number, pageSize?: number) => {
+            const data = await request<UsersResponse>(withPagination(`/api/users`, page, pageSize))
+            return {
+                users: nonAdminUsers(Array.isArray(data?.users) ? data.users : []),
+                pagination: normalizePagination(data?.pagination),
+            } as UsersResponse
+        },
+        searchUsers: async (q: string, page?: number, pageSize?: number) => {
+            const data = await request<UsersResponse>(withSearchAndPagination(`/api/users/search`, q, page, pageSize))
+            return {
+                users: nonAdminUsers(Array.isArray(data?.users) ? data.users : []),
+                pagination: normalizePagination(data?.pagination),
+            } as UsersResponse
         },
         user: (id: number) => request<UserDetail>(`/api/users/${id}`),
-        userSolved: (id: number) => request<SolvedChallenge[]>(`/api/users/${id}/solved`),
+        userSolved: async (id: number, page?: number, pageSize?: number) => {
+            const data = await request<Partial<UserSolvedResponse>>(withPagination(`/api/users/${id}/solved`, page, pageSize))
+            return {
+                solved: Array.isArray(data?.solved) ? data.solved : [],
+                pagination: normalizePagination(data?.pagination),
+            } as UserSolvedResponse
+        },
     }
 }
 

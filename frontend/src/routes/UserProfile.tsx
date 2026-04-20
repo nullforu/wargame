@@ -24,6 +24,14 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     const localeTag = useMemo(() => getLocaleTag(locale), [locale])
     const [user, setUser] = useState<UserDetail | null>(null)
     const [solved, setSolved] = useState<SolvedChallenge[]>([])
+    const readSolvedPageFromQuery = () => {
+        if (typeof window === 'undefined') return 1
+        const params = new URLSearchParams(window.location.search)
+        const value = Number(params.get('solved_page'))
+        return Number.isInteger(value) && value > 0 ? value : 1
+    }
+    const [solvedPage, setSolvedPage] = useState(readSolvedPageFromQuery)
+    const [solvedPagination, setSolvedPagination] = useState({ page: 1, page_size: 20, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
     const [loading, setLoading] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
     const [stacks, setStacks] = useState<Stack[]>([])
@@ -33,7 +41,6 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     const [editingUsername, setEditingUsername] = useState(false)
     const [usernameInput, setUsernameInput] = useState('')
     const [savingUsername, setSavingUsername] = useState(false)
-    const lastLoadedUserIdRef = useRef<number | null>(null)
     const lastStacksLoadedForUserIdRef = useRef<number | null>(null)
 
     const routeUserId = useMemo(() => parseRouteId(routeParams.id), [routeParams.id])
@@ -51,20 +58,21 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
         async (userId: number) => {
             setLoading(true)
             setErrorMessage('')
-            setUser(null)
             setSolved([])
+            setSolvedPagination({ page: 1, page_size: 20, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
 
             try {
-                const [userDetail, solvedData] = await Promise.all([api.user(userId), api.userSolved(userId)])
+                const [userDetail, solvedData] = await Promise.all([api.user(userId), api.userSolved(userId, solvedPage, 20)])
                 setUser(userDetail)
-                setSolved(solvedData)
+                setSolved(solvedData.solved)
+                setSolvedPagination(solvedData.pagination)
             } catch (error) {
                 setErrorMessage(formatApiError(error, t).message)
             } finally {
                 setLoading(false)
             }
         },
-        [api, t],
+        [api, solvedPage, t],
     )
 
     const loadStacks = useCallback(async () => {
@@ -119,6 +127,27 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
         }
     }, [api, t, user, usernameInput])
 
+    const pushSolvedPageQuery = useCallback((nextPage: number) => {
+        if (typeof window === 'undefined') return
+        const params = new URLSearchParams(window.location.search)
+        if (nextPage > 1) params.set('solved_page', String(nextPage))
+        else params.delete('solved_page')
+        const query = params.toString()
+        const nextURL = query ? `${window.location.pathname}?${query}` : window.location.pathname
+        const currentURL = `${window.location.pathname}${window.location.search}`
+        if (nextURL !== currentURL) {
+            window.history.pushState({}, '', nextURL)
+        }
+    }, [])
+
+    const backToUsersURL = useMemo(() => {
+        if (typeof window === 'undefined') return '/users'
+        const params = new URLSearchParams(window.location.search)
+        params.delete('solved_page')
+        const query = params.toString()
+        return query ? `/users?${query}` : '/users'
+    }, [routeParams.id, solvedPage])
+
     useEffect(() => {
         if (user && isOwnProfile) {
             setUsernameInput(user.username)
@@ -127,11 +156,16 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
 
     useEffect(() => {
         if (targetUserId === null) return
-        if (lastLoadedUserIdRef.current === targetUserId) return
+        void loadUserProfile(targetUserId)
+    }, [loadUserProfile, targetUserId, solvedPage])
 
-        lastLoadedUserIdRef.current = targetUserId
-        loadUserProfile(targetUserId)
-    }, [loadUserProfile, targetUserId])
+    useEffect(() => {
+        const onPopState = () => {
+            setSolvedPage(readSolvedPageFromQuery())
+        }
+        window.addEventListener('popstate', onPopState)
+        return () => window.removeEventListener('popstate', onPopState)
+    }, [])
 
     useEffect(() => {
         if (!isOwnProfile) {
@@ -149,8 +183,8 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     return (
         <section className='animate'>
             {showBackButton ? (
-                <div className='mb-6'>
-                    <button className='inline-flex items-center gap-2 text-sm text-text-muted hover:text-accent cursor-pointer' onClick={() => navigate('/users')}>
+                <div className='mb-4 md:mb-6'>
+                    <button className='inline-flex items-center gap-2 text-sm text-text-muted hover:text-accent cursor-pointer' onClick={() => navigate(backToUsersURL)}>
                         <svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
                             <path d='m15 18-6-6 6-6' />
                         </svg>
@@ -162,11 +196,11 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
             {!auth.user ? (
                 <LoginRequired title={t('profile.title')} />
             ) : loading ? (
-                <div className='rounded-2xl border border-border bg-surface p-8'>
+                <div className='rounded-none border-0 bg-transparent p-3 shadow-none md:rounded-2xl md:border md:border-border md:bg-surface md:p-8'>
                     <p className='text-center text-sm text-text-muted'>{t('common.loading')}</p>
                 </div>
             ) : errorMessage ? (
-                <div className='rounded-2xl border border-danger/30 bg-danger/10 p-8'>
+                <div className='rounded-none border-0 bg-danger/10 p-3 shadow-none md:rounded-2xl md:border md:border-danger/30 md:p-8'>
                     <p className='text-center text-sm text-danger'>{errorMessage}</p>
                 </div>
             ) : user ? (
@@ -200,7 +234,37 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
 
                     <SolvedChallengesCard solved={solved} formatDateTime={formatSolvedDateTime} />
 
-                    {solved.length > 0 ? <StatisticsCard totalPoints={totalSolvedPoints} solvedCount={solved.length} /> : null}
+                    {solvedPagination.total_pages > 0 ? (
+                        <div className='mt-3 flex flex-wrap items-center justify-end gap-2 rounded-none border-0 bg-transparent px-0 py-2 text-xs text-text-muted md:rounded-xl md:border md:border-border md:bg-surface md:px-3'>
+                            <button
+                                className='rounded-md border border-border px-2 py-1 disabled:opacity-50'
+                                disabled={!solvedPagination.has_prev}
+                                onClick={() => {
+                                    const nextPage = Math.max(1, solvedPage - 1)
+                                    setSolvedPage(nextPage)
+                                    pushSolvedPageQuery(nextPage)
+                                }}
+                            >
+                                {t('common.previous')}
+                            </button>
+                            <span>
+                                {solvedPagination.page} / {solvedPagination.total_pages || 1}
+                            </span>
+                            <button
+                                className='rounded-md border border-border px-2 py-1 disabled:opacity-50'
+                                disabled={!solvedPagination.has_next}
+                                onClick={() => {
+                                    const nextPage = solvedPage + 1
+                                    setSolvedPage(nextPage)
+                                    pushSolvedPageQuery(nextPage)
+                                }}
+                            >
+                                {t('common.next')}
+                            </button>
+                        </div>
+                    ) : null}
+
+                    {solved.length > 0 ? <StatisticsCard totalPoints={totalSolvedPoints} solvedCount={solvedPagination.total_count || solved.length} /> : null}
                 </div>
             ) : null}
         </section>

@@ -7,7 +7,9 @@
         "dev": "vite",
         "build": "tsc -b && vite build",
         "preview": "vite preview",
-        "format": "prettier --write ."
+        "format": "prettier --write .",
+        "i18n:unused": "node scripts/cleanup-i18n.mjs",
+        "i18n:cleanup": "node scripts/cleanup-i18n.mjs --write"
     },
     "dependencies": {
         "@monaco-editor/react": "^4.7.0",

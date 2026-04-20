@@ -20,10 +20,11 @@ const ChallengeManagement = () => {
     const [expandedChallengeId, setExpandedChallengeId] = useState<number | null>(null)
     const [manageLoading, setManageLoading] = useState(false)
     const [manageFieldErrors, setManageFieldErrors] = useState<FieldErrors>({})
-    const [editingField, setEditingField] = useState<'title' | 'description' | 'category' | 'points' | 'minimum_points' | 'previous_challenge_id' | 'flag' | 'is_active' | 'stack' | null>(null)
+    const [editingField, setEditingField] = useState<'title' | 'description' | 'category' | 'level' | 'points' | 'minimum_points' | 'previous_challenge_id' | 'flag' | 'is_active' | 'stack' | null>(null)
     const [editTitle, setEditTitle] = useState('')
     const [editDescription, setEditDescription] = useState('')
     const [editCategory, setEditCategory] = useState<string>(CHALLENGE_CATEGORIES[0])
+    const [editLevel, setEditLevel] = useState(1)
     const [editPoints, setEditPoints] = useState(100)
     const [editMinimumPoints, setEditMinimumPoints] = useState(100)
     const [editPreviousChallengeId, setEditPreviousChallengeId] = useState<number | ''>('')
@@ -44,6 +45,20 @@ const ChallengeManagement = () => {
     const [editFileError, setEditFileError] = useState('')
     const [editFileUploading, setEditFileUploading] = useState(false)
     const [editFileSuccess, setEditFileSuccess] = useState('')
+    const readQueryState = () => {
+        if (typeof window === 'undefined') return { q: '', page: 1 }
+        const params = new URLSearchParams(window.location.search)
+        const parsedPage = Number(params.get('page'))
+        return {
+            q: (params.get('q') ?? '').trim(),
+            page: Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1,
+        }
+    }
+    const initialQueryState = readQueryState()
+    const [searchQuery, setSearchQuery] = useState(initialQueryState.q)
+    const [appliedSearch, setAppliedSearch] = useState(initialQueryState.q)
+    const [page, setPage] = useState(initialQueryState.page)
+    const [pagination, setPagination] = useState({ page: 1, page_size: 20, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
     const challengeLookup = new Map<number, Challenge>(challenges.map((item) => [item.id, item]))
     const formatChallengeOption = (item: Challenge) => {
         const categoryValue = 'category' in item && item.category ? item.category : t('common.na')
@@ -52,6 +67,30 @@ const ChallengeManagement = () => {
 
     useEffect(() => {
         loadChallenges()
+    }, [page, appliedSearch])
+
+    const pushQueryState = (next: { q: string; page: number }) => {
+        if (typeof window === 'undefined') return
+        const params = new URLSearchParams()
+        if (next.q.trim() !== '') params.set('q', next.q.trim())
+        if (next.page > 1) params.set('page', String(next.page))
+        const query = params.toString()
+        const nextURL = query ? `${window.location.pathname}?${query}` : window.location.pathname
+        const currentURL = `${window.location.pathname}${window.location.search}`
+        if (nextURL !== currentURL) {
+            window.history.pushState({}, '', nextURL)
+        }
+    }
+
+    useEffect(() => {
+        const onPopState = () => {
+            const state = readQueryState()
+            setSearchQuery(state.q)
+            setAppliedSearch(state.q)
+            setPage(state.page)
+        }
+        window.addEventListener('popstate', onPopState)
+        return () => window.removeEventListener('popstate', onPopState)
     }, [])
 
     const loadChallenges = async () => {
@@ -59,11 +98,13 @@ const ChallengeManagement = () => {
         setErrorMessage('')
 
         try {
-            const response = await api.challenges()
+            const response = appliedSearch ? await api.searchChallenges(appliedSearch, page, 20) : await api.challenges(page, 20)
             setChallenges(response.challenges)
+            setPagination(response.pagination)
         } catch (error) {
             const formatted = formatApiError(error, t)
             setErrorMessage(formatted.message)
+            setPagination({ page: 1, page_size: 20, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
         } finally {
             setLoading(false)
         }
@@ -88,6 +129,7 @@ const ChallengeManagement = () => {
         setEditTitle(challenge.title)
         setEditDescription('description' in challenge ? challenge.description : '')
         setEditCategory('category' in challenge ? challenge.category : CHALLENGE_CATEGORIES[0])
+        setEditLevel('level' in challenge ? challenge.level : 1)
         setEditPoints(challenge.initial_points)
         setEditMinimumPoints(challenge.minimum_points)
         setEditIsActive(challenge.is_active)
@@ -105,6 +147,7 @@ const ChallengeManagement = () => {
             setEditTitle(detail.title)
             setEditDescription(detail.description)
             setEditCategory(detail.category)
+            setEditLevel(detail.level)
             setEditPoints(detail.initial_points)
             setEditMinimumPoints(detail.minimum_points)
             setEditIsActive(detail.is_active)
@@ -141,6 +184,7 @@ const ChallengeManagement = () => {
         if (field === 'title') setEditTitle(challenge.title)
         if (field === 'description') setEditDescription(detail?.description ?? '')
         if (field === 'category') setEditCategory(detail?.category ?? CHALLENGE_CATEGORIES[0])
+        if (field === 'level') setEditLevel(detail?.level ?? 1)
         if (field === 'points') setEditPoints(detail?.initial_points ?? challenge.points)
         if (field === 'minimum_points') setEditMinimumPoints(detail?.minimum_points ?? 0)
         if (field === 'previous_challenge_id') setEditPreviousChallengeId(loadedPreviousChallengeId ?? '')
@@ -185,6 +229,14 @@ const ChallengeManagement = () => {
                 return
             }
             payload.category = editCategory
+        }
+
+        if (field === 'level') {
+            if (detail && Number(editLevel) === detail.level) {
+                setEditingField(null)
+                return
+            }
+            payload.level = Number(editLevel)
         }
 
         if (field === 'points') {
@@ -269,6 +321,7 @@ const ChallengeManagement = () => {
             setEditTitle(updated.title)
             setEditDescription(updated.description)
             setEditCategory(updated.category)
+            setEditLevel(updated.level)
             setEditPoints(updated.initial_points)
             setEditMinimumPoints(updated.minimum_points)
             setEditIsActive(updated.is_active)
@@ -375,6 +428,42 @@ const ChallengeManagement = () => {
                 </button>
             </div>
 
+            <div className='space-y-2'>
+                <input
+                    type='text'
+                    placeholder={t('common.search')}
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    className='w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-text placeholder-text-subtle transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20'
+                />
+                <div className='flex gap-2'>
+                    <button
+                        type='button'
+                        className='rounded-lg border border-border bg-surface px-4 py-2 text-sm text-text transition hover:border-accent/40 hover:text-accent'
+                        onClick={() => {
+                            const nextQ = searchQuery.trim()
+                            setAppliedSearch(nextQ)
+                            setPage(1)
+                            pushQueryState({ q: nextQ, page: 1 })
+                        }}
+                    >
+                        {t('common.search')}
+                    </button>
+                    <button
+                        type='button'
+                        className='rounded-lg border border-border bg-surface px-4 py-2 text-sm text-text transition hover:border-accent/40 hover:text-accent'
+                        onClick={() => {
+                            setSearchQuery('')
+                            setAppliedSearch('')
+                            setPage(1)
+                            pushQueryState({ q: '', page: 1 })
+                        }}
+                    >
+                        {t('common.reset')}
+                    </button>
+                </div>
+            </div>
+
             {errorMessage ? <FormMessage variant='error' message={errorMessage} /> : null}
             {successMessage ? <FormMessage variant='success' message={successMessage} /> : null}
 
@@ -389,6 +478,7 @@ const ChallengeManagement = () => {
                                     <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>{t('common.id')}</th>
                                     <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>{t('common.title')}</th>
                                     <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>{t('common.category')}</th>
+                                    <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>LEVEL</th>
                                     <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>{t('admin.manage.initial')}</th>
                                     <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>{t('common.points')}</th>
                                     <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted'>{t('common.minimum')}</th>
@@ -413,6 +503,7 @@ const ChallengeManagement = () => {
                                                 <td className='whitespace-nowrap px-6 py-4 text-sm text-text'>{challenge.id}</td>
                                                 <td className='px-6 py-4 text-sm text-text'>{challenge.title}</td>
                                                 <td className='px-6 py-4 text-sm text-text'>{categoryLabel}</td>
+                                                <td className='px-6 py-4 text-sm text-text'>{challenge.level}</td>
                                                 <td className='px-6 py-4 text-sm text-text'>{challenge.points}</td>
                                                 <td className='px-6 py-4 text-sm text-text'>{initialPoints}</td>
                                                 <td className='px-6 py-4 text-sm text-text'>{minimumPoints}</td>
@@ -435,7 +526,7 @@ const ChallengeManagement = () => {
                                             </tr>
                                             {expandedChallengeId === challenge.id ? (
                                                 <tr className='bg-surface/70'>
-                                                    <td colSpan={9} className='px-6 py-6'>
+                                                    <td colSpan={10} className='px-6 py-6'>
                                                         <div className='space-y-5'>
                                                             <div>
                                                                 <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor={`manage-title-${challenge.id}`}>
@@ -537,7 +628,7 @@ const ChallengeManagement = () => {
                                                                     </p>
                                                                 ) : null}
                                                             </div>
-                                                            <div className='grid gap-4 md:grid-cols-3'>
+                                                            <div className='grid gap-4 md:grid-cols-4'>
                                                                 <div>
                                                                     <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor={`manage-category-${challenge.id}`}>
                                                                         {t('common.category')}
@@ -594,6 +685,56 @@ const ChallengeManagement = () => {
                                                                             {t('common.category')}: {manageFieldErrors.category}
                                                                         </p>
                                                                     ) : null}
+                                                                </div>
+                                                                <div>
+                                                                    <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor={`manage-level-${challenge.id}`}>
+                                                                        LEVEL
+                                                                    </label>
+                                                                    {editingField === 'level' ? (
+                                                                        <div className='mt-2 space-y-2'>
+                                                                            <input
+                                                                                id={`manage-level-${challenge.id}`}
+                                                                                className='w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text focus:border-accent focus:outline-none'
+                                                                                type='number'
+                                                                                min={1}
+                                                                                max={10}
+                                                                                value={editLevel}
+                                                                                onChange={(event) => setEditLevel(Number(event.target.value))}
+                                                                                disabled={manageLoading}
+                                                                            />
+                                                                            <div className='flex flex-wrap items-center gap-3'>
+                                                                                <button
+                                                                                    className='rounded-lg bg-accent px-3 py-2 text-xs font-medium text-contrast-foreground transition hover:bg-accent-strong disabled:opacity-60 cursor-pointer'
+                                                                                    type='button'
+                                                                                    onClick={() => saveField(challenge, 'level')}
+                                                                                    disabled={manageLoading}
+                                                                                >
+                                                                                    {manageLoading ? t('admin.site.saving') : t('common.save')}
+                                                                                </button>
+                                                                                <button
+                                                                                    className='rounded-lg border border-border px-3 py-2 text-xs text-text transition hover:border-border disabled:opacity-60 cursor-pointer'
+                                                                                    type='button'
+                                                                                    onClick={() => cancelEdit('level', challenge)}
+                                                                                    disabled={manageLoading}
+                                                                                >
+                                                                                    {t('common.cancel')}
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className='mt-2 flex items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text'>
+                                                                            <span>{editLevel}</span>
+                                                                            <button
+                                                                                className='text-xs text-accent hover:underline cursor-pointer disabled:opacity-60'
+                                                                                type='button'
+                                                                                onClick={() => beginEdit('level')}
+                                                                                disabled={manageLoading || editingField !== null}
+                                                                            >
+                                                                                {t('common.edit')}
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                    {manageFieldErrors.level ? <p className='mt-2 text-xs text-danger'>LEVEL: {manageFieldErrors.level}</p> : null}
                                                                 </div>
                                                                 <div>
                                                                     <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor={`manage-points-${challenge.id}`}>
@@ -1084,7 +1225,7 @@ const ChallengeManagement = () => {
                                 })}
                                 {challenges.length === 0 ? (
                                     <tr>
-                                        <td colSpan={9} className='px-6 py-8 text-center text-sm text-text-muted'>
+                                        <td colSpan={10} className='px-6 py-8 text-center text-sm text-text-muted'>
                                             {t('admin.manage.noChallenges')}
                                         </td>
                                     </tr>
@@ -1094,6 +1235,35 @@ const ChallengeManagement = () => {
                     </div>
                 </div>
             )}
+            <div className='mt-2 flex items-center justify-end gap-2'>
+                <button
+                    type='button'
+                    className='rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text transition hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50'
+                    disabled={!pagination.has_prev}
+                    onClick={() => {
+                        const nextPage = Math.max(1, page - 1)
+                        setPage(nextPage)
+                        pushQueryState({ q: appliedSearch, page: nextPage })
+                    }}
+                >
+                    {t('common.previous')}
+                </button>
+                <span className='text-sm text-text-muted'>
+                    {pagination.page} / {pagination.total_pages || 1}
+                </span>
+                <button
+                    type='button'
+                    className='rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text transition hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50'
+                    disabled={!pagination.has_next}
+                    onClick={() => {
+                        const nextPage = page + 1
+                        setPage(nextPage)
+                        pushQueryState({ q: appliedSearch, page: nextPage })
+                    }}
+                >
+                    {t('common.next')}
+                </button>
+            </div>
         </div>
     )
 }

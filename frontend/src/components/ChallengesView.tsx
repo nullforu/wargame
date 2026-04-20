@@ -1,21 +1,21 @@
 import { getCategoryKey, useT } from '../lib/i18n'
 import type { Challenge } from '../lib/types'
 
-interface ChallengeCardProps {
+interface ChallengeRowProps {
     challenge: Challenge
     isSolved: boolean
     onClick: () => void
 }
 
-const ChallengeCard = ({ challenge, isSolved, onClick }: ChallengeCardProps) => {
+const ChallengeRow = ({ challenge, isSolved, onClick }: ChallengeRowProps) => {
     const t = useT()
     const isLocked = challenge.is_locked === true
     const isActive = 'is_active' in challenge ? challenge.is_active !== false : true
     const hasCategory = 'category' in challenge && challenge.category
 
     return (
-        <div
-            className={`rounded-2xl border p-6 transition cursor-pointer hover:shadow-lg ${isActive ? 'border-border bg-surface hover:border-accent' : 'border-border/40 bg-surface-muted opacity-60'}`}
+        <article
+            className={`cursor-pointer border-b border-border px-4 py-4 transition hover:bg-surface-muted ${!isActive ? 'opacity-60' : ''}`}
             onClick={onClick}
             role='button'
             tabIndex={0}
@@ -26,23 +26,23 @@ const ChallengeCard = ({ challenge, isSolved, onClick }: ChallengeCardProps) => 
                 }
             }}
         >
-            <div className='flex items-start justify-between'>
-                <div className='flex-1'>
-                    <h3 className='text-lg font-medium text-text'>{challenge.title}</h3>
-                    <div className='mt-2 flex flex-wrap items-center gap-2 text-sm'>
-                        {hasCategory ? <span className='rounded-full bg-surface-subtle px-2.5 py-0.5 text-xs font-medium text-text'>{t(getCategoryKey(challenge.category))}</span> : null}
-                        <span className='text-text-muted'>{t('common.pointsShort', { points: challenge.points })}</span>
+            <div className='flex items-center justify-between gap-4'>
+                <div className='min-w-0 flex-1'>
+                    <h3 className='truncate text-base font-medium text-text'>{challenge.title}</h3>
+                    <div className='mt-1 flex flex-wrap items-center gap-3 text-xs text-text-muted'>
+                        {hasCategory ? <span>{t(getCategoryKey(challenge.category))}</span> : null}
+                        <span>{t('common.pointsShort', { points: challenge.points })}</span>
                     </div>
                 </div>
                 {isLocked ? (
-                    <span className='rounded-full bg-warning/20 px-3 py-1 text-xs text-warning-strong'>{t('challenge.lockedLabel')}</span>
+                    <span className='rounded-full bg-warning/20 px-2.5 py-1 text-xs text-warning-strong'>{t('challenge.lockedLabel')}</span>
                 ) : isSolved ? (
-                    <span className='rounded-full bg-success/20 px-3 py-1 text-xs text-success'>{t('challenge.solvedLabel')}</span>
+                    <span className='rounded-full bg-success/20 px-2.5 py-1 text-xs text-success'>{t('challenge.solvedLabel')}</span>
                 ) : !isActive ? (
-                    <span className='rounded-full bg-surface/10 px-3 py-1 text-xs text-text-muted'>{t('challenge.inactiveLabel')}</span>
+                    <span className='rounded-full bg-surface/10 px-2.5 py-1 text-xs text-text-muted'>{t('challenge.inactiveLabel')}</span>
                 ) : null}
             </div>
-        </div>
+        </article>
     )
 }
 
@@ -95,10 +95,10 @@ const ChallengesView = ({
     solvedIds,
     onSelectChallenge,
 }: ChallengesViewProps) => {
-    const renderChallengeGrid = (items: Challenge[]) => (
-        <div className='mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
+    const renderChallengeList = (items: Challenge[]) => (
+        <div className='mt-6 overflow-hidden rounded-2xl border border-border bg-surface'>
             {items.map((challenge) => (
-                <ChallengeCard key={challenge.id} challenge={challenge} isSolved={solvedIds.has(challenge.id)} onClick={() => onSelectChallenge(challenge)} />
+                <ChallengeRow key={challenge.id} challenge={challenge} isSolved={solvedIds.has(challenge.id)} onClick={() => onSelectChallenge(challenge)} />
             ))}
         </div>
     )
@@ -111,9 +111,9 @@ const ChallengesView = ({
                 return (
                     <div key={category.id}>
                         <h3 className='text-lg font-semibold text-text'>{category.label}</h3>
-                        <div className='mt-4 grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
+                        <div className='mt-4 overflow-hidden rounded-2xl border border-border bg-surface'>
                             {category.items.map((challenge) => (
-                                <ChallengeCard key={challenge.id} challenge={challenge} isSolved={solvedIds.has(challenge.id)} onClick={() => onSelectChallenge(challenge)} />
+                                <ChallengeRow key={challenge.id} challenge={challenge} isSolved={solvedIds.has(challenge.id)} onClick={() => onSelectChallenge(challenge)} />
                             ))}
                         </div>
                     </div>
@@ -122,7 +122,7 @@ const ChallengesView = ({
         </div>
     )
 
-    const renderChallenges = () => (groupByCategory ? renderGroupedChallenges() : renderChallengeGrid(challenges))
+    const renderChallenges = () => (groupByCategory ? renderGroupedChallenges() : renderChallengeList(challenges))
 
     const renderBody = () => {
         if (loading) {
