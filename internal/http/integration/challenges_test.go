@@ -341,13 +341,13 @@ func TestChallengesSortOptions(t *testing.T) {
 
 	assertOrder(parseIDs("/api/challenges?page=1&page_size=50&sort=latest"), []int64{idD, idC, idB, idA})
 	assertOrder(parseIDs("/api/challenges?page=1&page_size=50&sort=oldest"), []int64{idA, idB, idC, idD})
-	assertOrder(parseIDs("/api/challenges?page=1&page_size=50&sort=most_solved"), []int64{idA, idD, idB, idC})
-	assertOrder(parseIDs("/api/challenges?page=1&page_size=50&sort=least_solved"), []int64{idC, idD, idB, idA})
+	assertOrder(parseIDs("/api/challenges?page=1&page_size=50&sort=most_solved"), []int64{idA, idD, idC, idB})
+	assertOrder(parseIDs("/api/challenges?page=1&page_size=50&sort=least_solved"), []int64{idD, idC, idB, idA})
 
 	assertOrder(parseIDs("/api/challenges/search?q=Sort&page=1&page_size=50&sort=latest"), []int64{idD, idC, idB, idA})
 	assertOrder(parseIDs("/api/challenges/search?q=Sort&page=1&page_size=50&sort=oldest"), []int64{idA, idB, idC, idD})
-	assertOrder(parseIDs("/api/challenges/search?q=Sort&page=1&page_size=50&sort=most_solved"), []int64{idA, idD, idB, idC})
-	assertOrder(parseIDs("/api/challenges/search?q=Sort&page=1&page_size=50&sort=least_solved"), []int64{idC, idD, idB, idA})
+	assertOrder(parseIDs("/api/challenges/search?q=Sort&page=1&page_size=50&sort=most_solved"), []int64{idA, idD, idC, idB})
+	assertOrder(parseIDs("/api/challenges/search?q=Sort&page=1&page_size=50&sort=least_solved"), []int64{idD, idC, idB, idA})
 
 	rec := doRequest(t, env.router, http.MethodGet, "/api/challenges?sort=bad", nil, nil)
 	if rec.Code != http.StatusBadRequest {

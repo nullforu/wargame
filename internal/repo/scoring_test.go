@@ -50,7 +50,7 @@ func TestDecayFactor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decayFactor: %v", err)
 	}
-	if decay != 2 {
-		t.Fatalf("expected decay factor 2, got %d", decay)
+	if decay != 3 {
+		t.Fatalf("expected decay factor 3, got %d", decay)
 	}
 }

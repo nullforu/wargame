@@ -78,7 +78,7 @@ func (r *SubmissionRepo) correctSubmissionCountForChallenge(ctx context.Context,
 		TableExpr("submissions AS s").
 		Join("JOIN users AS u ON u.id = s.user_id").
 		Where("s.correct = true").
-		Where("u.role NOT IN (?)", bun.In([]string{models.BlockedRole, models.AdminRole})).
+		Where("u.role != ?", models.BlockedRole).
 		Where("s.challenge_id = ?", challengeID).
 		Count(ctx)
 }

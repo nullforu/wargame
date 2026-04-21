@@ -354,13 +354,13 @@ func TestWargameServiceChallengeSortValidationAndOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchChallenges most_solved: %v", err)
 	}
-	assertOrder(most, []int64{chA.ID, chD.ID, chB.ID, chC.ID})
+	assertOrder(most, []int64{chA.ID, chD.ID, chC.ID, chB.ID})
 
 	least, _, err := env.wargameSvc.SearchChallenges(context.Background(), "Sort", 1, 20, ChallengeQueryFilter{Sort: "least_solved"})
 	if err != nil {
 		t.Fatalf("SearchChallenges least_solved: %v", err)
 	}
-	assertOrder(least, []int64{chC.ID, chD.ID, chB.ID, chA.ID})
+	assertOrder(least, []int64{chD.ID, chC.ID, chB.ID, chA.ID})
 
 	if _, _, err := env.wargameSvc.ListChallenges(context.Background(), 1, 20, ChallengeQueryFilter{Sort: "invalid"}); err == nil {
 		t.Fatalf("expected invalid sort validation error")

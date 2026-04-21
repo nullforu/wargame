@@ -12,6 +12,7 @@ func TestScoreboard(t *testing.T) {
 	env := setupTest(t, testCfg)
 	user1 := createUser(t, env, "u1@example.com", "u1", "pass", models.UserRole)
 	user2 := createUser(t, env, "u2@example.com", "u2", "pass", models.UserRole)
+	admin := createUser(t, env, "admin@example.com", "admin", "pass", models.AdminRole)
 	blocked := createUser(t, env, "blocked@example.com", models.BlockedRole, "pass", models.UserRole)
 	blocked.Role = models.BlockedRole
 	if err := env.userRepo.Update(context.Background(), blocked); err != nil {
@@ -23,6 +24,7 @@ func TestScoreboard(t *testing.T) {
 	createSubmission(t, env, user1.ID, challenge1.ID, true, time.Now().UTC())
 	createSubmission(t, env, user2.ID, challenge1.ID, true, time.Now().UTC())
 	createSubmission(t, env, user2.ID, challenge2.ID, true, time.Now().UTC())
+	createSubmission(t, env, admin.ID, challenge2.ID, true, time.Now().UTC())
 	createSubmission(t, env, blocked.ID, challenge2.ID, true, time.Now().UTC())
 
 	rec := doRequest(t, env.router, http.MethodGet, "/api/leaderboard", nil, nil)
@@ -33,8 +35,8 @@ func TestScoreboard(t *testing.T) {
 	var resp models.LeaderboardResponse
 	decodeJSON(t, rec, &resp)
 
-	if len(resp.Entries) != 2 {
-		t.Fatalf("expected 2 rows, got %d", len(resp.Entries))
+	if len(resp.Entries) != 3 {
+		t.Fatalf("expected 3 rows, got %d", len(resp.Entries))
 	}
 
 	if resp.Entries[0].UserID != user2.ID || resp.Entries[0].Score != 300 {
@@ -46,6 +48,7 @@ func TestScoreboardTimeline(t *testing.T) {
 	env := setupTest(t, testCfg)
 	user1 := createUser(t, env, "u1@example.com", "u1", "pass", models.UserRole)
 	user2 := createUser(t, env, "u2@example.com", "u2", "pass", models.UserRole)
+	admin := createUser(t, env, "admin@example.com", "admin", "pass", models.AdminRole)
 	blocked := createUser(t, env, "blocked@example.com", models.BlockedRole, "pass", models.UserRole)
 	blocked.Role = models.BlockedRole
 	if err := env.userRepo.Update(context.Background(), blocked); err != nil {
@@ -58,6 +61,7 @@ func TestScoreboardTimeline(t *testing.T) {
 	createSubmission(t, env, user1.ID, challenge1.ID, true, base.Add(3*time.Minute))
 	createSubmission(t, env, user2.ID, challenge2.ID, true, base.Add(7*time.Minute))
 	createSubmission(t, env, user1.ID, challenge2.ID, true, base.Add(16*time.Minute))
+	createSubmission(t, env, admin.ID, challenge1.ID, true, base.Add(18*time.Minute))
 	createSubmission(t, env, blocked.ID, challenge2.ID, true, base.Add(20*time.Minute))
 
 	rec := doRequest(t, env.router, http.MethodGet, "/api/timeline", nil, nil)
@@ -76,8 +80,8 @@ func TestScoreboardTimeline(t *testing.T) {
 	}
 	decodeJSON(t, rec, &resp)
 
-	if len(resp.Submissions) != 3 {
-		t.Fatalf("expected 3 submissions, got %d", len(resp.Submissions))
+	if len(resp.Submissions) != 4 {
+		t.Fatalf("expected 4 submissions, got %d", len(resp.Submissions))
 	}
 
 	if resp.Submissions[0].UserID != 1 || resp.Submissions[0].Points != 100 || resp.Submissions[0].ChallengeCount != 1 {
@@ -91,12 +95,16 @@ func TestScoreboardTimeline(t *testing.T) {
 	if resp.Submissions[2].UserID != 1 || resp.Submissions[2].Points != 200 || resp.Submissions[2].ChallengeCount != 1 {
 		t.Fatalf("unexpected third submission: %+v", resp.Submissions[2])
 	}
+	if resp.Submissions[3].UserID != admin.ID || resp.Submissions[3].Points != 100 || resp.Submissions[3].ChallengeCount != 1 {
+		t.Fatalf("unexpected fourth submission: %+v", resp.Submissions[3])
+	}
 }
 
 func TestScoreboardFixedScoring(t *testing.T) {
 	env := setupTest(t, testCfg)
 	userA := createUser(t, env, "usera@example.com", "usera", "pass123", models.UserRole)
 	userSolo := createUser(t, env, "solo@example.com", "solo", "pass123", models.UserRole)
+	admin := createUser(t, env, "admin@example.com", "admin", "pass123", models.AdminRole)
 	blocked := createUser(t, env, "blocked@example.com", models.BlockedRole, "pass123", models.UserRole)
 	blocked.Role = models.BlockedRole
 	if err := env.userRepo.Update(context.Background(), blocked); err != nil {
@@ -107,6 +115,7 @@ func TestScoreboardFixedScoring(t *testing.T) {
 
 	createSubmission(t, env, userA.ID, challenge.ID, true, time.Now().UTC())
 	createSubmission(t, env, userSolo.ID, challenge.ID, true, time.Now().UTC())
+	createSubmission(t, env, admin.ID, challenge.ID, true, time.Now().UTC())
 	createSubmission(t, env, blocked.ID, challenge.ID, true, time.Now().UTC())
 
 	rec := doRequest(t, env.router, http.MethodGet, "/api/leaderboard", nil, nil)
@@ -117,8 +126,8 @@ func TestScoreboardFixedScoring(t *testing.T) {
 	var resp models.LeaderboardResponse
 	decodeJSON(t, rec, &resp)
 
-	if len(resp.Entries) != 2 {
-		t.Fatalf("expected 2 rows, got %d", len(resp.Entries))
+	if len(resp.Entries) != 3 {
+		t.Fatalf("expected 3 rows, got %d", len(resp.Entries))
 	}
 
 	if resp.Entries[0].Score != 500 || resp.Entries[1].Score != 500 {

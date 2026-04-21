@@ -34,6 +34,7 @@ func TestScoreboardServiceLeaderboardAndTimeline(t *testing.T) {
 	env := setupServiceTest(t)
 	user1 := createUser(t, env, "u1@example.com", "u1", "pass", models.UserRole)
 	user2 := createUser(t, env, "u2@example.com", "u2", "pass", models.UserRole)
+	admin := createUser(t, env, "admin@example.com", "admin", "pass", models.AdminRole)
 	blocked := createUser(t, env, "blocked@example.com", "blocked", "pass", models.BlockedRole)
 
 	ch1 := createChallenge(t, env, "Ch1", 100, "flag{1}", true)
@@ -42,14 +43,15 @@ func TestScoreboardServiceLeaderboardAndTimeline(t *testing.T) {
 	base := time.Date(2026, 1, 24, 12, 0, 0, 0, time.UTC)
 	createSubmission(t, env, user1.ID, ch1.ID, true, base.Add(2*time.Minute))
 	createSubmission(t, env, user2.ID, ch2.ID, true, base.Add(5*time.Minute))
+	createSubmission(t, env, admin.ID, ch2.ID, true, base.Add(5*time.Minute))
 	createSubmission(t, env, blocked.ID, ch1.ID, true, base.Add(6*time.Minute))
 
 	board, err := env.scoreSvc.Leaderboard(context.Background())
 	if err != nil {
 		t.Fatalf("Leaderboard: %v", err)
 	}
-	if len(board.Entries) != 2 {
-		t.Fatalf("expected 2 entries, got %d", len(board.Entries))
+	if len(board.Entries) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(board.Entries))
 	}
 
 	userScores := map[int64]int{}
@@ -59,6 +61,9 @@ func TestScoreboardServiceLeaderboardAndTimeline(t *testing.T) {
 	if userScores[user1.ID] == 0 || userScores[user2.ID] == 0 {
 		t.Fatalf("expected positive scores for both users, got %+v", userScores)
 	}
+	if userScores[admin.ID] == 0 {
+		t.Fatalf("expected positive score for admin, got %+v", userScores)
+	}
 	if _, ok := userScores[blocked.ID]; ok {
 		t.Fatalf("blocked user must be excluded from leaderboard")
 	}
@@ -67,7 +72,7 @@ func TestScoreboardServiceLeaderboardAndTimeline(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UserTimeline: %v", err)
 	}
-	if len(timeline) != 2 {
-		t.Fatalf("expected 2 timeline rows, got %d", len(timeline))
+	if len(timeline) != 3 {
+		t.Fatalf("expected 3 timeline rows, got %d", len(timeline))
 	}
 }

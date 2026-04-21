@@ -177,7 +177,7 @@ func TestChallengeRepoListActiveFilteredSort(t *testing.T) {
 		t.Fatalf("most_solved sort: %v", err)
 	}
 
-	if len(mostRows) != 4 || mostRows[0].ID != ch1.ID || mostRows[1].ID != ch4.ID || mostRows[2].ID != ch2.ID || mostRows[3].ID != ch3.ID {
+	if len(mostRows) != 4 || mostRows[0].ID != ch1.ID || mostRows[1].ID != ch4.ID || mostRows[2].ID != ch3.ID || mostRows[3].ID != ch2.ID {
 		t.Fatalf("unexpected most_solved order: %+v", mostRows)
 	}
 
@@ -186,7 +186,7 @@ func TestChallengeRepoListActiveFilteredSort(t *testing.T) {
 		t.Fatalf("least_solved sort: %v", err)
 	}
 
-	if len(leastRows) != 4 || leastRows[0].ID != ch3.ID || leastRows[1].ID != ch4.ID || leastRows[2].ID != ch2.ID || leastRows[3].ID != ch1.ID {
+	if len(leastRows) != 4 || leastRows[0].ID != ch4.ID || leastRows[1].ID != ch3.ID || leastRows[2].ID != ch2.ID || leastRows[3].ID != ch1.ID {
 		t.Fatalf("unexpected least_solved order: %+v", leastRows)
 	}
 }

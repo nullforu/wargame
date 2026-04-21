@@ -14,6 +14,7 @@ func TestScoreboardRepoLeaderboardAndTimeline(t *testing.T) {
 
 	user1 := createUserForTestUserScope(t, env, "u1@example.com", "u1", "pass", models.UserRole)
 	user2 := createUserForTestUserScope(t, env, "u2@example.com", "u2", "pass", models.UserRole)
+	admin := createUserForTestUserScope(t, env, "admin@example.com", "admin", "pass", models.AdminRole)
 	blocked := createUserForTestUserScope(t, env, "blocked@example.com", "blocked", "pass", models.BlockedRole)
 
 	ch1 := createChallenge(t, env, "ch1", 100, "FLAG{1}", true)
@@ -21,6 +22,7 @@ func TestScoreboardRepoLeaderboardAndTimeline(t *testing.T) {
 
 	createSubmission(t, env, user1.ID, ch1.ID, true, time.Now().Add(-3*time.Minute))
 	createSubmission(t, env, user1.ID, ch2.ID, true, time.Now().Add(-2*time.Minute))
+	createSubmission(t, env, admin.ID, ch2.ID, true, time.Now().Add(-90*time.Second))
 	createSubmission(t, env, user2.ID, ch2.ID, false, time.Now().Add(-time.Minute))
 	createSubmission(t, env, blocked.ID, ch1.ID, true, time.Now().Add(-30*time.Second))
 
@@ -28,8 +30,8 @@ func TestScoreboardRepoLeaderboardAndTimeline(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Leaderboard: %v", err)
 	}
-	if len(leaderboard.Entries) != 2 {
-		t.Fatalf("expected 2 leaderboard rows, got %d", len(leaderboard.Entries))
+	if len(leaderboard.Entries) != 3 {
+		t.Fatalf("expected 3 leaderboard rows, got %d", len(leaderboard.Entries))
 	}
 	if leaderboard.Entries[0].UserID != user1.ID {
 		t.Fatalf("unexpected first row: %+v", leaderboard.Entries[0])
@@ -43,7 +45,10 @@ func TestScoreboardRepoLeaderboardAndTimeline(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TimelineSubmissions: %v", err)
 	}
-	if len(rows) != 1 || rows[0].UserID != user1.ID {
+	if len(rows) != 2 {
+		t.Fatalf("unexpected timeline row count: %+v", rows)
+	}
+	if rows[0].UserID != user1.ID || rows[1].UserID != admin.ID {
 		t.Fatalf("unexpected timeline rows: %+v", rows)
 	}
 }

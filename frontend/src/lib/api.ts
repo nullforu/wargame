@@ -106,8 +106,6 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
         }
     }
 
-    const nonAdminUsers = (users: UsersResponse['users']) => users.filter((user) => String(user?.role ?? '').toLowerCase() !== 'admin')
-
     const withPagination = (path: string, page?: number, pageSize?: number) => {
         const params = new URLSearchParams()
         if (typeof page === 'number') params.set('page', String(page))
@@ -392,14 +390,14 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
         users: async (page?: number, pageSize?: number) => {
             const data = await request<UsersResponse>(withPagination(`/api/users`, page, pageSize))
             return {
-                users: nonAdminUsers(Array.isArray(data?.users) ? data.users : []),
+                users: Array.isArray(data?.users) ? data.users : [],
                 pagination: normalizePagination(data?.pagination),
             } as UsersResponse
         },
         searchUsers: async (q: string, page?: number, pageSize?: number) => {
             const data = await request<UsersResponse>(withSearchAndPagination(`/api/users/search`, q, page, pageSize))
             return {
-                users: nonAdminUsers(Array.isArray(data?.users) ? data.users : []),
+                users: Array.isArray(data?.users) ? data.users : [],
                 pagination: normalizePagination(data?.pagination),
             } as UsersResponse
         },
