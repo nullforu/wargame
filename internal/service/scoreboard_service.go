@@ -18,13 +18,18 @@ func NewScoreboardService(scoreRepo *repo.ScoreboardRepo) *ScoreboardService {
 	return &ScoreboardService{repo: scoreRepo}
 }
 
-func (s *ScoreboardService) Leaderboard(ctx context.Context) (models.LeaderboardResponse, error) {
-	rows, err := s.repo.Leaderboard(ctx)
+func (s *ScoreboardService) Leaderboard(ctx context.Context, page, pageSize int) (models.LeaderboardResponse, models.Pagination, error) {
+	params, err := NormalizePagination(page, pageSize)
 	if err != nil {
-		return models.LeaderboardResponse{}, fmt.Errorf("scoreboard.Leaderboard: %w", err)
+		return models.LeaderboardResponse{}, models.Pagination{}, err
 	}
 
-	return rows, nil
+	rows, totalCount, err := s.repo.Leaderboard(ctx, params.Page, params.PageSize)
+	if err != nil {
+		return models.LeaderboardResponse{}, models.Pagination{}, fmt.Errorf("scoreboard.Leaderboard: %w", err)
+	}
+
+	return rows, BuildPagination(params.Page, params.PageSize, totalCount), nil
 }
 
 func (s *ScoreboardService) UserTimeline(ctx context.Context, since *time.Time) ([]models.TimelineSubmission, error) {

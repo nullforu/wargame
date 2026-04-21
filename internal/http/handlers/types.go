@@ -241,6 +241,12 @@ type timelineResponse struct {
 	Submissions []models.TimelineSubmission `json:"submissions"`
 }
 
+type leaderboardListResponse struct {
+	Challenges []models.LeaderboardChallenge `json:"challenges"`
+	Entries    []models.LeaderboardEntry     `json:"entries"`
+	Pagination models.Pagination             `json:"pagination"`
+}
+
 type stackResponse struct {
 	StackID           string                 `json:"stack_id"`
 	ChallengeID       int64                  `json:"challenge_id"`

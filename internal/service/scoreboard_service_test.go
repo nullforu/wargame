@@ -46,12 +46,15 @@ func TestScoreboardServiceLeaderboardAndTimeline(t *testing.T) {
 	createSubmission(t, env, admin.ID, ch2.ID, true, base.Add(5*time.Minute))
 	createSubmission(t, env, blocked.ID, ch1.ID, true, base.Add(6*time.Minute))
 
-	board, err := env.scoreSvc.Leaderboard(context.Background())
+	board, pagination, err := env.scoreSvc.Leaderboard(context.Background(), 1, 20)
 	if err != nil {
 		t.Fatalf("Leaderboard: %v", err)
 	}
 	if len(board.Entries) != 3 {
 		t.Fatalf("expected 3 entries, got %d", len(board.Entries))
+	}
+	if pagination.TotalCount != 3 || pagination.Page != 1 || pagination.PageSize != 20 {
+		t.Fatalf("unexpected pagination: %+v", pagination)
 	}
 
 	userScores := map[int64]int{}
@@ -74,5 +77,12 @@ func TestScoreboardServiceLeaderboardAndTimeline(t *testing.T) {
 	}
 	if len(timeline) != 3 {
 		t.Fatalf("expected 3 timeline rows, got %d", len(timeline))
+	}
+}
+
+func TestScoreboardServiceLeaderboardPaginationValidation(t *testing.T) {
+	env := setupServiceTest(t)
+	if _, _, err := env.scoreSvc.Leaderboard(context.Background(), -1, 10); err == nil {
+		t.Fatalf("expected invalid pagination error")
 	}
 }

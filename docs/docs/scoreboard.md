@@ -5,7 +5,7 @@ nav_order: 5
 
 ## Get Leaderboard
 
-`GET /api/leaderboard`
+`GET /api/leaderboard?page=1&page_size=20`
 
 Response 200
 
@@ -32,7 +32,15 @@ Response 200
                 }
             ]
         }
-    ]
+    ],
+    "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total_count": 37,
+        "total_pages": 2,
+        "has_prev": false,
+        "has_next": true
+    }
 }
 ```
 
@@ -40,6 +48,7 @@ Notes:
 
 - Users are sorted by score (descending).
 - Blocked users are excluded from score and solve aggregation.
+- Pagination applies to leaderboard entries. Challenge columns are returned in full for matrix rendering.
 
 ---
 

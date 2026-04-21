@@ -27,20 +27,27 @@ func TestScoreboard(t *testing.T) {
 	createSubmission(t, env, admin.ID, challenge2.ID, true, time.Now().UTC())
 	createSubmission(t, env, blocked.ID, challenge2.ID, true, time.Now().UTC())
 
-	rec := doRequest(t, env.router, http.MethodGet, "/api/leaderboard", nil, nil)
+	rec := doRequest(t, env.router, http.MethodGet, "/api/leaderboard?page=1&page_size=2", nil, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var resp models.LeaderboardResponse
+	var resp struct {
+		Challenges []models.LeaderboardChallenge `json:"challenges"`
+		Entries    []models.LeaderboardEntry     `json:"entries"`
+		Pagination models.Pagination             `json:"pagination"`
+	}
 	decodeJSON(t, rec, &resp)
 
-	if len(resp.Entries) != 3 {
-		t.Fatalf("expected 3 rows, got %d", len(resp.Entries))
+	if len(resp.Entries) != 2 {
+		t.Fatalf("expected 2 rows on first page, got %d", len(resp.Entries))
 	}
 
 	if resp.Entries[0].UserID != user2.ID || resp.Entries[0].Score != 300 {
 		t.Fatalf("unexpected first row: %+v", resp.Entries[0])
+	}
+	if resp.Pagination.TotalCount != 3 || !resp.Pagination.HasNext {
+		t.Fatalf("unexpected pagination: %+v", resp.Pagination)
 	}
 }
 
@@ -118,12 +125,16 @@ func TestScoreboardFixedScoring(t *testing.T) {
 	createSubmission(t, env, admin.ID, challenge.ID, true, time.Now().UTC())
 	createSubmission(t, env, blocked.ID, challenge.ID, true, time.Now().UTC())
 
-	rec := doRequest(t, env.router, http.MethodGet, "/api/leaderboard", nil, nil)
+	rec := doRequest(t, env.router, http.MethodGet, "/api/leaderboard?page=1&page_size=10", nil, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var resp models.LeaderboardResponse
+	var resp struct {
+		Challenges []models.LeaderboardChallenge `json:"challenges"`
+		Entries    []models.LeaderboardEntry     `json:"entries"`
+		Pagination models.Pagination             `json:"pagination"`
+	}
 	decodeJSON(t, rec, &resp)
 
 	if len(resp.Entries) != 3 {
@@ -132,5 +143,13 @@ func TestScoreboardFixedScoring(t *testing.T) {
 
 	if resp.Entries[0].Score != 500 || resp.Entries[1].Score != 500 {
 		t.Fatalf("expected fixed scores 500, got %+v", resp.Entries)
+	}
+}
+
+func TestScoreboardLeaderboardInvalidPagination(t *testing.T) {
+	env := setupTest(t, testCfg)
+	rec := doRequest(t, env.router, http.MethodGet, "/api/leaderboard?page=bad&page_size=10", nil, nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

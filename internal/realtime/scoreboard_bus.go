@@ -37,7 +37,7 @@ type ScoreboardBus struct {
 }
 
 type ScoreboardReader interface {
-	Leaderboard(ctx context.Context) (models.LeaderboardResponse, error)
+	Leaderboard(ctx context.Context, page, pageSize int) (models.LeaderboardResponse, models.Pagination, error)
 	UserTimeline(ctx context.Context, since *time.Time) ([]models.TimelineSubmission, error)
 }
 
@@ -165,7 +165,7 @@ func randomToken() string {
 }
 
 func (b *ScoreboardBus) rebuildCaches(ctx context.Context) error {
-	leaderboard, err := b.score.Leaderboard(ctx)
+	leaderboard, pagination, err := b.score.Leaderboard(ctx, 1, 20)
 	if err != nil {
 		return err
 	}
@@ -174,7 +174,16 @@ func (b *ScoreboardBus) rebuildCaches(ctx context.Context) error {
 		return err
 	}
 
-	if err := b.storeJSON(ctx, "leaderboard:users", leaderboard, b.cfg.Cache.LeaderboardTTL); err != nil {
+	leaderboardResp := struct {
+		Challenges []models.LeaderboardChallenge `json:"challenges"`
+		Entries    []models.LeaderboardEntry     `json:"entries"`
+		Pagination models.Pagination             `json:"pagination"`
+	}{
+		Challenges: leaderboard.Challenges,
+		Entries:    leaderboard.Entries,
+		Pagination: pagination,
+	}
+	if err := b.storeJSON(ctx, "leaderboard:users:page:1:size:20", leaderboardResp, b.cfg.Cache.LeaderboardTTL); err != nil {
 		return err
 	}
 	userTimelineResp := struct {

@@ -104,7 +104,7 @@ func TestScoreboardBusHandleEventSkipsWhenLocked(t *testing.T) {
 	}
 
 	bus.handleEvent(ctx, ScoreboardEvent{Scope: "all"})
-	if exists, err := client.Exists(ctx, "leaderboard:users").Result(); err != nil {
+	if exists, err := client.Exists(ctx, "leaderboard:users:page:1:size:20").Result(); err != nil {
 		t.Fatalf("check leaderboard cache: %v", err)
 	} else if exists != 0 {
 		t.Fatalf("expected no leaderboard cache to be rebuilt while locked")
@@ -113,13 +113,17 @@ func TestScoreboardBusHandleEventSkipsWhenLocked(t *testing.T) {
 
 type fakeScoreboard struct {
 	leaderboard     models.LeaderboardResponse
+	leaderboardPage models.Pagination
 	userTimeline    []models.TimelineSubmission
 	leaderboardErr  error
 	userTimelineErr error
 }
 
-func (f *fakeScoreboard) Leaderboard(ctx context.Context) (models.LeaderboardResponse, error) {
-	return f.leaderboard, f.leaderboardErr
+func (f *fakeScoreboard) Leaderboard(ctx context.Context, page, pageSize int) (models.LeaderboardResponse, models.Pagination, error) {
+	if f.leaderboardPage.Page == 0 {
+		f.leaderboardPage = models.Pagination{Page: page, PageSize: pageSize}
+	}
+	return f.leaderboard, f.leaderboardPage, f.leaderboardErr
 }
 
 func (f *fakeScoreboard) UserTimeline(ctx context.Context, since *time.Time) ([]models.TimelineSubmission, error) {
@@ -137,7 +141,7 @@ func TestScoreboardBusHandleEventRebuildsCaches(t *testing.T) {
 	ctx := context.Background()
 	bus.handleEvent(ctx, ScoreboardEvent{Scope: "all", Reason: "test"})
 
-	if _, err := client.Get(ctx, "leaderboard:users").Result(); err != nil {
+	if _, err := client.Get(ctx, "leaderboard:users:page:1:size:20").Result(); err != nil {
 		t.Fatalf("expected leaderboard cache, got %v", err)
 	}
 	if _, err := client.Get(ctx, "timeline:users").Result(); err != nil {
@@ -155,7 +159,7 @@ func TestScoreboardBusHandleEventRebuildFails(t *testing.T) {
 
 	ctx := context.Background()
 	bus.handleEvent(ctx, ScoreboardEvent{Scope: "all", Reason: "test"})
-	if exists, err := client.Exists(ctx, "leaderboard:users").Result(); err != nil {
+	if exists, err := client.Exists(ctx, "leaderboard:users:page:1:size:20").Result(); err != nil {
 		t.Fatalf("check leaderboard cache: %v", err)
 	} else if exists != 0 {
 		t.Fatalf("unexpected leaderboard cache on rebuild failure")
@@ -203,7 +207,7 @@ func TestScoreboardBusRunDebounce(t *testing.T) {
 	if err := client.Publish(ctx, scoreboardEventsChannel, `{"scope":"all","reason":"b"}`).Err(); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
-	waitForRedisKey(t, client, "leaderboard:users", time.Second)
+	waitForRedisKey(t, client, "leaderboard:users:page:1:size:20", time.Second)
 }
 
 func waitForRedisKey(t *testing.T, client *redis.Client, key string, timeout time.Duration) {

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -874,19 +875,31 @@ func (h *Handler) DeleteChallengeFile(ctx *gin.Context) {
 }
 
 func (h *Handler) Leaderboard(ctx *gin.Context) {
-	cacheKey := "leaderboard:users"
-	if h.respondFromCache(ctx, cacheKey) {
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
 		return
 	}
 
-	rows, err := h.score.Leaderboard(ctx.Request.Context())
+	params, err := service.NormalizePagination(page, pageSize)
 	if err != nil {
 		writeError(ctx, err)
 		return
 	}
 
-	h.storeCache(ctx, cacheKey, rows, h.cfg.Cache.LeaderboardTTL)
-	ctx.JSON(http.StatusOK, rows)
+	cacheKey := fmt.Sprintf("leaderboard:users:page:%d:size:%d", params.Page, params.PageSize)
+	if h.respondFromCache(ctx, cacheKey) {
+		return
+	}
+
+	rows, pagination, err := h.score.Leaderboard(ctx.Request.Context(), params.Page, params.PageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	response := leaderboardListResponse{Challenges: rows.Challenges, Entries: rows.Entries, Pagination: pagination}
+	h.storeCache(ctx, cacheKey, response, h.cfg.Cache.LeaderboardTTL)
+	ctx.JSON(http.StatusOK, response)
 }
 
 func (h *Handler) Timeline(ctx *gin.Context) {

@@ -26,9 +26,12 @@ func TestScoreboardRepoLeaderboardAndTimeline(t *testing.T) {
 	createSubmission(t, env, user2.ID, ch2.ID, false, time.Now().Add(-time.Minute))
 	createSubmission(t, env, blocked.ID, ch1.ID, true, time.Now().Add(-30*time.Second))
 
-	leaderboard, err := scoreRepo.Leaderboard(context.Background())
+	leaderboard, totalCount, err := scoreRepo.Leaderboard(context.Background(), 1, 20)
 	if err != nil {
 		t.Fatalf("Leaderboard: %v", err)
+	}
+	if totalCount != 3 {
+		t.Fatalf("expected total count 3, got %d", totalCount)
 	}
 	if len(leaderboard.Entries) != 3 {
 		t.Fatalf("expected 3 leaderboard rows, got %d", len(leaderboard.Entries))
@@ -63,14 +66,52 @@ func TestScoreboardRepoLeaderboardTieBreak(t *testing.T) {
 	createSubmission(t, env, user1.ID, ch.ID, true, time.Now().UTC())
 	createSubmission(t, env, user2.ID, ch.ID, true, time.Now().UTC())
 
-	rows, err := scoreRepo.Leaderboard(context.Background())
+	rows, totalCount, err := scoreRepo.Leaderboard(context.Background(), 1, 10)
 	if err != nil {
 		t.Fatalf("Leaderboard: %v", err)
+	}
+	if totalCount != 2 {
+		t.Fatalf("expected total count 2, got %d", totalCount)
 	}
 	if len(rows.Entries) != 2 {
 		t.Fatalf("expected 2 rows, got %d", len(rows.Entries))
 	}
 	if rows.Entries[0].UserID != user1.ID {
 		t.Fatalf("expected lower id first, got %+v", rows.Entries)
+	}
+}
+
+func TestScoreboardRepoLeaderboardPagination(t *testing.T) {
+	env := setupRepoTest(t)
+	scoreRepo := NewScoreboardRepo(env.db)
+
+	user1 := createUserForTestUserScope(t, env, "u1@example.com", "u1", "pass", models.UserRole)
+	user2 := createUserForTestUserScope(t, env, "u2@example.com", "u2", "pass", models.UserRole)
+	user3 := createUserForTestUserScope(t, env, "u3@example.com", "u3", "pass", models.UserRole)
+	ch := createChallenge(t, env, "ch1", 100, "FLAG{1}", true)
+	createSubmission(t, env, user1.ID, ch.ID, true, time.Now().UTC())
+	createSubmission(t, env, user2.ID, ch.ID, true, time.Now().UTC())
+	_ = user3
+
+	page1, totalCount, err := scoreRepo.Leaderboard(context.Background(), 1, 2)
+	if err != nil {
+		t.Fatalf("Leaderboard page1: %v", err)
+	}
+	if totalCount != 3 {
+		t.Fatalf("expected total count 3, got %d", totalCount)
+	}
+	if len(page1.Entries) != 2 {
+		t.Fatalf("expected 2 rows in page1, got %d", len(page1.Entries))
+	}
+
+	page2, _, err := scoreRepo.Leaderboard(context.Background(), 2, 2)
+	if err != nil {
+		t.Fatalf("Leaderboard page2: %v", err)
+	}
+	if len(page2.Entries) != 1 {
+		t.Fatalf("expected 1 row in page2, got %d", len(page2.Entries))
+	}
+	if page2.Entries[0].UserID != user3.ID {
+		t.Fatalf("unexpected page2 row: %+v", page2.Entries[0])
 	}
 }
