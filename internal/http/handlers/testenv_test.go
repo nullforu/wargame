@@ -4,15 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
 	"wargame/internal/auth"
 	"wargame/internal/config"
 	"wargame/internal/db"
+	"wargame/internal/http/middleware"
 	"wargame/internal/models"
 	"wargame/internal/repo"
 	"wargame/internal/service"
@@ -618,6 +621,410 @@ func TestHandlerListChallengesAndUsers(t *testing.T) {
 		env.handler.ListChallenges(ctx)
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("expected 400, got %d", rec.Code)
+		}
+	})
+}
+
+func TestParseIDParam(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges/12", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "12"))
+		id, ok := parseIDParam(ctx, "id")
+		if !ok || id != 12 {
+			t.Fatalf("unexpected parse result id=%d ok=%v", id, ok)
+		}
+	})
+
+	t.Run("missing", func(t *testing.T) {
+		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
+		if _, ok := parseIDParam(ctx, "id"); ok {
+			t.Fatalf("expected failure")
+		}
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges/abc", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "abc"))
+		if _, ok := parseIDParam(ctx, "id"); ok {
+			t.Fatalf("expected failure")
+		}
+	})
+}
+
+func TestParseIDParamOrError(t *testing.T) {
+	ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/abc", nil)
+	ctx.Params = append(ctx.Params, ginParam("id", "abc"))
+	if _, ok := parseIDParamOrError(ctx, "id"); ok {
+		t.Fatalf("expected failure")
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestOptionalUserID(t *testing.T) {
+	env := setupHandlerTest(t)
+
+	t.Run("no authorization header", func(t *testing.T) {
+		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
+		if got := env.handler.optionalUserID(ctx); got != 0 {
+			t.Fatalf("expected 0, got %d", got)
+		}
+	})
+
+	t.Run("invalid bearer format", func(t *testing.T) {
+		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
+		ctx.Request.Header.Set("Authorization", "Bad token")
+		if got := env.handler.optionalUserID(ctx); got != 0 {
+			t.Fatalf("expected 0, got %d", got)
+		}
+	})
+
+	t.Run("valid access token", func(t *testing.T) {
+		token, err := auth.GenerateAccessToken(env.cfg.JWT, 777, models.UserRole)
+		if err != nil {
+			t.Fatalf("GenerateAccessToken: %v", err)
+		}
+
+		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
+		ctx.Request.Header.Set("Authorization", "Bearer "+token)
+		if got := env.handler.optionalUserID(ctx); got != 777 {
+			t.Fatalf("expected 777, got %d", got)
+		}
+	})
+}
+
+func TestHandlerGetChallengeAndSolvers(t *testing.T) {
+	env := setupHandlerTest(t)
+	user := createHandlerUser(t, env, "detail@example.com", "detail-user", "pass", models.UserRole)
+
+	prev := createHandlerChallenge(t, env, "Detail Prev", 100, "FLAG{PREV}", true)
+	locked := createHandlerChallenge(t, env, "Detail Locked", 200, "FLAG{LOCKED}", true)
+	locked.PreviousChallengeID = &prev.ID
+	if err := env.challengeRepo.Update(context.Background(), locked); err != nil {
+		t.Fatalf("update locked challenge: %v", err)
+	}
+
+	token, _, _, err := env.authSvc.Login(context.Background(), user.Email, "pass")
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	t.Run("get challenge invalid id", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/abc", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "abc"))
+		env.handler.GetChallenge(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("get challenge locked response", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(locked.ID), nil)
+		ctx.Request.Header.Set("Authorization", "Bearer "+token)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(locked.ID)))
+		env.handler.GetChallenge(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var resp lockedChallengeResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if !resp.IsLocked {
+			t.Fatalf("expected locked response")
+		}
+		if resp.PreviousChallengeID == nil || *resp.PreviousChallengeID != prev.ID {
+			t.Fatalf("unexpected previous challenge in response: %+v", resp)
+		}
+	})
+
+	t.Run("challenge solvers invalid id", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/abc/solvers", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "abc"))
+		env.handler.ChallengeSolvers(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("challenge solvers success", func(t *testing.T) {
+		now := time.Now().UTC()
+		createHandlerSubmission(t, env, user.ID, prev.ID, true, now.Add(-time.Minute))
+
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(prev.ID)+"/solvers?page=1&page_size=10", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(prev.ID)))
+		env.handler.ChallengeSolvers(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var resp challengeSolversResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if len(resp.Solvers) != 1 || resp.Solvers[0].UserID != user.ID {
+			t.Fatalf("unexpected solvers response: %+v", resp)
+		}
+	})
+}
+
+func TestHandlerGetUserSolved(t *testing.T) {
+	env := setupHandlerTest(t)
+	user := createHandlerUser(t, env, "solved@example.com", "solved-user", "pass", models.UserRole)
+	challenge := createHandlerChallenge(t, env, "Solved Challenge", 100, "FLAG{SOLVED}", true)
+	createHandlerSubmission(t, env, user.ID, challenge.ID, true, time.Now().UTC())
+
+	t.Run("invalid user id", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/users/abc/solved", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "abc"))
+		env.handler.GetUserSolved(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("success", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/users/"+toStringID(user.ID)+"/solved?page=1&page_size=10", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(user.ID)))
+		env.handler.GetUserSolved(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var resp userSolvedListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if len(resp.Solved) != 1 || resp.Solved[0].ChallengeID != challenge.ID {
+			t.Fatalf("unexpected solved response: %+v", resp)
+		}
+	})
+}
+
+func TestRequireNonNullOptionalStringAndPointer(t *testing.T) {
+	t.Run("unset", func(t *testing.T) {
+		val, err := requireNonNullOptionalString("title", optionalString{})
+		if err != nil || val != nil {
+			t.Fatalf("unexpected result val=%v err=%v", val, err)
+		}
+	})
+
+	t.Run("set null invalid", func(t *testing.T) {
+		_, err := requireNonNullOptionalString("title", optionalString{Set: true, Value: nil})
+		if !errorsIsInvalidInput(err) {
+			t.Fatalf("expected validation error, got %v", err)
+		}
+	})
+
+	t.Run("optionalStringToPointer", func(t *testing.T) {
+		if optionalStringToPointer(optionalString{}) != nil {
+			t.Fatalf("expected nil for unset")
+		}
+		empty := optionalStringToPointer(optionalString{Set: true, Value: nil})
+		if empty == nil || *empty != "" {
+			t.Fatalf("expected empty pointer, got %+v", empty)
+		}
+		value := "ok"
+		got := optionalStringToPointer(optionalString{Set: true, Value: &value})
+		if got == nil || *got != value {
+			t.Fatalf("expected value pointer, got %+v", got)
+		}
+	})
+}
+
+func ginParam(key, value string) gin.Param {
+	return gin.Param{Key: key, Value: value}
+}
+
+func toStringID(id int64) string {
+	return strconv.FormatInt(id, 10)
+}
+
+func errorsIsInvalidInput(err error) bool {
+	var ve *service.ValidationError
+	return err != nil && errors.As(err, &ve)
+}
+
+func TestHandlerCacheHelpers(t *testing.T) {
+	env := setupHandlerTest(t)
+
+	t.Run("respond from cache", func(t *testing.T) {
+		key := "cache:test:respond"
+		want := `{"ok":true}`
+		if err := env.redis.Set(context.Background(), key, want, time.Minute).Err(); err != nil {
+			t.Fatalf("seed cache: %v", err)
+		}
+
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/leaderboard", nil)
+		if !env.handler.respondFromCache(ctx, key) {
+			t.Fatalf("expected cache hit")
+		}
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", rec.Code)
+		}
+		if rec.Body.String() != want {
+			t.Fatalf("unexpected cached body: %s", rec.Body.String())
+		}
+	})
+
+	t.Run("store and invalidate cache", func(t *testing.T) {
+		if err := env.redis.Set(context.Background(), "leaderboard:users:stale", "stale", time.Minute).Err(); err != nil {
+			t.Fatalf("seed stale cache: %v", err)
+		}
+
+		ctx, _ := newJSONContext(t, http.MethodGet, "/api/leaderboard", nil)
+		env.handler.storeCache(ctx, "leaderboard:users:fresh", map[string]bool{"ok": true}, time.Minute)
+		if got, err := env.redis.Get(context.Background(), "leaderboard:users:fresh").Result(); err != nil || got == "" {
+			t.Fatalf("expected stored cache, got %q err %v", got, err)
+		}
+
+		env.handler.invalidateCacheByPrefix(context.Background(), "leaderboard:users:")
+		if exists, err := env.redis.Exists(context.Background(), "leaderboard:users:stale", "leaderboard:users:fresh").Result(); err != nil {
+			t.Fatalf("exists check: %v", err)
+		} else if exists != 0 {
+			t.Fatalf("expected caches invalidated, exists=%d", exists)
+		}
+	})
+
+	t.Run("notify scoreboard changed", func(t *testing.T) {
+		sub := env.redis.Subscribe(context.Background(), "scoreboard.events")
+		defer sub.Close()
+
+		env.handler.notifyScoreboardChanged(context.Background(), "test")
+		msg, err := sub.ReceiveMessage(context.Background())
+		if err != nil {
+			t.Fatalf("receive message: %v", err)
+		}
+
+		var payload struct {
+			Scope  string    `json:"scope"`
+			Reason string    `json:"reason"`
+			TS     time.Time `json:"ts"`
+		}
+		if err := json.Unmarshal([]byte(msg.Payload), &payload); err != nil {
+			t.Fatalf("decode payload: %v", err)
+		}
+		if payload.Scope != "all" || payload.Reason != "test" || payload.TS.IsZero() {
+			t.Fatalf("unexpected payload: %+v", payload)
+		}
+	})
+}
+
+func TestHandlerLeaderboardAndTimeline(t *testing.T) {
+	env := setupHandlerTest(t)
+
+	user1 := createHandlerUser(t, env, "lb1@example.com", "lb1", "pass", models.UserRole)
+	user2 := createHandlerUser(t, env, "lb2@example.com", "lb2", "pass", models.UserRole)
+	ch1 := createHandlerChallenge(t, env, "LB Ch1", 100, "FLAG{LB1}", true)
+	ch2 := createHandlerChallenge(t, env, "LB Ch2", 200, "FLAG{LB2}", true)
+
+	now := time.Now().UTC()
+	createHandlerSubmission(t, env, user1.ID, ch1.ID, true, now.Add(-2*time.Minute))
+	createHandlerSubmission(t, env, user2.ID, ch2.ID, true, now.Add(-time.Minute))
+
+	t.Run("leaderboard pagination response", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/leaderboard?page=1&page_size=1", nil)
+		env.handler.Leaderboard(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var resp leaderboardListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if len(resp.Entries) != 1 || resp.Pagination.TotalCount != 2 || !resp.Pagination.HasNext {
+			t.Fatalf("unexpected leaderboard response: %+v", resp)
+		}
+	})
+
+	t.Run("timeline response", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/timeline", nil)
+		env.handler.Timeline(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var resp timelineResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if len(resp.Submissions) < 1 {
+			t.Fatalf("expected submissions, got %+v", resp)
+		}
+	})
+}
+
+func TestHandlerAuthMeUpdateFlow(t *testing.T) {
+	env := setupHandlerTest(t)
+
+	t.Run("register/login/refresh/logout", func(t *testing.T) {
+		registerBody := []byte(`{"email":"flow@example.com","username":"flow-user","password":"pass1234"}`)
+		ctx, rec := newJSONContext(t, http.MethodPost, "/api/register", registerBody)
+		env.handler.Register(ctx)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("register status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		loginBody := []byte(`{"email":"flow@example.com","password":"pass1234"}`)
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/login", loginBody)
+		env.handler.Login(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("login status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var loginResp loginResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &loginResp); err != nil {
+			t.Fatalf("decode login: %v", err)
+		}
+		if loginResp.AccessToken == "" || loginResp.RefreshToken == "" {
+			t.Fatalf("expected tokens in login response: %+v", loginResp)
+		}
+
+		refreshBody := []byte(`{"refresh_token":"` + loginResp.RefreshToken + `"}`)
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/refresh", refreshBody)
+		env.handler.Refresh(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("refresh status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/logout", refreshBody)
+		env.handler.Logout(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("logout status %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("me and update me", func(t *testing.T) {
+		user := createHandlerUser(t, env, "me@example.com", "me-user", "pass", models.UserRole)
+
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/me", nil)
+		ctx.Set("userID", user.ID)
+		env.handler.Me(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("me status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		updateBody := []byte(`{"username":"me-user-updated"}`)
+		ctx, rec = newJSONContext(t, http.MethodPut, "/api/me", updateBody)
+		ctx.Set("userID", user.ID)
+		env.handler.UpdateMe(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("update me status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		updated, err := env.userRepo.GetByID(context.Background(), user.ID)
+		if err != nil {
+			t.Fatalf("get updated user: %v", err)
+		}
+		if updated.Username != "me-user-updated" {
+			t.Fatalf("expected updated username, got %q", updated.Username)
+		}
+
+		if middleware.UserID(ctx) != user.ID {
+			t.Fatalf("expected middleware user id %d", user.ID)
 		}
 	})
 }

@@ -25,7 +25,7 @@ type leaderboardChallengeRow struct {
 	Points   int    `bun:"points"`
 }
 
-func (r *ScoreboardRepo) leaderboardChallenges(ctx context.Context) ([]models.LeaderboardChallenge, map[int64]int, error) {
+func (r *ScoreboardRepo) leaderboardChallenges(ctx context.Context) ([]models.LeaderboardChallenge, error) {
 	rows := make([]leaderboardChallengeRow, 0)
 	if err := r.db.NewSelect().
 		TableExpr("challenges AS c").
@@ -35,22 +35,19 @@ func (r *ScoreboardRepo) leaderboardChallenges(ctx context.Context) ([]models.Le
 		ColumnExpr("c.points AS points").
 		OrderExpr("c.id ASC").
 		Scan(ctx, &rows); err != nil {
-		return nil, nil, wrapError("scoreboardRepo.leaderboardChallenges", err)
+		return nil, wrapError("scoreboardRepo.leaderboardChallenges", err)
 	}
 
-	pointsMap := make(map[int64]int, len(rows))
 	challenges := make([]models.LeaderboardChallenge, 0, len(rows))
 	for _, row := range rows {
-		points := row.Points
-		pointsMap[row.ID] = points
-		challenges = append(challenges, models.LeaderboardChallenge{ID: row.ID, Title: row.Title, Category: row.Category, Points: points})
+		challenges = append(challenges, models.LeaderboardChallenge{ID: row.ID, Title: row.Title, Category: row.Category, Points: row.Points})
 	}
 
-	return challenges, pointsMap, nil
+	return challenges, nil
 }
 
 func (r *ScoreboardRepo) Leaderboard(ctx context.Context, page, pageSize int) (models.LeaderboardResponse, int, error) {
-	challenges, _, err := r.leaderboardChallenges(ctx)
+	challenges, err := r.leaderboardChallenges(ctx)
 	if err != nil {
 		return models.LeaderboardResponse{}, 0, wrapError("scoreboardRepo.Leaderboard", err)
 	}

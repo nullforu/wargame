@@ -16,10 +16,10 @@ type PaginationParams struct {
 func NormalizePagination(page, pageSize int) (PaginationParams, error) {
 	validator := newFieldValidator()
 	if page < 0 {
-		validator.fields = append(validator.fields, FieldError{Field: "page", Reason: "must be >= 1"})
+		validator.fields = append(validator.fields, FieldError{Field: "page", Reason: "must be >= 0"})
 	}
 	if pageSize < 0 {
-		validator.fields = append(validator.fields, FieldError{Field: "page_size", Reason: "must be >= 1"})
+		validator.fields = append(validator.fields, FieldError{Field: "page_size", Reason: "must be >= 0"})
 	}
 
 	if page == 0 {
