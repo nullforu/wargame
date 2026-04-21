@@ -7,6 +7,7 @@ import { useApi } from '../lib/useApi'
 import { CHALLENGE_CATEGORIES } from '../lib/constants'
 import { useAuth } from '../lib/auth'
 import { navigate } from '../lib/router'
+import UserAvatar from '../components/UserAvatar'
 
 interface RouteProps {
     routeParams?: Record<string, string>
@@ -44,7 +45,7 @@ const PRIMARY_CHALLENGE_CATEGORIES = ['Web', 'Pwnable', 'Reversing', 'Crypto', '
 const PRIMARY_CATEGORY_SET = new Set<string>(PRIMARY_CHALLENGE_CATEGORIES)
 const EXTRA_CHALLENGE_CATEGORIES = CHALLENGE_CATEGORIES.filter((category) => !PRIMARY_CATEGORY_SET.has(category))
 
-const DifficultyBadge = ({ level, active }: { level: number; active?: boolean }) => {
+export const DifficultyBadge = ({ level, active }: { level: number; active?: boolean }) => {
     return (
         <span
             className={`
@@ -230,7 +231,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
         <section className='animate space-y-4'>
             <div className='grid gap-4 lg:grid-cols-[1.9fr_0.9fr]'>
                 <div className='space-y-3'>
-                    <div className='space-y-2 bg-transparent shadow-none md:bg-surface md:p-3 dark:bg-surface'>
+                    <div className='space-y-2 shadow-none md:p-3'>
                         <div className='flex items-center gap-2 mb-4'>
                             <div className='relative flex-1'>
                                 <span className='pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle dark:text-text-subtle'>⌕</span>
@@ -382,7 +383,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                         <div className='relative' ref={sortMenuRef}>
                             <button
                                 type='button'
-                                className='inline-flex min-w-28 items-center justify-between gap-2 rounded-md border border-accent/60 bg-surface px-3 py-1.5 text-xs text-text'
+                                className='inline-flex min-w-28 items-center justify-between gap-2 rounded-md border border-accent/20 px-3 py-1.5 text-xs text-text'
                                 onClick={() => setIsSortMenuOpen((prev) => !prev)}
                                 aria-haspopup='menu'
                                 aria-expanded={isSortMenuOpen}
@@ -415,7 +416,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                         </div>
                     </div>
 
-                    <div className='-mx-4 md:mx-0 overflow-hidden rounded-none md:rounded-xl bg-transparent md:bg-surface md:shadow-sm'>
+                    <div className='-mx-4 md:mx-0 overflow-hidden rounded-none md:rounded-xl bg-transparent'>
                         {loading ? (
                             <div className='px-4 py-8 text-sm text-text-muted'>{t('common.loading')}</div>
                         ) : errorMessage ? (
@@ -425,7 +426,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                         ) : (
                             <div className='overflow-x-auto'>
                                 <div className='min-w-150'>
-                                    <div className='grid grid-cols-[minmax(160px,2fr)_1fr_70px_100px] sm:grid-cols-[minmax(200px,2fr)_1fr_80px_110px] lg:grid-cols-[minmax(220px,2fr)_1fr_90px_120px] bg-surface-muted px-4 py-2 text-[12px] text-text-muted'>
+                                    <div className='grid grid-cols-[minmax(160px,2fr)_1fr_70px_100px] sm:grid-cols-[minmax(200px,2fr)_1fr_80px_110px] lg:grid-cols-[minmax(220px,2fr)_1fr_90px_120px] bg-surface px-4 py-2 text-[12px] text-text-muted'>
                                         <span>{t('challenges.tableProblem')}</span>
                                         <span>{t('common.category')}</span>
                                         <span>{t('challenges.tableSolveCount')}</span>
@@ -544,10 +545,11 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                 topUsers.map((entry, index) => (
                                     <button
                                         key={`top-user-${entry.username}-${index}`}
-                                        className='flex w-full items-center gap-3 rounded px-3 py-2 text-left hover:bg-surface-muted dark:hover:bg-surface-muted'
+                                        className='flex w-full items-center gap-2.75 rounded px-3 py-2 text-left hover:bg-surface-muted dark:hover:bg-surface-muted'
                                         onClick={() => navigate(`/users/${entry.user_id}`)}
                                     >
                                         <span className='text-xs text-text-subtle'>#{index + 1}</span>
+                                        <UserAvatar username={entry.username} size='sm' />
                                         <span className='text-sm font-semibold text-text'>{entry.username}</span>
                                         <span className='ml-auto text-xs text-text-muted'>{t('common.pointsShort', { points: entry.score })}</span>
                                     </button>

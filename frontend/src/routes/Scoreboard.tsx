@@ -20,7 +20,6 @@ const Scoreboard = ({ routeParams = {} }: RouteProps) => {
     return (
         <section className='animate space-y-4'>
             <h2 className='text-2xl font-semibold text-text'>{t('scoreboard.title')}</h2>
-            <p className='mt-1 text-sm text-text-muted'>{t('scoreboard.communityIntro')}</p>
 
             <div className='grid min-w-0 grid-cols-1 gap-4'>
                 <ScoreboardTimeline />

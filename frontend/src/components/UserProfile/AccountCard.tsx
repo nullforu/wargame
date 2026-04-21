@@ -1,5 +1,6 @@
 import type { UserDetail } from '../../lib/types'
 import { getRoleKey, useT } from '../../lib/i18n'
+import UserAvatar from '../UserAvatar'
 
 interface AccountCardProps {
     user: UserDetail
@@ -39,7 +40,8 @@ const AccountCard = ({ user, authEmail, savingUsername, onSave, editingUsername,
                             </button>
                         </div>
                     ) : (
-                        <div className='flex items-center gap-3 self-start sm:self-auto'>
+                        <div className='flex items-center gap-3.75 self-start sm:self-auto'>
+                            <UserAvatar username={user.username} size='md' />
                             <span>{user.username}</span>
                             <button className='text-xs text-accent hover:underline cursor-pointer' onClick={() => onEditingUsernameChange(true)}>
                                 {t('profile.edit')}

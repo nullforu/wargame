@@ -5,7 +5,6 @@ import { navigate } from '../lib/router'
 import ProfileHeader from '../components/UserProfile/ProfileHeader'
 import AccountCard from '../components/UserProfile/AccountCard'
 import ActiveStacksCard from '../components/UserProfile/ActiveStacksCard'
-import SolvedChallengesCard from '../components/UserProfile/SolvedChallengesCard'
 import StatisticsCard from '../components/UserProfile/StatisticsCard'
 import { getLocaleTag, useLocale, useT } from '../lib/i18n'
 import { useAuth } from '../lib/auth'
@@ -232,37 +231,59 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
                         </>
                     ) : null}
 
-                    <SolvedChallengesCard solved={solved} formatDateTime={formatSolvedDateTime} />
-
-                    {solvedPagination.total_pages > 0 ? (
-                        <div className='mt-3 flex flex-wrap items-center justify-end gap-2 rounded-none border-0 bg-transparent px-0 py-2 text-xs text-text-muted md:rounded-xl md:border md:border-border md:bg-surface md:px-3'>
-                            <button
-                                className='rounded-md border border-border px-2 py-1 disabled:opacity-50'
-                                disabled={!solvedPagination.has_prev}
-                                onClick={() => {
-                                    const nextPage = Math.max(1, solvedPage - 1)
-                                    setSolvedPage(nextPage)
-                                    pushSolvedPageQuery(nextPage)
-                                }}
-                            >
-                                {t('common.previous')}
-                            </button>
-                            <span>
-                                {solvedPagination.page} / {solvedPagination.total_pages || 1}
-                            </span>
-                            <button
-                                className='rounded-md border border-border px-2 py-1 disabled:opacity-50'
-                                disabled={!solvedPagination.has_next}
-                                onClick={() => {
-                                    const nextPage = solvedPage + 1
-                                    setSolvedPage(nextPage)
-                                    pushSolvedPageQuery(nextPage)
-                                }}
-                            >
-                                {t('common.next')}
-                            </button>
+                    <div className='mt-8 rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-2xl md:border md:border-border md:bg-surface md:p-6'>
+                        <div className='flex flex-wrap items-center justify-between gap-2'>
+                            <h3 className='text-lg text-text'>{t('profile.solvedChallenges')}</h3>
+                            <span className='text-sm text-text-muted'>{solved.length === 1 ? t('profile.problemSingular', { count: solved.length }) : t('profile.problemPlural', { count: solved.length })}</span>
                         </div>
-                    ) : null}
+
+                        <div className='mt-6 space-y-3'>
+                            {solved.map((item) => (
+                                <div key={item.challenge_id} className='rounded-none border-0 bg-transparent p-3 md:rounded-xl md:border md:border-border md:bg-surface-muted md:p-5'>
+                                    <h4 className='text-base font-medium text-text'>
+                                        {item.title}
+                                        <span className='ml-2 text-xs text-accent'>{t('common.pointsShort', { points: item.points })}</span>
+                                    </h4>
+                                    <p className='mt-2 text-sm text-text-muted'>{t('profile.solvedAt', { time: formatSolvedDateTime(item.solved_at) })}</p>
+                                </div>
+                            ))}
+
+                            {solved.length === 0 ? (
+                                <div className='rounded-none border-0 bg-surface-muted p-5 text-center md:rounded-xl md:border md:border-border md:p-8'>
+                                    <p className='text-sm text-text-muted'>{t('profile.noSolved')}</p>
+                                </div>
+                            ) : null}
+                        </div>
+                        {solvedPagination.total_pages > 0 ? (
+                            <div className='mt-3 flex flex-wrap items-center justify-end gap-2 text-xs text-text-muted md:px-3'>
+                                <button
+                                    className='rounded-md border border-border px-2 py-1 disabled:opacity-50'
+                                    disabled={!solvedPagination.has_prev}
+                                    onClick={() => {
+                                        const nextPage = Math.max(1, solvedPage - 1)
+                                        setSolvedPage(nextPage)
+                                        pushSolvedPageQuery(nextPage)
+                                    }}
+                                >
+                                    {t('common.previous')}
+                                </button>
+                                <span>
+                                    {solvedPagination.page} / {solvedPagination.total_pages || 1}
+                                </span>
+                                <button
+                                    className='rounded-md border border-border px-2 py-1 disabled:opacity-50'
+                                    disabled={!solvedPagination.has_next}
+                                    onClick={() => {
+                                        const nextPage = solvedPage + 1
+                                        setSolvedPage(nextPage)
+                                        pushSolvedPageQuery(nextPage)
+                                    }}
+                                >
+                                    {t('common.next')}
+                                </button>
+                            </div>
+                        ) : null}
+                    </div>
 
                     {solved.length > 0 ? <StatisticsCard totalPoints={totalSolvedPoints} solvedCount={solvedPagination.total_count || solved.length} /> : null}
                 </div>

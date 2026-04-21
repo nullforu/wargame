@@ -6,6 +6,7 @@ import { navigate } from '../lib/router'
 import { getRoleKey, useT } from '../lib/i18n'
 import { useApi } from '../lib/useApi'
 import { useAuth } from '../lib/auth'
+import UserAvatar from '../components/UserAvatar'
 
 interface RouteProps {
     routeParams?: Record<string, string>
@@ -144,11 +145,14 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                             {sortedUsers.map((user) => (
                                 <div key={user.id} className='px-4 py-3'>
                                     <div className='flex items-center justify-between gap-3'>
-                                        <div className='min-w-0'>
-                                            <p className='truncate text-sm font-semibold text-text'>{user.username}</p>
-                                            <p className='mt-1 text-xs text-text-muted'>
-                                                #{user.id} · {t(getRoleKey(user.role))}
-                                            </p>
+                                        <div className='min-w-0 flex items-center gap-3.75'>
+                                            <UserAvatar username={user.username} size='md' />
+                                            <div className='min-w-0'>
+                                                <p className='truncate text-sm font-semibold text-text'>{user.username}</p>
+                                                <p className='mt-1 text-xs text-text-muted'>
+                                                    #{user.id} · {t(getRoleKey(user.role))}
+                                                </p>
+                                            </div>
                                         </div>
                                         <button
                                             className='rounded-md border border-border bg-surface px-3 py-1 text-xs text-text-muted transition hover:bg-surface-muted dark:border-border dark:bg-surface dark:text-text dark:hover:bg-surface-muted'
@@ -171,9 +175,16 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                                 <p className='text-right font-medium'>{t('common.action')}</p>
                             </div>
                             {sortedUsers.map((user) => (
-                                <div key={user.id} className='grid grid-cols-[110px_minmax(0,1fr)_180px_120px] items-center px-4 py-4 transition hover:bg-surface-muted/40 dark:hover:bg-surface-muted'>
+                                <div
+                                    key={user.id}
+                                    className='grid grid-cols-[110px_minmax(0,1fr)_180px_120px] items-center px-4 py-4 transition hover:bg-surface-muted/40 dark:hover:bg-surface-muted cursor-pointer'
+                                    onClick={() => navigate(`/users/${user.id}${window.location.search}`)}
+                                >
                                     <p className='text-sm text-text dark:text-text'>{user.id}</p>
-                                    <p className='truncate pr-3 text-sm text-text dark:text-text'>{user.username}</p>
+                                    <div className='flex items-center gap-3.75 truncate'>
+                                        <UserAvatar username={user.username} size='sm' />
+                                        <p className='truncate pr-3 text-sm text-text dark:text-text'>{user.username}</p>
+                                    </div>
                                     <p className='text-xs text-text-muted dark:text-text-muted'>{t(getRoleKey(user.role))}</p>
                                     <div className='text-right'>
                                         <button

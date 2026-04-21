@@ -4,6 +4,7 @@ import type { LeaderboardChallenge, LeaderboardSolve, ScoreEntry } from '../lib/
 import { navigate } from '../lib/router'
 import { useT } from '../lib/i18n'
 import { useApi } from '../lib/useApi'
+import UserAvatar from './UserAvatar'
 
 interface ScoreboardLeaderboardProps {
     refreshTrigger?: number
@@ -109,7 +110,10 @@ const ScoreboardLeaderboard = ({ refreshTrigger = 0 }: ScoreboardLeaderboardProp
                                 >
                                     <span className='text-xs text-text-subtle'>#{index + 1}</span>
                                     <span className='text-xs font-semibold text-text'>{t('common.pointsShort', { points: entry.score })}</span>
-                                    <span className='truncate text-sm text-text'>{entry.username}</span>
+                                    <div className='flex items-center gap-3.75 truncate'>
+                                        <UserAvatar username={entry.username} size='sm' />
+                                        <span className='truncate text-sm text-text'>{entry.username}</span>
+                                    </div>
                                     {challenges.map((challenge) => {
                                         const solve = entry.solveMap.get(challenge.id)
                                         return (

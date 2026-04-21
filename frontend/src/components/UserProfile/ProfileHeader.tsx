@@ -1,5 +1,6 @@
 import type { UserDetail } from '../../lib/types'
 import { getRoleKey, useT } from '../../lib/i18n'
+import UserAvatar from '../UserAvatar'
 
 interface ProfileHeaderProps {
     user: UserDetail
@@ -12,7 +13,8 @@ const ProfileHeader = ({ user }: ProfileHeaderProps) => {
 
     return (
         <div className='flex flex-wrap items-end justify-between gap-4'>
-            <div>
+            <div className='flex items-center gap-4.75'>
+                <UserAvatar username={user.username} size='lg' />
                 <h2 className='text-2xl text-text sm:text-3xl'>{user.username}</h2>
             </div>
 
