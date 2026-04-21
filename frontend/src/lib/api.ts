@@ -339,11 +339,12 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
                 body: { flag },
                 auth: true,
             }),
-        leaderboard: async () => {
-            const data = await request<Partial<LeaderboardResponse>>(`/api/leaderboard`)
+        leaderboard: async (page?: number, pageSize?: number) => {
+            const data = await request<Partial<LeaderboardResponse>>(withPagination(`/api/leaderboard`, page, pageSize))
             return {
                 challenges: Array.isArray(data?.challenges) ? data.challenges : [],
                 entries: Array.isArray(data?.entries) ? data.entries : [],
+                pagination: normalizePagination(data?.pagination),
             } as LeaderboardResponse
         },
         timeline: async () => {

@@ -232,6 +232,7 @@ export interface ScoreEntry {
 export interface LeaderboardResponse {
     challenges: LeaderboardChallenge[]
     entries: ScoreEntry[]
+    pagination: PaginationMeta
 }
 
 export interface TimelineSubmission {
