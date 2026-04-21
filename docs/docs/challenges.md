@@ -7,6 +7,16 @@ nav_order: 4
 
 `GET /api/challenges`
 
+Query parameters:
+
+- `q` (optional, title keyword)
+- `category` (optional, exact category)
+- `level` (optional, integer `1..10`)
+- `solved` (optional, `true`/`false`, requires authenticated user context)
+- `sort` (optional, one of `latest`, `oldest`, `most_solved`, `least_solved`; default `latest`)
+- `page` (optional, default `1`)
+- `page_size` (optional, default `20`, max `100`)
+
 Response 200
 
 ```json
@@ -17,25 +27,167 @@ Response 200
             "title": "Warmup",
             "description": "...",
             "category": "Web",
+            "level": 3,
             "points": 100,
-            "initial_points": 200,
-            "minimum_points": 50,
             "solve_count": 12,
+            "created_by_user_id": 1,
+            "created_by_username": "admin",
             "is_active": true,
             "is_locked": false,
+            "is_solved": true,
             "has_file": true,
             "file_name": "challenge.zip",
             "stack_enabled": false,
             "stack_target_ports": []
         }
-    ]
+    ],
+    "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total_count": 1,
+        "total_pages": 1,
+        "has_prev": false,
+        "has_next": false
+    }
 }
 ```
 
 Notes:
 
-- `points` is dynamically calculated based on solve count.
+- `points` is fixed and equals the challenge author's configured score.
 - If a challenge is locked by progression, it is returned in a reduced form with `is_locked: true`.
+
+Errors:
+
+- 400 `invalid input`
+
+---
+
+## Search Challenges
+
+`GET /api/challenges/search`
+
+Query parameters:
+
+- `q` (required, challenge title keyword)
+- `category` (optional, exact category)
+- `level` (optional, integer `1..10`)
+- `solved` (optional, `true`/`false`, requires authenticated user context)
+- `sort` (optional, one of `latest`, `oldest`, `most_solved`, `least_solved`; default `latest`)
+- `page` (optional, default `1`)
+- `page_size` (optional, default `20`, max `100`)
+
+Response 200
+
+```json
+{
+    "challenges": [
+        {
+            "id": 1,
+            "title": "Warmup",
+            "description": "...",
+            "category": "Web",
+            "level": 3,
+            "points": 100,
+            "solve_count": 12,
+            "created_by_user_id": 1,
+            "created_by_username": "admin",
+            "is_active": true,
+            "is_locked": false,
+            "is_solved": true,
+            "has_file": true,
+            "file_name": "challenge.zip",
+            "stack_enabled": false,
+            "stack_target_ports": []
+        }
+    ],
+    "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total_count": 1,
+        "total_pages": 1,
+        "has_prev": false,
+        "has_next": false
+    }
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+
+---
+
+## Get Challenge Detail
+
+`GET /api/challenges/{id}`
+
+Response 200
+
+```json
+{
+    "id": 1,
+    "title": "Warmup",
+    "description": "...",
+    "category": "Web",
+    "level": 3,
+    "points": 100,
+    "solve_count": 12,
+    "created_by_user_id": 1,
+    "created_by_username": "admin",
+    "is_active": true,
+    "is_locked": false,
+    "is_solved": true,
+    "has_file": true,
+    "file_name": "challenge.zip",
+    "stack_enabled": false,
+    "stack_target_ports": []
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 404 `challenge not found`
+
+---
+
+## List Challenge Solvers
+
+`GET /api/challenges/{id}/solvers`
+
+Query parameters:
+
+- `page` (optional, default `1`)
+- `page_size` (optional, default `20`, max `100`)
+
+Response 200
+
+```json
+{
+    "solvers": [
+        {
+            "user_id": 7,
+            "username": "alice",
+            "solved_at": "2026-01-24T12:00:00Z",
+            "is_first_blood": true
+        }
+    ],
+    "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total_count": 1,
+        "total_pages": 1,
+        "has_prev": false,
+        "has_next": false
+    }
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 404 `challenge not found`
 
 ---
 
@@ -101,4 +253,3 @@ Errors:
 - 403 `user blocked` or `challenge locked`
 - 404 `challenge not found` or `challenge file not found`
 - 503 `storage unavailable`
-

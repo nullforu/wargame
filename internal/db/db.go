@@ -46,6 +46,9 @@ func AutoMigrate(ctx context.Context, db *bun.DB) error {
 	if err := createTables(ctx, db, modelsToCreate); err != nil {
 		return err
 	}
+	if err := ensureColumns(ctx, db); err != nil {
+		return err
+	}
 
 	return createIndexes(ctx, db)
 }
@@ -65,6 +68,7 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 		name  string
 		query string
 	}{
+		{name: "idx_challenges_category_level", query: "CREATE INDEX IF NOT EXISTS idx_challenges_category_level ON challenges (category, level)"},
 		{name: "idx_submissions_user", query: "CREATE INDEX IF NOT EXISTS idx_submissions_user ON submissions (user_id)"},
 		{name: "idx_submissions_challenge", query: "CREATE INDEX IF NOT EXISTS idx_submissions_challenge ON submissions (challenge_id)"},
 		{name: "idx_submissions_user_challenge", query: "CREATE INDEX IF NOT EXISTS idx_submissions_user_challenge ON submissions (user_id, challenge_id)"},
@@ -77,6 +81,24 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 	for _, idx := range indexes {
 		if _, err := db.ExecContext(ctx, idx.query); err != nil {
 			return fmt.Errorf("auto migrate create index %s: %w", idx.name, err)
+		}
+	}
+
+	return nil
+}
+
+func ensureColumns(ctx context.Context, db *bun.DB) error {
+	queries := []struct {
+		name  string
+		query string
+	}{
+		{name: "challenges.level", query: "ALTER TABLE challenges ADD COLUMN IF NOT EXISTS level integer NOT NULL DEFAULT 1"},
+		{name: "challenges.created_by_user_id", query: "ALTER TABLE challenges ADD COLUMN IF NOT EXISTS created_by_user_id bigint NULL REFERENCES users(id) ON DELETE SET NULL"},
+	}
+
+	for _, q := range queries {
+		if _, err := db.ExecContext(ctx, q.query); err != nil {
+			return fmt.Errorf("auto migrate ensure column %s: %w", q.name, err)
 		}
 	}
 

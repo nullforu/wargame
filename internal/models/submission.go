@@ -24,3 +24,10 @@ type SolvedChallenge struct {
 	Points      int       `bun:"points" json:"points"`
 	SolvedAt    time.Time `bun:"solved_at" json:"solved_at"`
 }
+
+type ChallengeSolver struct {
+	UserID       int64     `bun:"user_id" json:"user_id"`
+	Username     string    `bun:"username" json:"username"`
+	SolvedAt     time.Time `bun:"solved_at" json:"solved_at"`
+	IsFirstBlood bool      `bun:"is_first_blood" json:"is_first_blood"`
+}

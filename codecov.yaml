@@ -20,6 +20,8 @@ ignore:
   - "**/*.pb.go"
   - "**/*_grpc.pb.go"
   - "**/mock/**"
+  - "**/types.go"
+  - "**/routes.go"
   - "cmd/**"
   - "scripts/**"
   - "docs/**"

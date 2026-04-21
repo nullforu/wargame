@@ -38,13 +38,46 @@ func (s *UserService) GetByID(ctx context.Context, id int64) (*models.User, erro
 	return user, nil
 }
 
-func (s *UserService) List(ctx context.Context) ([]models.User, error) {
-	users, err := s.userRepo.List(ctx)
+func (s *UserService) List(ctx context.Context) ([]models.User, models.Pagination, error) {
+	params, err := NormalizePagination(0, 0)
 	if err != nil {
-		return nil, fmt.Errorf("user.List: %w", err)
+		return nil, models.Pagination{}, err
 	}
 
-	return users, nil
+	return s.ListPage(ctx, params.Page, params.PageSize)
+}
+
+func (s *UserService) ListPage(ctx context.Context, page, pageSize int) ([]models.User, models.Pagination, error) {
+	params, err := NormalizePagination(page, pageSize)
+	if err != nil {
+		return nil, models.Pagination{}, err
+	}
+
+	users, totalCount, err := s.userRepo.List(ctx, params.Page, params.PageSize)
+	if err != nil {
+		return nil, models.Pagination{}, fmt.Errorf("user.ListPage: %w", err)
+	}
+
+	return users, BuildPagination(params.Page, params.PageSize, totalCount), nil
+}
+
+func (s *UserService) Search(ctx context.Context, query string, page, pageSize int) ([]models.User, models.Pagination, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, models.Pagination{}, NewValidationError(FieldError{Field: "q", Reason: "required"})
+	}
+
+	params, err := NormalizePagination(page, pageSize)
+	if err != nil {
+		return nil, models.Pagination{}, err
+	}
+
+	users, totalCount, err := s.userRepo.Search(ctx, query, params.Page, params.PageSize)
+	if err != nil {
+		return nil, models.Pagination{}, fmt.Errorf("user.Search: %w", err)
+	}
+
+	return users, BuildPagination(params.Page, params.PageSize, totalCount), nil
 }
 
 func (s *UserService) UpdateProfile(ctx context.Context, userID int64, username *string) (*models.User, error) {

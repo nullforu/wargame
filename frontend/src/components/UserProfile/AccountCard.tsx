@@ -1,5 +1,6 @@
 import type { UserDetail } from '../../lib/types'
 import { getRoleKey, useT } from '../../lib/i18n'
+import UserAvatar from '../UserAvatar'
 
 interface AccountCardProps {
     user: UserDetail
@@ -21,16 +22,16 @@ const AccountCard = ({ user, authEmail, savingUsername, onSave, editingUsername,
     }
 
     return (
-        <div className='mt-6 rounded-2xl border border-border bg-surface p-6'>
+        <div className='mt-6 rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-2xl md:border md:border-border md:bg-surface md:p-6'>
             <h3 className='text-lg text-text'>{t('profile.account')}</h3>
 
             <div className='mt-4 space-y-2 text-sm text-text'>
-                <div className='flex items-center justify-between gap-4'>
+                <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
                     <span className='text-text-muted'>{t('common.username')}</span>
 
                     {editingUsername ? (
-                        <div className='flex items-center gap-2'>
-                            <input className='rounded-md border border-border bg-surface px-2 py-1 text-sm' value={usernameInput} onChange={(event) => onUsernameInputChange(event.target.value)} disabled={savingUsername} />
+                        <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto'>
+                            <input className='w-full rounded-md border border-border bg-surface px-2 py-1 text-sm sm:w-auto' value={usernameInput} onChange={(event) => onUsernameInputChange(event.target.value)} disabled={savingUsername} />
                             <button className='text-sm text-accent hover:underline disabled:opacity-50 cursor-pointer' disabled={savingUsername} onClick={onSave}>
                                 {t('profile.save')}
                             </button>
@@ -39,7 +40,8 @@ const AccountCard = ({ user, authEmail, savingUsername, onSave, editingUsername,
                             </button>
                         </div>
                     ) : (
-                        <div className='flex items-center gap-3'>
+                        <div className='flex items-center gap-3.75 self-start sm:self-auto'>
+                            <UserAvatar username={user.username} size='md' />
                             <span>{user.username}</span>
                             <button className='text-xs text-accent hover:underline cursor-pointer' onClick={() => onEditingUsernameChange(true)}>
                                 {t('profile.edit')}
@@ -48,12 +50,12 @@ const AccountCard = ({ user, authEmail, savingUsername, onSave, editingUsername,
                     )}
                 </div>
 
-                <div className='flex justify-between'>
+                <div className='flex flex-col gap-1 sm:flex-row sm:justify-between'>
                     <span className='text-text-muted'>{t('common.email')}</span>
                     <span>{authEmail}</span>
                 </div>
 
-                <div className='flex justify-between'>
+                <div className='flex flex-col gap-1 sm:flex-row sm:justify-between'>
                     <span className='text-text-muted'>{t('common.role')}</span>
                     <span className='uppercase text-accent'>{t(getRoleKey(user.role))}</span>
                 </div>

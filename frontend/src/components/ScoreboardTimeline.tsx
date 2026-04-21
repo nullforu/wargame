@@ -139,7 +139,7 @@ const ScoreboardTimeline = ({ refreshTrigger = 0 }: ScoreboardTimelineProps) => 
     const seriesCount = useMemo(() => chartModel?.series?.length || 0, [chartModel])
 
     return (
-        <div className='min-w-0 rounded-2xl border border-border  bg-surface-muted p-4 sm:p-6'>
+        <div className='min-w-0 rounded-xl border border-border bg-surface p-4'>
             {loading ? (
                 <p className='text-sm text-text-muted'>{t('timeline.calculating')}</p>
             ) : errorMessage ? (

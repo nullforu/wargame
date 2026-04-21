@@ -69,8 +69,8 @@ type createChallengeRequest struct {
 	Title               string                    `json:"title" binding:"required"`
 	Description         string                    `json:"description" binding:"required"`
 	Category            string                    `json:"category" binding:"required"`
+	Level               *int                      `json:"level"`
 	Points              int                       `json:"points" binding:"required"`
-	MinimumPoints       *int                      `json:"minimum_points"`
 	Flag                string                    `json:"flag" binding:"required"`
 	PreviousChallengeID *int64                    `json:"previous_challenge_id"`
 	IsActive            *bool                     `json:"is_active"`
@@ -83,8 +83,8 @@ type updateChallengeRequest struct {
 	Title               optionalString             `json:"title"`
 	Description         optionalString             `json:"description"`
 	Category            optionalString             `json:"category"`
+	Level               *int                       `json:"level"`
 	Points              *int                       `json:"points"`
-	MinimumPoints       *int                       `json:"minimum_points"`
 	Flag                optionalString             `json:"flag"`
 	PreviousChallengeID optionalInt64              `json:"previous_challenge_id"`
 	IsActive            *bool                      `json:"is_active"`
@@ -157,13 +157,15 @@ type challengeResponse struct {
 	Title               string                    `json:"title"`
 	Description         string                    `json:"description"`
 	Category            string                    `json:"category"`
+	Level               int                       `json:"level"`
 	Points              int                       `json:"points"`
-	InitialPoints       int                       `json:"initial_points"`
-	MinimumPoints       int                       `json:"minimum_points"`
 	SolveCount          int                       `json:"solve_count"`
+	CreatedByUserID     *int64                    `json:"created_by_user_id,omitempty"`
+	CreatedByUsername   string                    `json:"created_by_username,omitempty"`
 	PreviousChallengeID *int64                    `json:"previous_challenge_id,omitempty"`
 	IsActive            bool                      `json:"is_active"`
 	IsLocked            bool                      `json:"is_locked"`
+	IsSolved            bool                      `json:"is_solved"`
 	HasFile             bool                      `json:"has_file"`
 	FileName            *string                   `json:"file_name,omitempty"`
 	StackEnabled        bool                      `json:"stack_enabled"`
@@ -174,19 +176,44 @@ type lockedChallengeResponse struct {
 	ID                        int64   `json:"id"`
 	Title                     string  `json:"title"`
 	Category                  string  `json:"category"`
+	Level                     int     `json:"level"`
 	Points                    int     `json:"points"`
-	InitialPoints             int     `json:"initial_points"`
-	MinimumPoints             int     `json:"minimum_points"`
 	SolveCount                int     `json:"solve_count"`
+	CreatedByUserID           *int64  `json:"created_by_user_id,omitempty"`
+	CreatedByUsername         string  `json:"created_by_username,omitempty"`
 	PreviousChallengeID       *int64  `json:"previous_challenge_id,omitempty"`
 	PreviousChallengeTitle    *string `json:"previous_challenge_title,omitempty"`
 	PreviousChallengeCategory *string `json:"previous_challenge_category,omitempty"`
 	IsActive                  bool    `json:"is_active"`
 	IsLocked                  bool    `json:"is_locked"`
+	IsSolved                  bool    `json:"is_solved"`
 }
 
 type challengesListResponse struct {
-	Challenges []any `json:"challenges,omitempty"`
+	Challenges []any             `json:"challenges,omitempty"`
+	Pagination models.Pagination `json:"pagination"`
+}
+
+type usersListResponse struct {
+	Users      []userDetailResponse `json:"users,omitempty"`
+	Pagination models.Pagination    `json:"pagination"`
+}
+
+type userSolvedListResponse struct {
+	Solved     []models.SolvedChallenge `json:"solved,omitempty"`
+	Pagination models.Pagination        `json:"pagination"`
+}
+
+type challengeSolverResponse struct {
+	UserID       int64     `json:"user_id"`
+	Username     string    `json:"username"`
+	SolvedAt     time.Time `json:"solved_at"`
+	IsFirstBlood bool      `json:"is_first_blood"`
+}
+
+type challengeSolversResponse struct {
+	Solvers    []challengeSolverResponse `json:"solvers,omitempty"`
+	Pagination models.Pagination         `json:"pagination"`
 }
 
 type adminChallengeResponse struct {
@@ -212,6 +239,12 @@ type challengeFileUploadResponse struct {
 
 type timelineResponse struct {
 	Submissions []models.TimelineSubmission `json:"submissions"`
+}
+
+type leaderboardListResponse struct {
+	Challenges []models.LeaderboardChallenge `json:"challenges"`
+	Entries    []models.LeaderboardEntry     `json:"entries"`
+	Pagination models.Pagination             `json:"pagination"`
 }
 
 type stackResponse struct {
@@ -277,17 +310,50 @@ func newAdminUserResponse(user *models.User) adminUserResponse {
 	return adminUserResponse{ID: user.ID, Email: user.Email, Username: user.Username, Role: user.Role, BlockedReason: user.BlockedReason, BlockedAt: user.BlockedAt}
 }
 
-func newChallengeResponse(challenge *models.Challenge) challengeResponse {
+func newChallengeResponse(challenge *models.Challenge, isSolved bool) challengeResponse {
 	hasFile := challenge.FileKey != nil && *challenge.FileKey != ""
-	return challengeResponse{ID: challenge.ID, Title: challenge.Title, Description: challenge.Description, Category: challenge.Category, Points: challenge.Points, InitialPoints: challenge.InitialPoints, MinimumPoints: challenge.MinimumPoints, SolveCount: challenge.SolveCount, PreviousChallengeID: challenge.PreviousChallengeID, IsActive: challenge.IsActive, IsLocked: false, HasFile: hasFile, FileName: challenge.FileName, StackEnabled: challenge.StackEnabled, StackTargetPorts: []stackpkg.TargetPortSpec(challenge.StackTargetPorts)}
+	return challengeResponse{
+		ID:                  challenge.ID,
+		Title:               challenge.Title,
+		Description:         challenge.Description,
+		Category:            challenge.Category,
+		Level:               challenge.Level,
+		Points:              challenge.Points,
+		SolveCount:          challenge.SolveCount,
+		CreatedByUserID:     challenge.CreatedByUserID,
+		CreatedByUsername:   challenge.CreatedByUsername,
+		PreviousChallengeID: challenge.PreviousChallengeID,
+		IsActive:            challenge.IsActive,
+		IsLocked:            false,
+		IsSolved:            isSolved,
+		HasFile:             hasFile,
+		FileName:            challenge.FileName,
+		StackEnabled:        challenge.StackEnabled,
+		StackTargetPorts:    []stackpkg.TargetPortSpec(challenge.StackTargetPorts),
+	}
 }
 
-func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Challenge) lockedChallengeResponse {
+func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Challenge, isSolved bool) lockedChallengeResponse {
 	var prevTitle *string
 	var prevCategory *string
 	if previous != nil {
 		prevTitle = &previous.Title
 		prevCategory = &previous.Category
 	}
-	return lockedChallengeResponse{ID: challenge.ID, Title: challenge.Title, Category: challenge.Category, Points: challenge.Points, InitialPoints: challenge.InitialPoints, MinimumPoints: challenge.MinimumPoints, SolveCount: challenge.SolveCount, PreviousChallengeID: challenge.PreviousChallengeID, PreviousChallengeTitle: prevTitle, PreviousChallengeCategory: prevCategory, IsActive: challenge.IsActive, IsLocked: true}
+	return lockedChallengeResponse{
+		ID:                        challenge.ID,
+		Title:                     challenge.Title,
+		Category:                  challenge.Category,
+		Level:                     challenge.Level,
+		Points:                    challenge.Points,
+		SolveCount:                challenge.SolveCount,
+		CreatedByUserID:           challenge.CreatedByUserID,
+		CreatedByUsername:         challenge.CreatedByUsername,
+		PreviousChallengeID:       challenge.PreviousChallengeID,
+		PreviousChallengeTitle:    prevTitle,
+		PreviousChallengeCategory: prevCategory,
+		IsActive:                  challenge.IsActive,
+		IsLocked:                  true,
+		IsSolved:                  isSolved,
+	}
 }

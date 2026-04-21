@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"wargame/internal/models"
-	"wargame/internal/scoring"
 
 	"github.com/uptrace/bun"
 )
@@ -20,14 +19,13 @@ func NewScoreboardRepo(db *bun.DB) *ScoreboardRepo {
 }
 
 type leaderboardChallengeRow struct {
-	ID            int64  `bun:"id"`
-	Title         string `bun:"title"`
-	Category      string `bun:"category"`
-	Points        int    `bun:"points"`
-	MinimumPoints int    `bun:"minimum_points"`
+	ID       int64  `bun:"id"`
+	Title    string `bun:"title"`
+	Category string `bun:"category"`
+	Points   int    `bun:"points"`
 }
 
-func (r *ScoreboardRepo) leaderboardChallenges(ctx context.Context) ([]models.LeaderboardChallenge, map[int64]int, error) {
+func (r *ScoreboardRepo) leaderboardChallenges(ctx context.Context) ([]models.LeaderboardChallenge, error) {
 	rows := make([]leaderboardChallengeRow, 0)
 	if err := r.db.NewSelect().
 		TableExpr("challenges AS c").
@@ -35,80 +33,59 @@ func (r *ScoreboardRepo) leaderboardChallenges(ctx context.Context) ([]models.Le
 		ColumnExpr("c.title AS title").
 		ColumnExpr("c.category AS category").
 		ColumnExpr("c.points AS points").
-		ColumnExpr("c.minimum_points AS minimum_points").
 		OrderExpr("c.id ASC").
 		Scan(ctx, &rows); err != nil {
-		return nil, nil, wrapError("scoreboardRepo.leaderboardChallenges", err)
+		return nil, wrapError("scoreboardRepo.leaderboardChallenges", err)
 	}
 
-	solveCounts, err := solveCountsByChallenge(ctx, r.db)
-	if err != nil {
-		return nil, nil, wrapError("scoreboardRepo.leaderboardChallenges solve counts", err)
-	}
-
-	decay, err := decayFactor(ctx, r.db)
-	if err != nil {
-		return nil, nil, wrapError("scoreboardRepo.leaderboardChallenges decay", err)
-	}
-
-	pointsMap := make(map[int64]int, len(rows))
 	challenges := make([]models.LeaderboardChallenge, 0, len(rows))
 	for _, row := range rows {
-		points := scoring.DynamicPoints(row.Points, row.MinimumPoints, solveCounts[row.ID], decay)
-		pointsMap[row.ID] = points
-		challenges = append(challenges, models.LeaderboardChallenge{ID: row.ID, Title: row.Title, Category: row.Category, Points: points})
+		challenges = append(challenges, models.LeaderboardChallenge{ID: row.ID, Title: row.Title, Category: row.Category, Points: row.Points})
 	}
 
-	return challenges, pointsMap, nil
+	return challenges, nil
 }
 
-func (r *ScoreboardRepo) Leaderboard(ctx context.Context) (models.LeaderboardResponse, error) {
-	challenges, pointsMap, err := r.leaderboardChallenges(ctx)
+func (r *ScoreboardRepo) Leaderboard(ctx context.Context, page, pageSize int) (models.LeaderboardResponse, int, error) {
+	challenges, err := r.leaderboardChallenges(ctx)
 	if err != nil {
-		return models.LeaderboardResponse{}, wrapError("scoreboardRepo.Leaderboard", err)
+		return models.LeaderboardResponse{}, 0, wrapError("scoreboardRepo.Leaderboard", err)
+	}
+
+	totalCount, err := r.db.NewSelect().
+		TableExpr("users AS u").
+		Where("u.role != ?", models.BlockedRole).
+		Count(ctx)
+	if err != nil {
+		return models.LeaderboardResponse{}, 0, wrapError("scoreboardRepo.Leaderboard count", err)
 	}
 
 	rows := make([]models.LeaderboardEntry, 0)
+	offset := (page - 1) * pageSize
 	if err := r.db.NewSelect().
 		TableExpr("users AS u").
 		ColumnExpr("u.id AS user_id").
 		ColumnExpr("u.username AS username").
-		Where("u.role NOT IN (?)", bun.In([]string{models.BlockedRole, models.AdminRole})).
-		OrderExpr("u.id ASC").
+		ColumnExpr("COALESCE(SUM(c.points), 0) AS score").
+		Join("LEFT JOIN submissions AS s ON s.user_id = u.id AND s.correct = true").
+		Join("LEFT JOIN challenges AS c ON c.id = s.challenge_id").
+		Where("u.role != ?", models.BlockedRole).
+		GroupExpr("u.id, u.username").
+		OrderExpr("score DESC, u.id ASC").
+		Limit(pageSize).
+		Offset(offset).
 		Scan(ctx, &rows); err != nil {
-		return models.LeaderboardResponse{}, wrapError("scoreboardRepo.Leaderboard", err)
+		return models.LeaderboardResponse{}, 0, wrapError("scoreboardRepo.Leaderboard", err)
 	}
 
-	type submissionRow struct {
-		UserID      int64 `bun:"user_id"`
-		ChallengeID int64 `bun:"challenge_id"`
-	}
-	submissions := make([]submissionRow, 0)
-	if err := r.db.NewSelect().
-		TableExpr("submissions AS s").
-		ColumnExpr("s.user_id AS user_id").
-		ColumnExpr("s.challenge_id AS challenge_id").
-		Join("JOIN users AS u ON u.id = s.user_id").
-		Where("s.correct = true").
-		Where("u.role NOT IN (?)", bun.In([]string{models.BlockedRole, models.AdminRole})).
-		Scan(ctx, &submissions); err != nil {
-		return models.LeaderboardResponse{}, wrapError("scoreboardRepo.Leaderboard submissions", err)
+	if len(rows) == 0 {
+		return models.LeaderboardResponse{Challenges: challenges, Entries: []models.LeaderboardEntry{}}, totalCount, nil
 	}
 
-	scores := make(map[int64]int, len(rows))
-	for _, sub := range submissions {
-		scores[sub.UserID] += pointsMap[sub.ChallengeID]
+	userIDs := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		userIDs = append(userIDs, row.UserID)
 	}
-	for i := range rows {
-		rows[i].Score = scores[rows[i].UserID]
-	}
-
-	sort.Slice(rows, func(i, j int) bool {
-		if rows[i].Score == rows[j].Score {
-			return rows[i].UserID < rows[j].UserID
-		}
-		return rows[i].Score > rows[j].Score
-	})
 
 	type solveRow struct {
 		UserID       int64     `bun:"user_id"`
@@ -123,12 +100,11 @@ func (r *ScoreboardRepo) Leaderboard(ctx context.Context) (models.LeaderboardRes
 		ColumnExpr("s.challenge_id AS challenge_id").
 		ColumnExpr("MIN(s.submitted_at) AS solved_at").
 		ColumnExpr("BOOL_OR(s.is_first_blood) AS is_first_blood").
-		Join("JOIN users AS u ON u.id = s.user_id").
 		Where("s.correct = true").
-		Where("u.role NOT IN (?)", bun.In([]string{models.BlockedRole, models.AdminRole})).
+		Where("s.user_id IN (?)", bun.In(userIDs)).
 		GroupExpr("s.user_id, s.challenge_id").
 		Scan(ctx, &solvedRows); err != nil {
-		return models.LeaderboardResponse{}, wrapError("scoreboardRepo.Leaderboard solves", err)
+		return models.LeaderboardResponse{}, 0, wrapError("scoreboardRepo.Leaderboard solves", err)
 	}
 
 	solvedByUser := make(map[int64][]models.LeaderboardSolve)
@@ -146,11 +122,11 @@ func (r *ScoreboardRepo) Leaderboard(ctx context.Context) (models.LeaderboardRes
 		})
 	}
 
-	return models.LeaderboardResponse{Challenges: challenges, Entries: rows}, nil
+	return models.LeaderboardResponse{Challenges: challenges, Entries: rows}, totalCount, nil
 }
 
 func (r *ScoreboardRepo) TimelineSubmissions(ctx context.Context, since *time.Time) ([]models.UserTimelineRow, error) {
-	pointsMap, err := dynamicPointsMap(ctx, r.db)
+	pointsMap, err := fixedPointsMap(ctx, r.db)
 	if err != nil {
 		return nil, wrapError("scoreboardRepo.TimelineSubmissions", err)
 	}
@@ -164,7 +140,7 @@ func (r *ScoreboardRepo) TimelineSubmissions(ctx context.Context, since *time.Ti
 		ColumnExpr("s.challenge_id AS challenge_id").
 		Join("JOIN users AS u ON u.id = s.user_id").
 		Where("s.correct = true").
-		Where("u.role NOT IN (?)", bun.In([]string{models.BlockedRole, models.AdminRole}))
+		Where("u.role != ?", models.BlockedRole)
 
 	query = applyTimelineWindow(query, since)
 	if err := query.Scan(ctx, &rows); err != nil {

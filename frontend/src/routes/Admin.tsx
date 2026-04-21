@@ -57,23 +57,15 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
     }, [activeTab])
 
     return (
-        <section className='animate'>
-            <div className='mb-4 lg:mb-6'>
-                <h2 className='text-2xl font-semibold text-text lg:text-3xl'>{t('admin.title')}</h2>
-            </div>
-
+        <section className='animate space-y-3'>
             {!auth.user ? (
-                <div className='rounded-2xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning-strong lg:p-6'>{t('admin.loginRequired')}</div>
+                <div className='border border-warning/40 bg-warning/10 p-4 text-sm text-warning'>{t('admin.loginRequired')}</div>
             ) : auth.user.role !== 'admin' ? (
-                <div className='rounded-2xl border border-danger/40 bg-danger/10 p-4 text-sm text-danger lg:p-6'>{t('admin.accessDenied')}</div>
+                <div className='border border-danger/40 bg-danger/10 p-4 text-sm text-danger'>{t('admin.accessDenied')}</div>
             ) : (
                 <>
-                    <div className='mb-4 flex items-center gap-3'>
-                        <select
-                            className='flex-1 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text focus:border-accent focus:outline-none lg:hidden'
-                            value={activeTab}
-                            onChange={(event) => setActiveTab(event.target.value as AdminTabId)}
-                        >
+                    <div className='lg:hidden'>
+                        <select className='w-full border border-border px-3 py-2 text-sm text-text focus:border-accent focus:outline-none' value={activeTab} onChange={(event) => setActiveTab(event.target.value as AdminTabId)}>
                             {adminTabs.map((tab) => (
                                 <option key={tab.id} value={tab.id}>
                                     {tab.label}
@@ -82,25 +74,21 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
                         </select>
                     </div>
 
-                    <div className='flex flex-col gap-6 lg:flex-row lg:gap-8'>
-                        <nav className='hidden lg:block lg:w-64 lg:shrink-0'>
-                            <div className='rounded-2xl border border-border bg-surface p-2'>
-                                {adminTabs.map((tab) => (
-                                    <button
-                                        key={tab.id}
-                                        className={`flex w-full items-center rounded-lg px-4 py-2.5 text-left text-sm transition cursor-pointer ${
-                                            activeTab === tab.id ? 'bg-surface-subtle font-medium text-text' : 'text-text hover:bg-surface-muted'
-                                        }`}
-                                        onClick={() => setActiveTab(tab.id as AdminTabId)}
-                                        type='button'
-                                    >
-                                        {tab.label}
-                                    </button>
-                                ))}
-                            </div>
+                    <div className='flex flex-col gap-4 lg:flex-row'>
+                        <nav className='hidden w-64 shrink-0 lg:block'>
+                            {adminTabs.map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    className={`flex w-full items-center rounded-none border-b border-border px-4 py-3 text-left text-sm ${activeTab === tab.id ? 'bg-surface-muted font-semibold text-accent' : 'text-text-muted hover:bg-surface-muted'}`}
+                                    onClick={() => setActiveTab(tab.id as AdminTabId)}
+                                    type='button'
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
                         </nav>
 
-                        <div className='flex-1 lg:min-w-0'>
+                        <div className='min-w-0 flex-1'>
                             {activeTab === 'challenge_create' ? <CreateChallenge /> : activeTab === 'challenge_management' ? <ChallengeManagement /> : activeTab === 'stacks' ? <Stacks /> : activeTab === 'users' ? <Users /> : null}
                         </div>
                     </div>

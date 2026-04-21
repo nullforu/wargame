@@ -27,24 +27,36 @@ func TestListUsers(t *testing.T) {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var resp []struct {
-		ID            int64   `json:"id"`
-		Username      string  `json:"username"`
-		Role          string  `json:"role"`
-		BlockedReason *string `json:"blocked_reason"`
+	var resp struct {
+		Users []struct {
+			ID            int64   `json:"id"`
+			Username      string  `json:"username"`
+			Role          string  `json:"role"`
+			BlockedReason *string `json:"blocked_reason"`
+		} `json:"users"`
+		Pagination struct {
+			Page       int  `json:"page"`
+			PageSize   int  `json:"page_size"`
+			TotalCount int  `json:"total_count"`
+			HasNext    bool `json:"has_next"`
+		} `json:"pagination"`
 	}
 	decodeJSON(t, rec, &resp)
 
-	if len(resp) != 3 {
-		t.Fatalf("expected 3 users, got %d", len(resp))
+	if len(resp.Users) != 3 {
+		t.Fatalf("expected 3 users, got %d", len(resp.Users))
 	}
 
-	if resp[0].Username != "user1" || resp[1].Username != "user2" || resp[2].Username != models.AdminRole {
-		t.Fatalf("unexpected response: %+v", resp)
+	if resp.Users[0].Username != "user1" || resp.Users[1].Username != "user2" || resp.Users[2].Username != models.AdminRole {
+		t.Fatalf("unexpected response: %+v", resp.Users)
 	}
 
-	if resp[0].BlockedReason == nil {
+	if resp.Users[0].BlockedReason == nil {
 		t.Fatalf("expected blocked reason for user1")
+	}
+
+	if resp.Pagination.Page != 1 || resp.Pagination.PageSize != 20 || resp.Pagination.TotalCount != 3 || resp.Pagination.HasNext {
+		t.Fatalf("unexpected pagination: %+v", resp.Pagination)
 	}
 }
 
@@ -97,6 +109,70 @@ func TestGetUser(t *testing.T) {
 	})
 }
 
+func TestListUsersPaginationAndSearch(t *testing.T) {
+	env := setupTest(t, testCfg)
+	_ = createUser(t, env, "alpha@example.com", "alpha", "pass1", models.UserRole)
+	_ = createUser(t, env, "beta@example.com", "beta", "pass2", models.UserRole)
+	_ = createUser(t, env, "admin@example.com", "admin", "pass3", models.AdminRole)
+
+	rec := doRequest(t, env.router, http.MethodGet, "/api/users?page=2&page_size=1", nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var pagedResp struct {
+		Users []struct {
+			Username string `json:"username"`
+		} `json:"users"`
+		Pagination struct {
+			Page       int  `json:"page"`
+			PageSize   int  `json:"page_size"`
+			TotalCount int  `json:"total_count"`
+			HasPrev    bool `json:"has_prev"`
+			HasNext    bool `json:"has_next"`
+		} `json:"pagination"`
+	}
+	decodeJSON(t, rec, &pagedResp)
+	if len(pagedResp.Users) != 1 || pagedResp.Users[0].Username != "beta" {
+		t.Fatalf("unexpected paged users: %+v", pagedResp.Users)
+	}
+	if pagedResp.Pagination.Page != 2 || pagedResp.Pagination.PageSize != 1 || pagedResp.Pagination.TotalCount != 3 || !pagedResp.Pagination.HasPrev || !pagedResp.Pagination.HasNext {
+		t.Fatalf("unexpected pagination: %+v", pagedResp.Pagination)
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/users/search?q=alp&page=1&page_size=10", nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("search status %d: %s", rec.Code, rec.Body.String())
+	}
+	var searchResp struct {
+		Users []struct {
+			Username string `json:"username"`
+		} `json:"users"`
+		Pagination struct {
+			TotalCount int `json:"total_count"`
+		} `json:"pagination"`
+	}
+	decodeJSON(t, rec, &searchResp)
+	if len(searchResp.Users) != 1 || searchResp.Users[0].Username != "alpha" || searchResp.Pagination.TotalCount != 1 {
+		t.Fatalf("unexpected search response: %+v", searchResp)
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/users/search?q=&page=1&page_size=10", nil, nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for empty q, got %d", rec.Code)
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/users?page=-1", nil, nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid page, got %d", rec.Code)
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/users?page=1&page_size=101", nil, nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for oversized page_size, got %d", rec.Code)
+	}
+}
+
 func TestGetUserSolved(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		env := setupTest(t, testCfg)
@@ -109,20 +185,29 @@ func TestGetUserSolved(t *testing.T) {
 			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 		}
 
-		var resp []struct {
-			ChallengeID int64  `json:"challenge_id"`
-			Title       string `json:"title"`
-			Points      int    `json:"points"`
-			SolvedAt    string `json:"solved_at"`
+		var resp struct {
+			Solved []struct {
+				ChallengeID int64  `json:"challenge_id"`
+				Title       string `json:"title"`
+				Points      int    `json:"points"`
+				SolvedAt    string `json:"solved_at"`
+			} `json:"solved"`
+			Pagination struct {
+				Page       int `json:"page"`
+				TotalCount int `json:"total_count"`
+			} `json:"pagination"`
 		}
 		decodeJSON(t, rec, &resp)
 
-		if len(resp) != 1 {
-			t.Fatalf("expected 1 solved challenge, got %d", len(resp))
+		if len(resp.Solved) != 1 {
+			t.Fatalf("expected 1 solved challenge, got %d", len(resp.Solved))
 		}
 
-		if resp[0].ChallengeID != challenge.ID || resp[0].Title != "Warmup" || resp[0].Points != 100 {
+		if resp.Solved[0].ChallengeID != challenge.ID || resp.Solved[0].Title != "Warmup" || resp.Solved[0].Points != 100 {
 			t.Fatalf("unexpected response: %+v", resp)
+		}
+		if resp.Pagination.Page != 1 || resp.Pagination.TotalCount != 1 {
+			t.Fatalf("unexpected pagination: %+v", resp.Pagination)
 		}
 	})
 
@@ -135,11 +220,13 @@ func TestGetUserSolved(t *testing.T) {
 			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 		}
 
-		var resp []any
+		var resp struct {
+			Solved []any `json:"solved"`
+		}
 		decodeJSON(t, rec, &resp)
 
-		if len(resp) != 0 {
-			t.Fatalf("expected empty list, got %d", len(resp))
+		if len(resp.Solved) != 0 {
+			t.Fatalf("expected empty list, got %d", len(resp.Solved))
 		}
 	})
 

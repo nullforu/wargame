@@ -5,7 +5,7 @@ nav_order: 5
 
 ## Get Leaderboard
 
-`GET /api/leaderboard`
+`GET /api/leaderboard?page=1&page_size=20`
 
 Response 200
 
@@ -32,7 +32,15 @@ Response 200
                 }
             ]
         }
-    ]
+    ],
+    "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total_count": 37,
+        "total_pages": 2,
+        "has_prev": false,
+        "has_next": true
+    }
 }
 ```
 
@@ -40,6 +48,7 @@ Notes:
 
 - Users are sorted by score (descending).
 - Blocked users are excluded from score and solve aggregation.
+- Pagination applies to leaderboard entries. Challenge columns are returned in full for matrix rendering.
 
 ---
 
@@ -70,44 +79,7 @@ Notes:
 
 ---
 
-## Scoreboard Stream (SSE)
+## Cache Refresh Behavior
 
-`GET /api/scoreboard/stream`
-
-Opens a Server-Sent Events stream that notifies clients when leaderboard/timeline caches are rebuilt.
-
-### Events
-
-- `ready`: sent immediately after connection.
-- `scoreboard`: sent after cache rebuild.
-
-Payload schema:
-
-```json
-{
-    "scope": "all",
-    "reason": "submission_correct",
-    "ts": "2026-02-27T18:00:00Z"
-}
-```
-
-### Scoreboard-Affecting APIs
-
-| Action             | API                                 | Reason               |
-| ------------------ | ----------------------------------- | -------------------- |
-| Correct submission | `POST /api/challenges/{id}/submit`  | `submission_correct` |
-| Challenge created  | `POST /api/admin/challenges`        | `challenge_created`  |
-| Challenge updated  | `PUT /api/admin/challenges/{id}`    | `challenge_updated`  |
-| Challenge deleted  | `DELETE /api/admin/challenges/{id}` | `challenge_deleted`  |
-| Block user         | `POST /api/admin/users/{id}/block`  | `user_blocked`       |
-| Unblock user       | `POST /api/admin/users/{id}/unblock`| `user_unblocked`     |
-
-Example stream:
-
-```
-event: ready
-data: {}
-
-event: scoreboard
-data: {"scope":"all","reason":"submission_correct","ts":"2026-02-27T18:00:00Z"}
-```
+Leaderboard and timeline caches are invalidated and rebuilt asynchronously when scoreboard-affecting actions occur (for example correct submissions or admin challenge/user status changes).  
+The API no longer provides an SSE stream endpoint.

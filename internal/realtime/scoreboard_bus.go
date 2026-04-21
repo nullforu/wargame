@@ -16,9 +16,8 @@ import (
 )
 
 const (
-	scoreboardEventsChannel  = "scoreboard.events"
-	scoreboardRebuiltChannel = "scoreboard.rebuilt"
-	scoreboardLockKey        = "scoreboard:rebuild:lock"
+	scoreboardEventsChannel = "scoreboard.events"
+	scoreboardLockKey       = "scoreboard:rebuild:lock"
 )
 
 type ScoreboardEvent struct {
@@ -32,19 +31,18 @@ type ScoreboardBus struct {
 	cfg      config.Config
 	score    ScoreboardReader
 	logger   *logging.Logger
-	hub      *SSEHub
 	debounce time.Duration
 	lockTTL  time.Duration
 	trigger  chan string
 }
 
 type ScoreboardReader interface {
-	Leaderboard(ctx context.Context) (models.LeaderboardResponse, error)
+	Leaderboard(ctx context.Context, page, pageSize int) (models.LeaderboardResponse, models.Pagination, error)
 	UserTimeline(ctx context.Context, since *time.Time) ([]models.TimelineSubmission, error)
 }
 
-func NewScoreboardBus(redisClient *redis.Client, cfg config.Config, scoreSvc ScoreboardReader, logger *logging.Logger, hub *SSEHub) *ScoreboardBus {
-	return &ScoreboardBus{redis: redisClient, cfg: cfg, score: scoreSvc, logger: logger, hub: hub, debounce: 300 * time.Millisecond, lockTTL: 10 * time.Second, trigger: make(chan string, 16)}
+func NewScoreboardBus(redisClient *redis.Client, cfg config.Config, scoreSvc ScoreboardReader, logger *logging.Logger) *ScoreboardBus {
+	return &ScoreboardBus{redis: redisClient, cfg: cfg, score: scoreSvc, logger: logger, debounce: 300 * time.Millisecond, lockTTL: 10 * time.Second, trigger: make(chan string, 16)}
 }
 
 func (b *ScoreboardBus) Publish(ctx context.Context, event ScoreboardEvent) {
@@ -57,17 +55,13 @@ func (b *ScoreboardBus) Publish(ctx context.Context, event ScoreboardEvent) {
 
 func (b *ScoreboardBus) Start(ctx context.Context) {
 	pubsub := b.redis.Subscribe(ctx, scoreboardEventsChannel)
-	rebuilt := b.redis.Subscribe(ctx, scoreboardRebuiltChannel)
-	go b.run(ctx, pubsub, rebuilt)
+	go b.run(ctx, pubsub)
 }
 
-func (b *ScoreboardBus) run(ctx context.Context, pubsub *redis.PubSub, rebuilt *redis.PubSub) {
+func (b *ScoreboardBus) run(ctx context.Context, pubsub *redis.PubSub) {
 	defer func() {
 		if err := pubsub.Close(); err != nil {
 			b.logger.Warn("leaderboard pubsub close", slog.Any("error", err))
-		}
-		if err := rebuilt.Close(); err != nil {
-			b.logger.Warn("leaderboard rebuilt close", slog.Any("error", err))
 		}
 	}()
 
@@ -85,21 +79,6 @@ func (b *ScoreboardBus) run(ctx context.Context, pubsub *redis.PubSub, rebuilt *
 				case b.trigger <- msg.Payload:
 				default:
 				}
-			}
-		}
-	}()
-
-	go func() {
-		ch := rebuilt.Channel()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg, ok := <-ch:
-				if !ok {
-					return
-				}
-				b.hub.Broadcast(msg.Payload)
 			}
 		}
 	}()
@@ -139,7 +118,7 @@ func (b *ScoreboardBus) run(ctx context.Context, pubsub *redis.PubSub, rebuilt *
 	}
 }
 
-func (b *ScoreboardBus) handleEvent(ctx context.Context, event ScoreboardEvent) {
+func (b *ScoreboardBus) handleEvent(ctx context.Context, _ ScoreboardEvent) {
 	locked, token := b.acquireLock(ctx)
 	if !locked {
 		return
@@ -155,11 +134,6 @@ func (b *ScoreboardBus) handleEvent(ctx context.Context, event ScoreboardEvent) 
 	}
 
 	b.releaseLock(ctx, token)
-	payload, err := json.Marshal(event)
-	if err != nil {
-		return
-	}
-	_ = b.redis.Publish(ctx, scoreboardRebuiltChannel, payload).Err()
 }
 
 func (b *ScoreboardBus) acquireLock(ctx context.Context) (bool, string) {
@@ -191,7 +165,7 @@ func randomToken() string {
 }
 
 func (b *ScoreboardBus) rebuildCaches(ctx context.Context) error {
-	leaderboard, err := b.score.Leaderboard(ctx)
+	leaderboard, pagination, err := b.score.Leaderboard(ctx, 1, 20)
 	if err != nil {
 		return err
 	}
@@ -200,7 +174,16 @@ func (b *ScoreboardBus) rebuildCaches(ctx context.Context) error {
 		return err
 	}
 
-	if err := b.storeJSON(ctx, "leaderboard:users", leaderboard, b.cfg.Cache.LeaderboardTTL); err != nil {
+	leaderboardResp := struct {
+		Challenges []models.LeaderboardChallenge `json:"challenges"`
+		Entries    []models.LeaderboardEntry     `json:"entries"`
+		Pagination models.Pagination             `json:"pagination"`
+	}{
+		Challenges: leaderboard.Challenges,
+		Entries:    leaderboard.Entries,
+		Pagination: pagination,
+	}
+	if err := b.storeJSON(ctx, "leaderboard:users:page:1:size:20", leaderboardResp, b.cfg.Cache.LeaderboardTTL); err != nil {
 		return err
 	}
 	userTimelineResp := struct {

@@ -93,8 +93,8 @@ Request
     "title": "New Challenge",
     "description": "...",
     "category": "Web",
+    "level": 3,
     "points": 200,
-    "minimum_points": 50,
     "flag": "flag{...}",
     "previous_challenge_id": 1,
     "is_active": true,
@@ -109,6 +109,10 @@ Request
 }
 ```
 
+Parameters
+
+- `level`: difficulty level from `1` to `10` (default: `1`)
+
 Response 201
 
 ```json
@@ -117,9 +121,8 @@ Response 201
     "title": "New Challenge",
     "description": "...",
     "category": "Web",
+    "level": 3,
     "points": 200,
-    "initial_points": 200,
-    "minimum_points": 50,
     "solve_count": 0,
     "previous_challenge_id": 1,
     "is_active": true,
@@ -155,8 +158,8 @@ All fields are optional. Omitted fields are unchanged.
 ```json
 {
     "title": "Updated Challenge",
+    "level": 4,
     "points": 250,
-    "minimum_points": 100,
     "flag": "flag{rotated}",
     "is_active": false,
     "stack_enabled": true,
@@ -178,9 +181,8 @@ Response 200
     "title": "Updated Challenge",
     "description": "...",
     "category": "Crypto",
+    "level": 4,
     "points": 250,
-    "initial_points": 250,
-    "minimum_points": 100,
     "solve_count": 12,
     "is_active": false,
     "is_locked": false,
@@ -223,9 +225,8 @@ Response 200
     "title": "Updated Challenge",
     "description": "...",
     "category": "Crypto",
+    "level": 4,
     "points": 250,
-    "initial_points": 250,
-    "minimum_points": 100,
     "solve_count": 12,
     "is_active": false,
     "is_locked": false,
@@ -386,9 +387,8 @@ Response 200
         "title": "New Challenge",
         "description": "...",
         "category": "Web",
+        "level": 3,
         "points": 200,
-        "initial_points": 200,
-        "minimum_points": 50,
         "solve_count": 0,
         "is_active": true,
         "is_locked": false,
@@ -436,9 +436,8 @@ Response 200
     "title": "New Challenge",
     "description": "...",
     "category": "Web",
+    "level": 3,
     "points": 200,
-    "initial_points": 200,
-    "minimum_points": 50,
     "solve_count": 0,
     "is_active": true,
     "is_locked": false,

@@ -106,11 +106,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	sseHub := realtime.NewSSEHub()
-	leaderboardBus := realtime.NewScoreboardBus(redisClient, cfg, scoreSvc, logger, sseHub)
+	leaderboardBus := realtime.NewScoreboardBus(redisClient, cfg, scoreSvc, logger)
 	leaderboardBus.Start(ctx)
 
-	router := httpserver.NewRouter(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, redisClient, logger, sseHub)
+	router := httpserver.NewRouter(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, redisClient, logger)
 	srv := &nethttp.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           router,

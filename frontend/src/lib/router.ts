@@ -3,9 +3,11 @@ export const navigate = (path: string, event?: { preventDefault: () => void }) =
 
     event?.preventDefault()
 
-    const normalized = path.startsWith('/') ? path : `/${path}`
-    if (window.location.pathname === normalized) return
+    const target = new URL(path.startsWith('/') ? path : `/${path}`, window.location.origin)
+    const next = `${target.pathname}${target.search}${target.hash}`
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    if (current === next) return
 
-    window.history.pushState({}, '', normalized)
+    window.history.pushState({}, '', next)
     window.dispatchEvent(new PopStateEvent('popstate'))
 }

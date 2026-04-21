@@ -37,10 +37,11 @@ export interface ChallengeDetail {
     title: string
     description: string
     category: string
+    level: number
     points: number
-    initial_points: number
-    minimum_points: number
     solve_count: number
+    created_by_user_id?: number | null
+    created_by_username?: string
     is_active: boolean
     has_file: boolean
     file_name?: string | null
@@ -48,21 +49,24 @@ export interface ChallengeDetail {
     stack_target_ports: TargetPortSpec[]
     previous_challenge_id?: number | null
     is_locked?: false
+    is_solved: boolean
 }
 
 export interface LockedChallenge {
     id: number
     title: string
     category: string
+    level: number
     points: number
-    initial_points: number
-    minimum_points: number
     solve_count: number
+    created_by_user_id?: number | null
+    created_by_username?: string
     is_active: boolean
     previous_challenge_id?: number | null
     previous_challenge_title?: string | null
     previous_challenge_category?: string | null
     is_locked: true
+    is_solved: boolean
 }
 
 export type Challenge = ChallengeDetail | LockedChallenge
@@ -86,8 +90,8 @@ export interface ChallengeCreatePayload {
     title: string
     description: string
     category: string
+    level?: number
     points: number
-    minimum_points?: number
     flag: string
     is_active: boolean
     previous_challenge_id?: number | null
@@ -102,8 +106,8 @@ export interface ChallengeUpdatePayload {
     title?: string
     description?: string
     category?: string
+    level?: number
     points?: number
-    minimum_points?: number
     flag?: string
     is_active?: boolean
     previous_challenge_id?: number | null
@@ -161,6 +165,7 @@ export interface FlagSubmissionPayload {
 
 export interface ChallengesResponse {
     challenges: Challenge[]
+    pagination: PaginationMeta
 }
 
 export interface StacksResponse {
@@ -187,6 +192,23 @@ export interface SolvedChallenge {
     solved_at: string
 }
 
+export interface UserSolvedResponse {
+    solved: SolvedChallenge[]
+    pagination: PaginationMeta
+}
+
+export interface ChallengeSolver {
+    user_id: number
+    username: string
+    solved_at: string
+    is_first_blood: boolean
+}
+
+export interface ChallengeSolversResponse {
+    solvers: ChallengeSolver[]
+    pagination: PaginationMeta
+}
+
 export interface LeaderboardChallenge {
     id: number
     title: string
@@ -210,6 +232,7 @@ export interface ScoreEntry {
 export interface LeaderboardResponse {
     challenges: LeaderboardChallenge[]
     entries: ScoreEntry[]
+    pagination: PaginationMeta
 }
 
 export interface TimelineSubmission {
@@ -238,4 +261,18 @@ export interface UserDetail {
     role: string
     blocked_reason: string | null
     blocked_at: string | null
+}
+
+export interface PaginationMeta {
+    page: number
+    page_size: number
+    total_count: number
+    total_pages: number
+    has_prev: boolean
+    has_next: boolean
+}
+
+export interface UsersResponse {
+    users: UserListItem[]
+    pagination: PaginationMeta
 }
