@@ -21,7 +21,7 @@ ignore:
   - "**/*_grpc.pb.go"
   - "**/mock/**"
   - "**/types.go"
-  - "**/routes.go"
+  - "**/router.go"
   - "cmd/**"
   - "scripts/**"
   - "docs/**"

@@ -145,7 +145,6 @@ func TestChallengeDetailFiltersSolvedAndSolvers(t *testing.T) {
 			"title":       "Web L3",
 			"description": "desc",
 			"category":    "Web",
-			"level":       3,
 			"points":      300,
 			"flag":        "flag{web3}",
 			"is_active":   true,
@@ -154,7 +153,6 @@ func TestChallengeDetailFiltersSolvedAndSolvers(t *testing.T) {
 			"title":       "Crypto L7",
 			"description": "desc",
 			"category":    "Crypto",
-			"level":       7,
 			"points":      700,
 			"flag":        "flag{crypto7}",
 			"is_active":   true,
@@ -196,15 +194,15 @@ func TestChallengeDetailFiltersSolvedAndSolvers(t *testing.T) {
 	foundSolved := false
 	for _, item := range listResp.Challenges {
 		if item.ID == created[0].ID {
-			foundSolved = item.IsSolved && item.Level == 3
+			foundSolved = item.IsSolved && item.Level == models.UnknownLevel
 		}
 	}
 
 	if !foundSolved {
-		t.Fatalf("expected solved challenge with level in list: %+v", listResp.Challenges)
+		t.Fatalf("expected solved challenge with unknown level in list: %+v", listResp.Challenges)
 	}
 
-	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges/search?q=Web&category=Web&level=3&solved=true&page=1&page_size=20", nil, authHeader(userAccess))
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges/search?q=Web&category=Web&solved=true&page=1&page_size=20", nil, authHeader(userAccess))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("search status %d: %s", rec.Code, rec.Body.String())
 	}
@@ -225,14 +223,15 @@ func TestChallengeDetailFiltersSolvedAndSolvers(t *testing.T) {
 	}
 
 	var detail struct {
-		ID                int64  `json:"id"`
-		Level             int    `json:"level"`
-		IsSolved          bool   `json:"is_solved"`
-		CreatedByUserID   int64  `json:"created_by_user_id"`
-		CreatedByUsername string `json:"created_by_username"`
+		ID                int64                   `json:"id"`
+		Level             int                     `json:"level"`
+		LevelVoteCounts   []models.LevelVoteCount `json:"level_vote_counts"`
+		IsSolved          bool                    `json:"is_solved"`
+		CreatedByUserID   int64                   `json:"created_by_user_id"`
+		CreatedByUsername string                  `json:"created_by_username"`
 	}
 	decodeJSON(t, rec, &detail)
-	if detail.ID != created[0].ID || detail.Level != 3 || !detail.IsSolved {
+	if detail.ID != created[0].ID || detail.Level != models.UnknownLevel || !detail.IsSolved || len(detail.LevelVoteCounts) != 0 {
 		t.Fatalf("unexpected detail: %+v", detail)
 	}
 	if detail.CreatedByUserID <= 0 || detail.CreatedByUsername == "" {
@@ -357,5 +356,212 @@ func TestChallengesSortOptions(t *testing.T) {
 	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges/search?q=Sort&sort=bad", nil, nil)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected invalid sort(search) to return 400, got %d", rec.Code)
+	}
+}
+
+func TestChallengeLevelVotes(t *testing.T) {
+	env := setupTest(t, testCfg)
+	admin := createUser(t, env, "admin@example.com", models.AdminRole, "adminpass", models.AdminRole)
+	adminAccess, _, _ := loginUser(t, env.router, admin.Email, "adminpass")
+	user1 := createUser(t, env, "vote1@example.com", "vote1", "pass", models.UserRole)
+	user2 := createUser(t, env, "vote2@example.com", "vote2", "pass", models.UserRole)
+	user1Access, _, _ := loginUser(t, env.router, user1.Email, "pass")
+	user2Access, _, _ := loginUser(t, env.router, user2.Email, "pass")
+
+	rec := doRequest(t, env.router, http.MethodPost, "/api/admin/challenges", map[string]any{
+		"title":       "Vote Target",
+		"description": "desc",
+		"category":    "Web",
+		"points":      100,
+		"flag":        "flag{vote}",
+		"is_active":   true,
+	}, authHeader(adminAccess))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var created struct {
+		ID    int64 `json:"id"`
+		Level int   `json:"level"`
+	}
+	decodeJSON(t, rec, &created)
+	if created.Level != models.UnknownLevel {
+		t.Fatalf("expected unknown on create, got %d", created.Level)
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(created.ID)+"/vote", map[string]any{
+		"level": 6,
+	}, authHeader(user1Access))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected forbidden before solving, got %d", rec.Code)
+	}
+
+	for _, u := range []struct {
+		id     int64
+		access string
+	}{
+		{user1.ID, user1Access},
+		{user2.ID, user2Access},
+	} {
+		createSubmission(t, env, u.id, created.ID, true, time.Now().UTC())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(created.ID)+"/vote", map[string]any{
+		"level": 6,
+	}, authHeader(user1Access))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("vote1 status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(created.ID)+"/vote", map[string]any{
+		"level": 7,
+	}, authHeader(user2Access))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("vote2 status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(created.ID)+"/vote", map[string]any{
+		"level": 6,
+	}, authHeader(user1Access))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("vote1 update status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges/"+itoa(created.ID), nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("detail status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var detail struct {
+		Level           int                     `json:"level"`
+		LevelVoteCounts []models.LevelVoteCount `json:"level_vote_counts"`
+	}
+	decodeJSON(t, rec, &detail)
+	if detail.Level != 6 {
+		t.Fatalf("expected representative level 6, got %d", detail.Level)
+	}
+
+	if len(detail.LevelVoteCounts) != 2 {
+		t.Fatalf("expected two level count entries, got %+v", detail.LevelVoteCounts)
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges/"+itoa(created.ID)+"/votes?page=1&page_size=1", nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("votes status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var votes struct {
+		Votes []struct {
+			UserID int64 `json:"user_id"`
+			Level  int   `json:"level"`
+		} `json:"votes"`
+		Pagination struct {
+			TotalCount int  `json:"total_count"`
+			HasNext    bool `json:"has_next"`
+		} `json:"pagination"`
+	}
+	decodeJSON(t, rec, &votes)
+	if votes.Pagination.TotalCount != 2 || !votes.Pagination.HasNext || len(votes.Votes) != 1 {
+		t.Fatalf("unexpected votes pagination: %+v", votes.Pagination)
+	}
+}
+
+func TestChallengesLevelFilterIntegration(t *testing.T) {
+	env := setupTest(t, testCfg)
+	admin := createUser(t, env, "admin@example.com", models.AdminRole, "adminpass", models.AdminRole)
+	adminAccess, _, _ := loginUser(t, env.router, admin.Email, "adminpass")
+	user1 := createUser(t, env, "lv-user1@example.com", "lv-user1", "pass", models.UserRole)
+	user2 := createUser(t, env, "lv-user2@example.com", "lv-user2", "pass", models.UserRole)
+	user3 := createUser(t, env, "lv-user3@example.com", "lv-user3", "pass", models.UserRole)
+	user1Access, _, _ := loginUser(t, env.router, user1.Email, "pass")
+	user2Access, _, _ := loginUser(t, env.router, user2.Email, "pass")
+	user3Access, _, _ := loginUser(t, env.router, user3.Email, "pass")
+
+	createChallengeReq := func(title, flag string) int64 {
+		rec := doRequest(t, env.router, http.MethodPost, "/api/admin/challenges", map[string]any{
+			"title":       title,
+			"description": "desc",
+			"category":    "Web",
+			"points":      100,
+			"flag":        flag,
+			"is_active":   true,
+		}, authHeader(adminAccess))
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var created struct {
+			ID int64 `json:"id"`
+		}
+		decodeJSON(t, rec, &created)
+
+		return created.ID
+	}
+
+	unknownID := createChallengeReq("Unknown Challenge", "flag{unknown}")
+	level7ID := createChallengeReq("Level Seven Challenge", "flag{lv7}")
+	level6ID := createChallengeReq("Level Six Challenge", "flag{lv6}")
+
+	createSubmission(t, env, user1.ID, level7ID, true, time.Now().UTC())
+	createSubmission(t, env, user2.ID, level7ID, true, time.Now().UTC())
+	createSubmission(t, env, user3.ID, level7ID, true, time.Now().UTC())
+	createSubmission(t, env, user1.ID, level6ID, true, time.Now().UTC())
+	createSubmission(t, env, user2.ID, level6ID, true, time.Now().UTC())
+
+	rec := doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(level7ID)+"/vote", map[string]any{"level": 7}, authHeader(user1Access))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("vote status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(level7ID)+"/vote", map[string]any{"level": 7}, authHeader(user2Access))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("vote status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(level7ID)+"/vote", map[string]any{"level": 6}, authHeader(user3Access))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("vote status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(level6ID)+"/vote", map[string]any{"level": 6}, authHeader(user1Access))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("vote status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(level6ID)+"/vote", map[string]any{"level": 7}, authHeader(user2Access))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("vote status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(level6ID)+"/vote", map[string]any{"level": 6}, authHeader(user1Access))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("vote status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	assertOnlyChallenge := func(path string, wantID int64) {
+		rec := doRequest(t, env.router, http.MethodGet, path, nil, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("filter status %d for %s: %s", rec.Code, path, rec.Body.String())
+		}
+
+		var resp struct {
+			Challenges []struct {
+				ID int64 `json:"id"`
+			} `json:"challenges"`
+		}
+		decodeJSON(t, rec, &resp)
+		if len(resp.Challenges) != 1 || resp.Challenges[0].ID != wantID {
+			t.Fatalf("unexpected filter result for %s: %+v", path, resp.Challenges)
+		}
+	}
+
+	assertOnlyChallenge("/api/challenges?level=0&page=1&page_size=50", unknownID)
+	assertOnlyChallenge("/api/challenges?level=7&page=1&page_size=50", level7ID)
+	assertOnlyChallenge("/api/challenges?level=6&page=1&page_size=50", level6ID)
+	assertOnlyChallenge("/api/challenges/search?q=Challenge&level=7&page=1&page_size=50", level7ID)
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges?level=abc&page=1&page_size=20", nil, nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid level, got %d", rec.Code)
 	}
 }

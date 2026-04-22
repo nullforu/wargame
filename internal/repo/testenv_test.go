@@ -152,7 +152,7 @@ func setupRepoTest(t *testing.T) repoEnv {
 
 func resetRepoState(t *testing.T) {
 	t.Helper()
-	if _, err := repoDB.ExecContext(context.Background(), "TRUNCATE TABLE submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := repoDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 }
@@ -192,7 +192,6 @@ func createChallenge(t *testing.T, env repoEnv, title string, points int, flag s
 		Title:       title,
 		Description: "desc",
 		Category:    "Misc",
-		Level:       1,
 		Points:      points,
 		IsActive:    active,
 		CreatedAt:   time.Now().UTC(),

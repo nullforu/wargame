@@ -233,6 +233,7 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 	userRepo := repo.NewUserRepo(testDB)
 	challengeRepo := repo.NewChallengeRepo(testDB)
 	submissionRepo := repo.NewSubmissionRepo(testDB)
+	voteRepo := repo.NewChallengeVoteRepo(testDB)
 	scoreRepo := repo.NewScoreboardRepo(testDB)
 	stackRepo := repo.NewStackRepo(testDB)
 
@@ -241,7 +242,7 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 	authSvc := service.NewAuthService(cfg, userRepo, testRedis)
 	userSvc := service.NewUserService(userRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
-	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, testRedis, fileStore)
+	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, testRedis, fileStore)
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, testRedis)
 
 	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, testRedis, testLogger)
@@ -264,7 +265,7 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 func resetState(t *testing.T) {
 	t.Helper()
 
-	if _, err := testDB.ExecContext(context.Background(), "TRUNCATE TABLE submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := testDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
@@ -446,7 +447,6 @@ func createChallenge(t *testing.T, env testEnv, title string, points int, flag s
 		Title:       title,
 		Description: "desc",
 		Category:    "Misc",
-		Level:       1,
 		Points:      points,
 		IsActive:    active,
 		CreatedAt:   time.Now().UTC(),
@@ -474,7 +474,6 @@ func createStackChallenge(t *testing.T, env testEnv, title string) *models.Chall
 		Title:        title,
 		Description:  "stack desc",
 		Category:     "Web",
-		Level:        1,
 		Points:       100,
 		StackEnabled: true,
 		StackTargetPorts: stack.TargetPortSpecs{
@@ -507,6 +506,7 @@ func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testE
 	userRepo := repo.NewUserRepo(testDB)
 	challengeRepo := repo.NewChallengeRepo(testDB)
 	submissionRepo := repo.NewSubmissionRepo(testDB)
+	voteRepo := repo.NewChallengeVoteRepo(testDB)
 	scoreRepo := repo.NewScoreboardRepo(testDB)
 	stackRepo := repo.NewStackRepo(testDB)
 
@@ -515,7 +515,7 @@ func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testE
 	authSvc := service.NewAuthService(cfg, userRepo, testRedis)
 	userSvc := service.NewUserService(userRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
-	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, testRedis, fileStore)
+	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, testRedis, fileStore)
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, mockClient, testRedis)
 
 	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, testRedis, testLogger)

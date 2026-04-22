@@ -185,6 +185,7 @@ func setupServiceTest(t *testing.T) serviceEnv {
 	userRepo := repo.NewUserRepo(serviceDB)
 	challengeRepo := repo.NewChallengeRepo(serviceDB)
 	submissionRepo := repo.NewSubmissionRepo(serviceDB)
+	voteRepo := repo.NewChallengeVoteRepo(serviceDB)
 	scoreRepo := repo.NewScoreboardRepo(serviceDB)
 	stackRepo := repo.NewStackRepo(serviceDB)
 
@@ -193,7 +194,7 @@ func setupServiceTest(t *testing.T) serviceEnv {
 	authSvc := NewAuthService(serviceCfg, userRepo, serviceRedis)
 	userSvc := NewUserService(userRepo)
 	scoreSvc := NewScoreboardService(scoreRepo)
-	wargameSvc := NewWargameService(serviceCfg, challengeRepo, submissionRepo, serviceRedis, fileStore)
+	wargameSvc := NewWargameService(serviceCfg, challengeRepo, submissionRepo, voteRepo, serviceRedis, fileStore)
 	stackSvc := NewStackService(serviceCfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, serviceRedis)
 
 	env := serviceEnv{
@@ -218,7 +219,7 @@ func setupServiceTest(t *testing.T) serviceEnv {
 func resetServiceState(t *testing.T) {
 	t.Helper()
 
-	if _, err := serviceDB.ExecContext(context.Background(), "TRUNCATE TABLE submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := serviceDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
@@ -264,7 +265,6 @@ func createChallenge(t *testing.T, env serviceEnv, title string, points int, fla
 		Title:       title,
 		Description: "desc",
 		Category:    "Misc",
-		Level:       1,
 		Points:      points,
 		IsActive:    active,
 		CreatedAt:   time.Now().UTC(),
