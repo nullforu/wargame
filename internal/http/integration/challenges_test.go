@@ -464,6 +464,24 @@ func TestChallengeLevelVotes(t *testing.T) {
 	if votes.Pagination.TotalCount != 2 || !votes.Pagination.HasNext || len(votes.Votes) != 1 {
 		t.Fatalf("unexpected votes pagination: %+v", votes.Pagination)
 	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges/"+itoa(created.ID)+"/my-vote", nil, authHeader(user1Access))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("my-vote status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var myVote struct {
+		Level *int `json:"level"`
+	}
+	decodeJSON(t, rec, &myVote)
+	if myVote.Level == nil || *myVote.Level != 6 {
+		t.Fatalf("expected my vote level 6, got %+v", myVote.Level)
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges/"+itoa(created.ID)+"/my-vote", nil, nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthorized without token, got %d", rec.Code)
+	}
 }
 
 func TestChallengesLevelFilterIntegration(t *testing.T) {

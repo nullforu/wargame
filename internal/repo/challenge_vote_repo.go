@@ -37,6 +37,7 @@ func (r *ChallengeVoteRepo) VoteCountsByChallengeID(ctx context.Context, challen
 		ColumnExpr("COUNT(*) AS count").
 		Where("cv.challenge_id = ?", challengeID).
 		GroupExpr("cv.level").
+		OrderExpr("cv.level ASC").
 		Scan(ctx, &rows); err != nil {
 		return nil, wrapError("challengeVoteRepo.VoteCountsByChallengeID", err)
 	}
@@ -132,6 +133,7 @@ func (r *ChallengeVoteRepo) VoteCountsByChallengeIDs(ctx context.Context, challe
 		ColumnExpr("COUNT(*) AS count").
 		Where("cv.challenge_id IN (?)", bun.In(challengeIDs)).
 		GroupExpr("cv.challenge_id, cv.level").
+		OrderExpr("cv.challenge_id ASC, cv.level ASC").
 		Scan(ctx, &rows); err != nil {
 		return nil, wrapError("challengeVoteRepo.VoteCountsByChallengeIDs", err)
 	}
@@ -149,6 +151,29 @@ func (r *ChallengeVoteRepo) VoteCountsByChallengeIDs(ctx context.Context, challe
 	}
 
 	return result, nil
+}
+
+func (r *ChallengeVoteRepo) VoteLevelByUserAndChallengeID(ctx context.Context, userID, challengeID int64) (*int, error) {
+	type row struct {
+		Level int `bun:"level"`
+	}
+	rows := make([]row, 0, 1)
+	if err := r.db.NewSelect().
+		TableExpr("challenge_votes AS cv").
+		ColumnExpr("cv.level AS level").
+		Where("cv.user_id = ?", userID).
+		Where("cv.challenge_id = ?", challengeID).
+		Limit(1).
+		Scan(ctx, &rows); err != nil {
+		return nil, wrapError("challengeVoteRepo.VoteLevelByUserAndChallengeID", err)
+	}
+
+	if len(rows) == 0 {
+		return nil, nil
+	}
+
+	level := rows[0].Level
+	return &level, nil
 }
 
 func (r *ChallengeVoteRepo) VotesByChallengePage(ctx context.Context, challengeID int64, page, pageSize int) ([]models.ChallengeVoteDetail, int, error) {

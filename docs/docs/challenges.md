@@ -307,6 +307,40 @@ Errors:
 
 ---
 
+## Get My Challenge Vote
+
+`GET /api/challenges/{id}/my-vote`
+
+Headers
+
+```
+Authorization: Bearer <access_token>
+```
+
+Response 200
+
+```json
+{
+    "level": 7
+}
+```
+
+When the caller has not voted on this challenge yet:
+
+```json
+{
+    "level": null
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 404 `challenge not found`
+
+---
+
 ## Download Challenge File
 
 `POST /api/challenges/{id}/file/download`

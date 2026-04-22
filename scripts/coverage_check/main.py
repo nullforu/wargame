@@ -43,7 +43,7 @@ if __name__ == '__main__':
             continue
 
         fname, stmts, count = parts
-        fname = fname.split(':',1)[0]
+        fname = fname.rsplit(':',1)[0]
         if fname.startswith('wargame/'):
             fname = fname[len('wargame/'):]
         if is_excluded(fname):

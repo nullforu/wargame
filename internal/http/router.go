@@ -54,6 +54,7 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		auth.GET("/me", h.Me)
 		auth.GET("/stacks", h.ListStacks)
 		auth.GET("/challenges/:id/stack", h.GetStack)
+		auth.GET("/challenges/:id/my-vote", h.ChallengeMyVote)
 
 		unblocked := auth.Group("")
 		unblocked.Use(middleware.RequireActiveUser(userSvc))

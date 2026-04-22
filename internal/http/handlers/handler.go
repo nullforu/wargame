@@ -917,6 +917,21 @@ func (h *Handler) ChallengeVotes(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, challengeVotesResponse{Votes: votes, Pagination: pagination})
 }
 
+func (h *Handler) ChallengeMyVote(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	level, err := h.wargame.ChallengeVoteLevelByUser(ctx.Request.Context(), middleware.UserID(ctx), challengeID)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, challengeMyVoteResponse{Level: level})
+}
+
 func (h *Handler) Leaderboard(ctx *gin.Context) {
 	page, pageSize, ok := parsePaginationParams(ctx)
 	if !ok {

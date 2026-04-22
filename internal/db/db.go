@@ -47,9 +47,6 @@ func AutoMigrate(ctx context.Context, db *bun.DB) error {
 	if err := createTables(ctx, db, modelsToCreate); err != nil {
 		return err
 	}
-	if err := ensureColumns(ctx, db); err != nil {
-		return err
-	}
 
 	return createIndexes(ctx, db)
 }
@@ -85,42 +82,6 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 	for _, idx := range indexes {
 		if _, err := db.ExecContext(ctx, idx.query); err != nil {
 			return fmt.Errorf("auto migrate create index %s: %w", idx.name, err)
-		}
-	}
-
-	return nil
-}
-
-func ensureColumns(ctx context.Context, db *bun.DB) error {
-	queries := []struct {
-		name  string
-		query string
-	}{
-		{name: "challenges.created_by_user_id", query: "ALTER TABLE challenges ADD COLUMN IF NOT EXISTS created_by_user_id bigint NULL REFERENCES users(id) ON DELETE SET NULL"},
-		{name: "challenge_votes.updated_at", query: "ALTER TABLE challenge_votes ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT current_timestamp"},
-		{name: "challenge_votes.created_at", query: "ALTER TABLE challenge_votes ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT current_timestamp"},
-		{name: "challenge_votes.level", query: "ALTER TABLE challenge_votes ADD COLUMN IF NOT EXISTS level integer NOT NULL DEFAULT 1"},
-	}
-
-	for _, q := range queries {
-		if _, err := db.ExecContext(ctx, q.query); err != nil {
-			return fmt.Errorf("auto migrate ensure column %s: %w", q.name, err)
-		}
-	}
-
-	dropQueries := []struct {
-		name  string
-		query string
-	}{
-		{name: "idx_challenges_category_level", query: "DROP INDEX IF EXISTS idx_challenges_category_level"},
-		{name: "challenges.level", query: "ALTER TABLE challenges DROP COLUMN IF EXISTS level"},
-		{name: "challenge_votes.difficulty", query: "ALTER TABLE challenge_votes DROP COLUMN IF EXISTS difficulty"},
-		{name: "idx_challenge_votes_challenge_difficulty", query: "DROP INDEX IF EXISTS idx_challenge_votes_challenge_difficulty"},
-	}
-
-	for _, q := range dropQueries {
-		if _, err := db.ExecContext(ctx, q.query); err != nil {
-			return fmt.Errorf("auto migrate drop %s: %w", q.name, err)
 		}
 	}
 

@@ -149,7 +149,7 @@ func startHandlerPostgres(ctx context.Context) (testcontainers.Container, config
 			"POSTGRES_DB":       "wargame_test",
 		},
 		WaitingFor: wait.ForAll(
-			wait.ForListeningPort("5432/tcp"),
+			wait.ForListeningPort("5432/tcp").SkipExternalCheck(),
 			wait.ForLog("database system is ready to accept connections"),
 		),
 	}

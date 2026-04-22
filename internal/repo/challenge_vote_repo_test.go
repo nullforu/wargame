@@ -38,6 +38,10 @@ func TestChallengeVoteRepoRepresentativeAndCounts(t *testing.T) {
 	if len(counts) != 2 {
 		t.Fatalf("expected 2 count rows, got %+v", counts)
 	}
+
+	if counts[0].Level != 3 || counts[1].Level != 7 {
+		t.Fatalf("expected counts ordered by level asc, got %+v", counts)
+	}
 }
 
 func TestChallengeVoteRepoTieBreakAndPagination(t *testing.T) {
@@ -132,6 +136,10 @@ func TestChallengeVoteRepoVoteCountsByChallengeIDs(t *testing.T) {
 		t.Fatalf("expected 2 grouped rows, got %+v", counts[ch1.ID])
 	}
 
+	if counts[ch1.ID][0].Level != 6 || counts[ch1.ID][1].Level != 7 {
+		t.Fatalf("expected per-challenge counts ordered by level asc, got %+v", counts[ch1.ID])
+	}
+
 	empty, err := repo.VoteCountsByChallengeIDs(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("VoteCountsByChallengeIDs empty: %v", err)
@@ -139,6 +147,34 @@ func TestChallengeVoteRepoVoteCountsByChallengeIDs(t *testing.T) {
 
 	if len(empty) != 0 {
 		t.Fatalf("expected empty map for empty ids, got %+v", empty)
+	}
+}
+
+func TestChallengeVoteRepoVoteLevelByUserAndChallengeID(t *testing.T) {
+	env := setupRepoTest(t)
+	repo := NewChallengeVoteRepo(env.db)
+	ch := createChallenge(t, env, "my-vote", 100, "FLAG{MV}", true)
+	user := createUserForTestUserScope(t, env, "mv@example.com", "mv", "pass", models.UserRole)
+
+	now := time.Now().UTC()
+	mustUpsertVote(t, repo, ch.ID, user.ID, 8, now)
+
+	level, err := repo.VoteLevelByUserAndChallengeID(context.Background(), user.ID, ch.ID)
+	if err != nil {
+		t.Fatalf("VoteLevelByUserAndChallengeID: %v", err)
+	}
+
+	if level == nil || *level != 8 {
+		t.Fatalf("expected level=8, got %+v", level)
+	}
+
+	none, err := repo.VoteLevelByUserAndChallengeID(context.Background(), user.ID, 999999)
+	if err != nil {
+		t.Fatalf("VoteLevelByUserAndChallengeID none: %v", err)
+	}
+
+	if none != nil {
+		t.Fatalf("expected nil for missing vote, got %+v", none)
 	}
 }
 

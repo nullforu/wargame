@@ -157,6 +157,57 @@ func TestHandlerChallengeVotesValidation(t *testing.T) {
 	})
 }
 
+func TestHandlerChallengeMyVote(t *testing.T) {
+	env := setupHandlerTest(t)
+	user := createHandlerUser(t, env, "myvote-handler@example.com", "myvote-handler", "pass", models.UserRole)
+	challenge := createHandlerChallenge(t, env, "My Vote Challenge", 100, "FLAG{HMV}", true)
+
+	t.Run("no vote yet", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(challenge.ID)+"/my-vote", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		ctx.Set("userID", user.ID)
+
+		env.handler.ChallengeMyVote(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp challengeMyVoteResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if resp.Level != nil {
+			t.Fatalf("expected nil level, got %+v", resp.Level)
+		}
+	})
+
+	createHandlerSubmission(t, env, user.ID, challenge.ID, true, time.Now().UTC())
+	if err := env.wargameSvc.VoteChallengeLevel(context.Background(), user.ID, challenge.ID, 9); err != nil {
+		t.Fatalf("seed vote: %v", err)
+	}
+
+	t.Run("returns own vote", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(challenge.ID)+"/my-vote", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		ctx.Set("userID", user.ID)
+
+		env.handler.ChallengeMyVote(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp challengeMyVoteResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if resp.Level == nil || *resp.Level != 9 {
+			t.Fatalf("expected level=9, got %+v", resp.Level)
+		}
+	})
+}
+
 func TestHandlerVoteChallengeLevelNotFound(t *testing.T) {
 	env := setupHandlerTest(t)
 	user := createHandlerUser(t, env, "user@example.com", "user", "pass", models.UserRole)

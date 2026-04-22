@@ -197,6 +197,10 @@ type challengeVotesResponse struct {
 	Pagination models.Pagination            `json:"pagination"`
 }
 
+type challengeMyVoteResponse struct {
+	Level *int `json:"level"`
+}
+
 type challengesListResponse struct {
 	Challenges []any             `json:"challenges,omitempty"`
 	Pagination models.Pagination `json:"pagination"`

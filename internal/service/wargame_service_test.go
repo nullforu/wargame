@@ -729,6 +729,35 @@ func TestWargameServiceChallengeVotesPageNotFound(t *testing.T) {
 	}
 }
 
+func TestWargameServiceChallengeVoteLevelByUser(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "myvote@example.com", "myvote", "pass", models.UserRole)
+	challenge := createChallenge(t, env, "myvote-target", 100, "FLAG{MYV}", true)
+
+	level, err := env.wargameSvc.ChallengeVoteLevelByUser(context.Background(), user.ID, challenge.ID)
+	if err != nil {
+		t.Fatalf("ChallengeVoteLevelByUser empty: %v", err)
+	}
+
+	if level != nil {
+		t.Fatalf("expected nil level before vote, got %+v", level)
+	}
+
+	createSubmission(t, env, user.ID, challenge.ID, true, time.Now().UTC())
+	if err := env.wargameSvc.VoteChallengeLevel(context.Background(), user.ID, challenge.ID, 6); err != nil {
+		t.Fatalf("VoteChallengeLevel: %v", err)
+	}
+
+	level, err = env.wargameSvc.ChallengeVoteLevelByUser(context.Background(), user.ID, challenge.ID)
+	if err != nil {
+		t.Fatalf("ChallengeVoteLevelByUser: %v", err)
+	}
+
+	if level == nil || *level != 6 {
+		t.Fatalf("expected level=6, got %+v", level)
+	}
+}
+
 func TestWargameServiceVoteChallengeLevelRepoFailures(t *testing.T) {
 	env := setupServiceTest(t)
 	user := createUser(t, env, "vote3@example.com", "vote3", "pass", models.UserRole)

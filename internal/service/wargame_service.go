@@ -507,6 +507,33 @@ func (s *WargameService) ChallengeVotesPage(ctx context.Context, challengeID int
 	return rows, BuildPagination(params.Page, params.PageSize, totalCount), nil
 }
 
+func (s *WargameService) ChallengeVoteLevelByUser(ctx context.Context, userID, challengeID int64) (*int, error) {
+	validator := newFieldValidator()
+	validator.PositiveID("challenge_id", challengeID)
+	if userID <= 0 {
+		validator.fields = append(validator.fields, FieldError{Field: "user_id", Reason: "invalid"})
+	}
+
+	if err := validator.Error(); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.challengeRepo.GetByID(ctx, challengeID); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrChallengeNotFound
+		}
+
+		return nil, fmt.Errorf("wargame.ChallengeVoteLevelByUser challenge lookup: %w", err)
+	}
+
+	level, err := s.voteRepo.VoteLevelByUserAndChallengeID(ctx, userID, challengeID)
+	if err != nil {
+		return nil, fmt.Errorf("wargame.ChallengeVoteLevelByUser: %w", err)
+	}
+
+	return level, nil
+}
+
 func (s *WargameService) DeleteChallenge(ctx context.Context, id int64) error {
 	challenge, err := s.challengeRepo.GetByID(ctx, id)
 	if err != nil {
