@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -187,7 +188,10 @@ func startPostgres(ctx context.Context) (testcontainers.Container, config.DBConf
 			"POSTGRES_PASSWORD": "wargame",
 			"POSTGRES_DB":       "wargame_test",
 		},
-		WaitingFor: wait.ForListeningPort("5432/tcp"),
+		WaitingFor: wait.ForAll(
+			wait.ForListeningPort("5432/tcp"),
+			wait.ForLog("database system is ready to accept connections"),
+		),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -199,6 +203,7 @@ func startPostgres(ctx context.Context) (testcontainers.Container, config.DBConf
 	}
 
 	host, err := container.Host(ctx)
+	fmt.Printf("Postgres host: %s\n", host)
 	if err != nil {
 		_ = container.Terminate(ctx)
 		return nil, config.DBConfig{}, err
