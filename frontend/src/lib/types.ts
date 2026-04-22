@@ -89,6 +89,10 @@ export interface ChallengeVotesResponse {
     pagination: PaginationMeta
 }
 
+export interface ChallengeMyVoteResponse {
+    level: number | null
+}
+
 export interface AdminChallengeDetail extends ChallengeDetail {
     stack_pod_spec?: string | null
 }

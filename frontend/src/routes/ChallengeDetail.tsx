@@ -60,6 +60,8 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const [votePagination, setVotePagination] = useState<PaginationMeta>(EMPTY_VOTE_PAGINATION)
     const [voteSubmitting, setVoteSubmitting] = useState(false)
     const [voteMessage, setVoteMessage] = useState('')
+    const [myVoteLevel, setMyVoteLevel] = useState<number | null>(null)
+    const [myVoteLoaded, setMyVoteLoaded] = useState(false)
     const [selectedLevel, setSelectedLevel] = useState<number | null>(null)
 
     const pushSolverPageQuery = (nextPage: number) => {
@@ -116,6 +118,18 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         }
     }
 
+    const loadMyVote = async () => {
+        if (!challengeId) return
+        try {
+            const data = await api.challengeMyVote(challengeId)
+            setMyVoteLevel(data.level)
+        } catch {
+            setMyVoteLevel(null)
+        } finally {
+            setMyVoteLoaded(true)
+        }
+    }
+
     useEffect(() => {
         if (!auth.user || !challengeId) return
         void loadChallenge()
@@ -150,7 +164,15 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }, [auth.user?.id, challengeId, votePage])
 
     useEffect(() => {
+        if (!auth.user || !challengeId) return
+        setMyVoteLoaded(false)
+        void loadMyVote()
+    }, [auth.user?.id, challengeId])
+
+    useEffect(() => {
         setVotePage(1)
+        setMyVoteLevel(null)
+        setMyVoteLoaded(false)
         setSelectedLevel(null)
     }, [challengeId])
 
@@ -168,18 +190,15 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }, [])
 
     useEffect(() => {
-        if (!auth.user) return
-        const ownVote = votes.find((item) => item.user_id === auth.user?.id)
-        if (ownVote) {
-            setSelectedLevel(ownVote.level)
+        if (!myVoteLoaded) return
+        if (myVoteLevel !== null) {
+            setSelectedLevel(myVoteLevel)
+            return
         }
-    }, [votes, auth.user?.id])
-
-    useEffect(() => {
         if (selectedLevel !== null) return
         const currentLevel = normalizeLevel(challenge?.level)
         setSelectedLevel(currentLevel > 0 ? currentLevel : 0)
-    }, [challenge?.level, selectedLevel])
+    }, [challenge?.level, myVoteLevel, myVoteLoaded, selectedLevel])
 
     const submitFlag = async () => {
         if (!challengeId || !challenge || challenge.is_locked || challenge.is_active === false) return
@@ -219,6 +238,8 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         setVoteMessage('')
         try {
             await api.voteChallengeLevel(challengeId, level)
+            setMyVoteLevel(level)
+            setMyVoteLoaded(true)
             setSelectedLevel(level)
             setVoteMessage(t('challenge.voteSubmitted'))
             await loadChallenge()
