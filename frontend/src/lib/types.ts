@@ -38,6 +38,7 @@ export interface ChallengeDetail {
     description: string
     category: string
     level: number
+    level_vote_counts?: LevelVoteCount[]
     points: number
     solve_count: number
     created_by_user_id?: number | null
@@ -71,6 +72,23 @@ export interface LockedChallenge {
 
 export type Challenge = ChallengeDetail | LockedChallenge
 
+export interface LevelVoteCount {
+    level: number
+    count: number
+}
+
+export interface ChallengeVote {
+    user_id: number
+    username: string
+    level: number
+    updated_at: string
+}
+
+export interface ChallengeVotesResponse {
+    votes: ChallengeVote[]
+    pagination: PaginationMeta
+}
+
 export interface AdminChallengeDetail extends ChallengeDetail {
     stack_pod_spec?: string | null
 }
@@ -90,7 +108,6 @@ export interface ChallengeCreatePayload {
     title: string
     description: string
     category: string
-    level?: number
     points: number
     flag: string
     is_active: boolean
@@ -106,7 +123,6 @@ export interface ChallengeUpdatePayload {
     title?: string
     description?: string
     category?: string
-    level?: number
     points?: number
     flag?: string
     is_active?: boolean

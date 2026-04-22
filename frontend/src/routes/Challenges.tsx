@@ -8,6 +8,8 @@ import { CHALLENGE_CATEGORIES } from '../lib/constants'
 import { useAuth } from '../lib/auth'
 import { navigate } from '../lib/router'
 import UserAvatar from '../components/UserAvatar'
+import { levelBadgeClass, normalizeLevel } from '../lib/level'
+import FlagIcon from '../components/FlagIcon'
 
 interface RouteProps {
     routeParams?: Record<string, string>
@@ -34,24 +36,18 @@ const parseSortFilter = (value: string | null): SortFilter => {
     return 'latest'
 }
 
-const getDifficultyBadgeClass = (level: number) => {
-    if (level >= 9) return 'bg-rose-300 text-rose-900 dark:bg-rose-700 dark:text-rose-50'
-    if (level >= 7) return 'bg-blue-300 text-blue-900 dark:bg-blue-700 dark:text-blue-50'
-    if (level >= 4) return 'bg-sky-200 text-sky-900 dark:bg-sky-700 dark:text-sky-50'
-    return 'bg-green-200 text-green-900 dark:bg-green-600 dark:text-green-50'
-}
-
 const PRIMARY_CHALLENGE_CATEGORIES = ['Web', 'Pwnable', 'Reversing', 'Crypto', 'Forensics', 'Programming', 'Misc'] as const
 const PRIMARY_CATEGORY_SET = new Set<string>(PRIMARY_CHALLENGE_CATEGORIES)
 const EXTRA_CHALLENGE_CATEGORIES = CHALLENGE_CATEGORIES.filter((category) => !PRIMARY_CATEGORY_SET.has(category))
 
-export const DifficultyBadge = ({ level, active }: { level: number; active?: boolean }) => {
+export const LevelBadge = ({ level, active }: { level?: number; active?: boolean }) => {
+    const normalized = normalizeLevel(level)
     return (
         <span
             className={`
                 inline-flex items-center justify-center
-                rounded-full bg-white
-                border border-border
+                rounded-full bg-white dark:bg-surface
+                border border-border dark:border-border/80
                 ${active ? 'ring-1 ring-accent' : ''}
                 transition
                 h-8 w-8
@@ -61,11 +57,11 @@ export const DifficultyBadge = ({ level, active }: { level: number; active?: boo
                 className={`
                     inline-flex items-center justify-center
                     rounded-full text-[11px] font-bold
-                    ${getDifficultyBadgeClass(level)}
+                    ${levelBadgeClass(normalized)}
                     h-6.5 w-6.5
                 `}
             >
-                {level}
+                {normalized > 0 ? normalized : '?'}
             </span>
         </span>
     )
@@ -354,7 +350,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                     }}
                                     className='transition hover:scale-105'
                                 >
-                                    <DifficultyBadge level={level} active={levelFilter === level} />
+                                    <LevelBadge level={level} active={levelFilter === level} />
                                 </button>
                             ))}
                         </div>
@@ -453,7 +449,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                                     }}
                                                 >
                                                     <div className='flex items-center gap-3 min-w-0'>
-                                                        <DifficultyBadge level={challenge.level} />
+                                                        <LevelBadge level={challenge.level} />
                                                         <div className='flex items-center min-w-0 flex-1'>
                                                             <span className='truncate text-[14px] sm:text-[16px] font-semibold pr-4'>{challenge.title}</span>
                                                             {challenge.is_locked ? (
@@ -464,18 +460,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                                                     </svg>
                                                                 </span>
                                                             ) : challenge.is_solved ? (
-                                                                <span className='shrink-0 w-4 h-4 text-accent -ml-1.5'>
-                                                                    <svg viewBox='0 0 24 24' className='w-full h-full'>
-                                                                        <path d='M5 6.7c.9-.8 2.1-1.2 3.5-1.2 2.7 0 4.6 2.2 8.5.6v8.8c-3.9 1.7-5.8-.9-8.5-.9-1.2 0-2.5.3-3.5.9V6.7Z' fill='currentColor' opacity='0.7' />
-                                                                        <path
-                                                                            d='M4.5 21V16M4.5 16V6.5C5.5 5.5 7 5 8.5 5C11.5 5 13.5 7.5 17.5 5.5V15.5C13.5 17.5 11.5 14.5 8.5 14.5C7.5 14.5 5.5 15 4.5 16Z'
-                                                                            fill='none'
-                                                                            stroke='currentColor'
-                                                                            strokeLinecap='round'
-                                                                            strokeLinejoin='round'
-                                                                        />
-                                                                    </svg>
-                                                                </span>
+                                                                <FlagIcon className='shrink-0 w-4 h-4 text-accent -ml-1.5' />
                                                             ) : null}
                                                         </div>
                                                     </div>
