@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -203,7 +202,6 @@ func startPostgres(ctx context.Context) (testcontainers.Container, config.DBConf
 	}
 
 	host, err := container.Host(ctx)
-	fmt.Printf("Postgres host: %s\n", host)
 	if err != nil {
 		_ = container.Terminate(ctx)
 		return nil, config.DBConfig{}, err

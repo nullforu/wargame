@@ -58,7 +58,7 @@ func (r *ChallengeVoteRepo) RepresentativeLevelByChallengeID(ctx context.Context
 		ColumnExpr("MAX(cv.updated_at) AS latest_vote_at").
 		Where("cv.challenge_id = ?", challengeID).
 		GroupExpr("cv.level").
-		OrderExpr("vote_count DESC, latest_vote_at DESC").
+		OrderExpr("vote_count DESC, latest_vote_at DESC, level DESC").
 		Limit(1)
 
 	if err := r.db.NewSelect().
@@ -92,7 +92,7 @@ func (r *ChallengeVoteRepo) RepresentativeLevelsByChallengeIDs(ctx context.Conte
 			ColumnExpr("cv.level").
 			ColumnExpr("COUNT(*) AS vote_count").
 			ColumnExpr("MAX(cv.updated_at) AS latest_vote_at").
-			ColumnExpr("ROW_NUMBER() OVER (PARTITION BY cv.challenge_id ORDER BY COUNT(*) DESC, MAX(cv.updated_at) DESC) AS rn").
+			ColumnExpr("ROW_NUMBER() OVER (PARTITION BY cv.challenge_id ORDER BY COUNT(*) DESC, MAX(cv.updated_at) DESC, cv.level DESC) AS rn").
 			Where("cv.challenge_id IN (?)", bun.In(challengeIDs)).
 			GroupExpr("cv.challenge_id, cv.level"),
 		).

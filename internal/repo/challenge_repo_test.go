@@ -137,6 +137,7 @@ func TestChallengeRepoListActiveFilteredByRepresentativeLevel(t *testing.T) {
 	chUnknown := createChallenge(t, env, "Unknown Level", 100, "FLAG{U}", true)
 	ch7 := createChallenge(t, env, "Level Seven", 100, "FLAG{L7}", true)
 	ch6 := createChallenge(t, env, "Level Six", 100, "FLAG{L6}", true)
+	chTie := createChallenge(t, env, "Level Tie", 100, "FLAG{LT}", true)
 
 	u1 := createUserForTestUserScope(t, env, "lv1@example.com", "lv1", "pass", models.UserRole)
 	u2 := createUserForTestUserScope(t, env, "lv2@example.com", "lv2", "pass", models.UserRole)
@@ -150,6 +151,10 @@ func TestChallengeRepoListActiveFilteredByRepresentativeLevel(t *testing.T) {
 	mustUpsertVote(t, voteRepo, ch6.ID, u1.ID, 6, now.Add(-2*time.Minute))
 	mustUpsertVote(t, voteRepo, ch6.ID, u2.ID, 7, now.Add(-time.Minute))
 	mustUpsertVote(t, voteRepo, ch6.ID, u1.ID, 6, now)
+
+	sameTs := now.Add(-30 * time.Second).Truncate(time.Microsecond)
+	mustUpsertVote(t, voteRepo, chTie.ID, u1.ID, 5, sameTs)
+	mustUpsertVote(t, voteRepo, chTie.ID, u2.ID, 8, sameTs)
 
 	level7 := 7
 	rows, total, err := env.challengeRepo.ListActiveFiltered(context.Background(), ChallengeListFilter{Level: &level7}, 1, 20)
@@ -169,6 +174,15 @@ func TestChallengeRepoListActiveFilteredByRepresentativeLevel(t *testing.T) {
 
 	if total != 1 || len(rows) != 1 || rows[0].ID != ch6.ID {
 		t.Fatalf("unexpected level=6 rows total=%d rows=%+v", total, rows)
+	}
+
+	level8 := 8
+	rows, total, err = env.challengeRepo.ListActiveFiltered(context.Background(), ChallengeListFilter{Level: &level8}, 1, 20)
+	if err != nil {
+		t.Fatalf("ListActiveFiltered level=8: %v", err)
+	}
+	if total != 1 || len(rows) != 1 || rows[0].ID != chTie.ID {
+		t.Fatalf("unexpected level=8 rows total=%d rows=%+v", total, rows)
 	}
 
 	levelUnknown := 0

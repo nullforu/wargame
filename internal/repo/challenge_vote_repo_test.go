@@ -75,6 +75,26 @@ func TestChallengeVoteRepoTieBreakAndPagination(t *testing.T) {
 	}
 }
 
+func TestChallengeVoteRepoRepresentativeLevelDeterministicExactTie(t *testing.T) {
+	env := setupRepoTest(t)
+	repo := NewChallengeVoteRepo(env.db)
+	ch := createChallenge(t, env, "vote-deterministic-tie", 100, "FLAG{VDT}", true)
+	u1 := createUserForTestUserScope(t, env, "dt1@example.com", "dt1", "pass", models.UserRole)
+	u2 := createUserForTestUserScope(t, env, "dt2@example.com", "dt2", "pass", models.UserRole)
+
+	ts := time.Now().UTC().Truncate(time.Microsecond)
+	mustUpsertVote(t, repo, ch.ID, u1.ID, 6, ts)
+	mustUpsertVote(t, repo, ch.ID, u2.ID, 7, ts)
+
+	level, err := repo.RepresentativeLevelByChallengeID(context.Background(), ch.ID)
+	if err != nil {
+		t.Fatalf("RepresentativeLevelByChallengeID deterministic tie: %v", err)
+	}
+	if level != 7 {
+		t.Fatalf("expected deterministic tie-break to choose higher level=7, got %d", level)
+	}
+}
+
 func TestChallengeVoteRepoRepresentativeLevelsByChallengeIDs(t *testing.T) {
 	env := setupRepoTest(t)
 	repo := NewChallengeVoteRepo(env.db)

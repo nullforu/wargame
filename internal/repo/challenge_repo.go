@@ -58,7 +58,7 @@ func (r *ChallengeRepo) ListActiveFiltered(ctx context.Context, filter Challenge
 			TableExpr("challenge_votes AS cv").
 			ColumnExpr("cv.challenge_id").
 			ColumnExpr("cv.level").
-			ColumnExpr("ROW_NUMBER() OVER (PARTITION BY cv.challenge_id ORDER BY COUNT(*) DESC, MAX(cv.updated_at) DESC) AS rn").
+			ColumnExpr("ROW_NUMBER() OVER (PARTITION BY cv.challenge_id ORDER BY COUNT(*) DESC, MAX(cv.updated_at) DESC, cv.level DESC) AS rn").
 			GroupExpr("cv.challenge_id, cv.level")
 
 		countQuery = countQuery.
