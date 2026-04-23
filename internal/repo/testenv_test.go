@@ -92,7 +92,10 @@ func startPostgres(ctx context.Context) (testcontainers.Container, config.DBConf
 			"POSTGRES_PASSWORD": "wargame",
 			"POSTGRES_DB":       "wargame_test",
 		},
-		WaitingFor: wait.ForListeningPort("5432/tcp"),
+		WaitingFor: wait.ForAll(
+			wait.ForListeningPort("5432/tcp").SkipExternalCheck(),
+			wait.ForLog("database system is ready to accept connections"),
+		),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -152,7 +155,7 @@ func setupRepoTest(t *testing.T) repoEnv {
 
 func resetRepoState(t *testing.T) {
 	t.Helper()
-	if _, err := repoDB.ExecContext(context.Background(), "TRUNCATE TABLE submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := repoDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 }
@@ -192,7 +195,6 @@ func createChallenge(t *testing.T, env repoEnv, title string, points int, flag s
 		Title:       title,
 		Description: "desc",
 		Category:    "Misc",
-		Level:       1,
 		Points:      points,
 		IsActive:    active,
 		CreatedAt:   time.Now().UTC(),

@@ -150,7 +150,6 @@ type challengeQueryFilters struct {
 
 func parseChallengeFilters(ctx *gin.Context) (challengeQueryFilters, bool) {
 	category := strings.TrimSpace(ctx.Query("category"))
-
 	var level *int
 	if levelRaw := strings.TrimSpace(ctx.Query("level")); levelRaw != "" {
 		parsed, err := strconv.Atoi(levelRaw)
@@ -693,7 +692,7 @@ func (h *Handler) CreateChallenge(ctx *gin.Context) {
 		stackEnabled = *req.StackEnabled
 	}
 
-	challenge, err := h.wargame.CreateChallenge(ctx.Request.Context(), req.Title, req.Description, req.Category, req.Level, req.Points, req.Flag, active, stackEnabled, stack.TargetPortSpecs(req.StackTargetPorts), req.StackPodSpec, req.PreviousChallengeID)
+	challenge, err := h.wargame.CreateChallenge(ctx.Request.Context(), req.Title, req.Description, req.Category, req.Points, req.Flag, active, stackEnabled, stack.TargetPortSpecs(req.StackTargetPorts), req.StackPodSpec, req.PreviousChallengeID)
 	if err != nil {
 		writeError(ctx, err)
 		return
@@ -758,7 +757,7 @@ func (h *Handler) UpdateChallenge(ctx *gin.Context) {
 		previousChallengeID = req.PreviousChallengeID.Value
 	}
 
-	challenge, err := h.wargame.UpdateChallenge(ctx.Request.Context(), challengeID, title, description, category, req.Level, req.Points, flag, req.IsActive, req.StackEnabled, req.StackTargetPorts, stackPodSpec, previousChallengeID, previousChallengeSet)
+	challenge, err := h.wargame.UpdateChallenge(ctx.Request.Context(), challengeID, title, description, category, req.Points, flag, req.IsActive, req.StackEnabled, req.StackTargetPorts, stackPodSpec, previousChallengeID, previousChallengeSet)
 	if err != nil {
 		writeError(ctx, err)
 		return
@@ -872,6 +871,65 @@ func (h *Handler) DeleteChallengeFile(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, false))
+}
+
+func (h *Handler) VoteChallengeLevel(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req levelVoteRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	if err := h.wargame.VoteChallengeLevel(ctx.Request.Context(), middleware.UserID(ctx), challengeID, req.Level); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *Handler) ChallengeVotes(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	votes, pagination, err := h.wargame.ChallengeVotesPage(ctx.Request.Context(), challengeID, page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	for i := range votes {
+		votes[i].UpdatedAt = votes[i].UpdatedAt.UTC()
+	}
+
+	ctx.JSON(http.StatusOK, challengeVotesResponse{Votes: votes, Pagination: pagination})
+}
+
+func (h *Handler) ChallengeMyVote(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	level, err := h.wargame.ChallengeVoteLevelByUser(ctx.Request.Context(), middleware.UserID(ctx), challengeID)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, challengeMyVoteResponse{Level: level})
 }
 
 func (h *Handler) Leaderboard(ctx *gin.Context) {

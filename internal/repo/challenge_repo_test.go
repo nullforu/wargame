@@ -100,14 +100,12 @@ func TestChallengeRepoListActiveFiltered(t *testing.T) {
 	user := createUserForTestUserScope(t, env, "solver@example.com", "solver", "pass", models.UserRole)
 
 	web := createChallenge(t, env, "Web Warmup", 300, "FLAG{1}", true)
-	web.Level = 3
 	web.Category = "Web"
 	if err := env.challengeRepo.Update(context.Background(), web); err != nil {
 		t.Fatalf("update web: %v", err)
 	}
 
 	crypto := createChallenge(t, env, "Crypto Warmup", 700, "FLAG{2}", true)
-	crypto.Level = 7
 	crypto.Category = "Crypto"
 	if err := env.challengeRepo.Update(context.Background(), crypto); err != nil {
 		t.Fatalf("update crypto: %v", err)
@@ -115,13 +113,11 @@ func TestChallengeRepoListActiveFiltered(t *testing.T) {
 
 	createSubmission(t, env, user.ID, web.ID, true, time.Now().UTC())
 
-	level := 3
 	solved := true
 	userID := user.ID
 	rows, total, err := env.challengeRepo.ListActiveFiltered(context.Background(), ChallengeListFilter{
 		Query:          "Warmup",
 		Category:       "Web",
-		Level:          &level,
 		Solved:         &solved,
 		SolvedByUserID: &userID,
 	}, 1, 20)
@@ -131,6 +127,72 @@ func TestChallengeRepoListActiveFiltered(t *testing.T) {
 
 	if total != 1 || len(rows) != 1 || rows[0].ID != web.ID {
 		t.Fatalf("unexpected filtered rows: total=%d rows=%+v", total, rows)
+	}
+}
+
+func TestChallengeRepoListActiveFilteredByRepresentativeLevel(t *testing.T) {
+	env := setupRepoTest(t)
+	voteRepo := NewChallengeVoteRepo(env.db)
+
+	chUnknown := createChallenge(t, env, "Unknown Level", 100, "FLAG{U}", true)
+	ch7 := createChallenge(t, env, "Level Seven", 100, "FLAG{L7}", true)
+	ch6 := createChallenge(t, env, "Level Six", 100, "FLAG{L6}", true)
+	chTie := createChallenge(t, env, "Level Tie", 100, "FLAG{LT}", true)
+
+	u1 := createUserForTestUserScope(t, env, "lv1@example.com", "lv1", "pass", models.UserRole)
+	u2 := createUserForTestUserScope(t, env, "lv2@example.com", "lv2", "pass", models.UserRole)
+	u3 := createUserForTestUserScope(t, env, "lv3@example.com", "lv3", "pass", models.UserRole)
+	now := time.Now().UTC()
+
+	mustUpsertVote(t, voteRepo, ch7.ID, u1.ID, 7, now.Add(-3*time.Minute))
+	mustUpsertVote(t, voteRepo, ch7.ID, u2.ID, 7, now.Add(-2*time.Minute))
+	mustUpsertVote(t, voteRepo, ch7.ID, u3.ID, 6, now.Add(-time.Minute))
+
+	mustUpsertVote(t, voteRepo, ch6.ID, u1.ID, 6, now.Add(-2*time.Minute))
+	mustUpsertVote(t, voteRepo, ch6.ID, u2.ID, 7, now.Add(-time.Minute))
+	mustUpsertVote(t, voteRepo, ch6.ID, u1.ID, 6, now)
+
+	sameTs := now.Add(-30 * time.Second).Truncate(time.Microsecond)
+	mustUpsertVote(t, voteRepo, chTie.ID, u1.ID, 5, sameTs)
+	mustUpsertVote(t, voteRepo, chTie.ID, u2.ID, 8, sameTs)
+
+	level7 := 7
+	rows, total, err := env.challengeRepo.ListActiveFiltered(context.Background(), ChallengeListFilter{Level: &level7}, 1, 20)
+	if err != nil {
+		t.Fatalf("ListActiveFiltered level=7: %v", err)
+	}
+
+	if total != 1 || len(rows) != 1 || rows[0].ID != ch7.ID {
+		t.Fatalf("unexpected level=7 rows total=%d rows=%+v", total, rows)
+	}
+
+	level6 := 6
+	rows, total, err = env.challengeRepo.ListActiveFiltered(context.Background(), ChallengeListFilter{Level: &level6}, 1, 20)
+	if err != nil {
+		t.Fatalf("ListActiveFiltered level=6: %v", err)
+	}
+
+	if total != 1 || len(rows) != 1 || rows[0].ID != ch6.ID {
+		t.Fatalf("unexpected level=6 rows total=%d rows=%+v", total, rows)
+	}
+
+	level8 := 8
+	rows, total, err = env.challengeRepo.ListActiveFiltered(context.Background(), ChallengeListFilter{Level: &level8}, 1, 20)
+	if err != nil {
+		t.Fatalf("ListActiveFiltered level=8: %v", err)
+	}
+	if total != 1 || len(rows) != 1 || rows[0].ID != chTie.ID {
+		t.Fatalf("unexpected level=8 rows total=%d rows=%+v", total, rows)
+	}
+
+	levelUnknown := 0
+	rows, total, err = env.challengeRepo.ListActiveFiltered(context.Background(), ChallengeListFilter{Level: &levelUnknown}, 1, 20)
+	if err != nil {
+		t.Fatalf("ListActiveFiltered level=0: %v", err)
+	}
+
+	if total != 1 || len(rows) != 1 || rows[0].ID != chUnknown.ID {
+		t.Fatalf("unexpected level=0 rows total=%d rows=%+v", total, rows)
 	}
 }
 

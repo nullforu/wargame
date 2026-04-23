@@ -6,7 +6,7 @@
 
 BEGIN;
 
-TRUNCATE TABLE submissions, stacks, challenges, users RESTART IDENTITY CASCADE;
+TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users RESTART IDENTITY CASCADE;
 
 -- bcrypt("pass1234!", cost=10)
 -- generated value: $2a$10$bsyMO/LWwVSIFN.LS09qbuPjVxwIvOqC3i79lJ6hzHw722cwLRa4m
@@ -32,7 +32,6 @@ INSERT INTO challenges (
     id,
     title,
     description,
-    level,
     points,
     category,
     flag_hash,
@@ -63,7 +62,6 @@ SELECT
     g.cid,
     format('Challenge %03s', g.cid),
     format('This is dummy challenge #%s. Category rotation, prerequisite chain, and varied points are included for pagination/search/load testing.', g.cid),
-    g.level,
     (g.level * 100) + ((g.cid % 3) * 20),
     (ARRAY['Web', 'Pwnable', 'Reversing', 'Crypto', 'Forensics', 'Cloud', 'Misc', 'Programming'])[((g.cid - 1) % 8) + 1],
     '$2a$10$bsyMO/LWwVSIFN.LS09qbuPjVxwIvOqC3i79lJ6hzHw722cwLRa4m',
@@ -128,6 +126,21 @@ JOIN challenges c ON c.is_active = TRUE
 WHERE u.role = 'user'
   AND ((u.id * 7 + c.id * 13) % 31 = 0)
 LIMIT 220;
+
+-- Seed level votes from solved users so representative level is derived from votes.
+-- Vote levels are deterministic 1..10 and comply with the "must solve before voting" rule.
+INSERT INTO challenge_votes (user_id, challenge_id, level, created_at, updated_at)
+SELECT
+    s.user_id,
+    s.challenge_id,
+    (((s.user_id * 7 + s.challenge_id * 11) % 10) + 1) AS level,
+    s.submitted_at + INTERVAL '5 minutes',
+    s.submitted_at + INTERVAL '5 minutes'
+FROM submissions AS s
+JOIN users AS u ON u.id = s.user_id
+WHERE s.correct = TRUE
+  AND u.role = 'user'
+  AND ((s.user_id * 13 + s.challenge_id * 17) % 4 <> 0);
 
 -- Active stacks on stack-enabled challenges
 INSERT INTO stacks (user_id, challenge_id, stack_id, status, node_public_ip, ports, ttl_expires_at, created_at, updated_at)

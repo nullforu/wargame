@@ -55,7 +55,7 @@ func ptrString(value string) *string { return &value }
 func TestWargameServiceCreateListGetChallenge(t *testing.T) {
 	env := setupServiceTest(t)
 
-	created, err := env.wargameSvc.CreateChallenge(context.Background(), "Title", "Desc", "Misc", nil, 100, "FLAG{1}", true, false, nil, nil, nil)
+	created, err := env.wargameSvc.CreateChallenge(context.Background(), "Title", "Desc", "Misc", 100, "FLAG{1}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge: %v", err)
 	}
@@ -82,15 +82,15 @@ func TestWargameServiceCreateListGetChallenge(t *testing.T) {
 
 func TestWargameServiceSearchAndPagination(t *testing.T) {
 	env := setupServiceTest(t)
-	_, err := env.wargameSvc.CreateChallenge(context.Background(), "Web Warmup", "Desc", "Web", nil, 100, "FLAG{1}", true, false, nil, nil, nil)
+	_, err := env.wargameSvc.CreateChallenge(context.Background(), "Web Warmup", "Desc", "Web", 100, "FLAG{1}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge 1: %v", err)
 	}
-	_, err = env.wargameSvc.CreateChallenge(context.Background(), "Web Advanced", "Desc", "Web", nil, 100, "FLAG{2}", true, false, nil, nil, nil)
+	_, err = env.wargameSvc.CreateChallenge(context.Background(), "Web Advanced", "Desc", "Web", 100, "FLAG{2}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge 2: %v", err)
 	}
-	_, err = env.wargameSvc.CreateChallenge(context.Background(), "Crypto Basic", "Desc", "Crypto", nil, 100, "FLAG{3}", true, false, nil, nil, nil)
+	_, err = env.wargameSvc.CreateChallenge(context.Background(), "Crypto Basic", "Desc", "Crypto", 100, "FLAG{3}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge 3: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestWargameServiceUpdateAndDeleteChallenge(t *testing.T) {
 	points := 120
 	active := false
 
-	updated, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, &title, &desc, &category, nil, &points, nil, &active, nil, nil, nil, nil, false)
+	updated, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, &title, &desc, &category, &points, nil, &active, nil, nil, nil, nil, false)
 	if err != nil {
 		t.Fatalf("UpdateChallenge: %v", err)
 	}
@@ -183,12 +183,11 @@ func TestWargameServiceChallengeFiltersAndPagedSolvedAndSolvers(t *testing.T) {
 	user1 := createUser(t, env, "f1@example.com", "f1", "pass", models.UserRole)
 	user2 := createUser(t, env, "f2@example.com", "f2", "pass", models.UserRole)
 
-	level3 := 3
-	chWeb, err := env.wargameSvc.CreateChallenge(context.Background(), "Web SQL", "Desc", "Web", &level3, 200, "FLAG{WEB}", true, false, nil, nil, nil)
+	chWeb, err := env.wargameSvc.CreateChallenge(context.Background(), "Web SQL", "Desc", "Web", 200, "FLAG{WEB}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge web: %v", err)
 	}
-	chCrypto, err := env.wargameSvc.CreateChallenge(context.Background(), "Crypto RSA", "Desc", "Crypto", nil, 150, "FLAG{CRYPTO}", true, false, nil, nil, nil)
+	chCrypto, err := env.wargameSvc.CreateChallenge(context.Background(), "Crypto RSA", "Desc", "Crypto", 150, "FLAG{CRYPTO}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge crypto: %v", err)
 	}
@@ -200,7 +199,6 @@ func TestWargameServiceChallengeFiltersAndPagedSolvedAndSolvers(t *testing.T) {
 	solvedTrue := true
 	rows, pagination, err := env.wargameSvc.ListChallenges(context.Background(), 1, 20, ChallengeQueryFilter{
 		Category: "Web",
-		Level:    &level3,
 		Solved:   &solvedTrue,
 		UserID:   user1.ID,
 	})
@@ -239,7 +237,6 @@ func TestWargameServiceChallengeFiltersAndPagedSolvedAndSolvers(t *testing.T) {
 
 	searchRows, _, err := env.wargameSvc.SearchChallenges(context.Background(), "Web", 1, 20, ChallengeQueryFilter{
 		Category: "Web",
-		Level:    &level3,
 		Solved:   &solvedTrue,
 		UserID:   user1.ID,
 	})
@@ -291,6 +288,21 @@ func TestWargameServiceChallengeFiltersAndPagedSolvedAndSolvers(t *testing.T) {
 	}
 }
 
+func TestWargameServiceLevelFilterValidation(t *testing.T) {
+	env := setupServiceTest(t)
+
+	level := 11
+	_, _, err := env.wargameSvc.ListChallenges(context.Background(), 1, 20, ChallengeQueryFilter{Level: &level})
+	if err == nil {
+		t.Fatalf("expected validation error for invalid level filter")
+	}
+
+	var ve *ValidationError
+	if !errors.As(err, &ve) {
+		t.Fatalf("expected validation error type, got %v", err)
+	}
+}
+
 func TestWargameServiceChallengeSortValidationAndOrder(t *testing.T) {
 	env := setupServiceTest(t)
 	user1 := createUser(t, env, "sort1@example.com", "sort1", "pass", models.UserRole)
@@ -298,22 +310,22 @@ func TestWargameServiceChallengeSortValidationAndOrder(t *testing.T) {
 	blocked := createUser(t, env, "sortblocked@example.com", "sortblocked", "pass", models.BlockedRole)
 	adminUser := createUser(t, env, "sortadmin@example.com", "sortadmin", "pass", models.AdminRole)
 
-	chA, err := env.wargameSvc.CreateChallenge(context.Background(), "Sort A", "Desc", "Web", nil, 100, "FLAG{A}", true, false, nil, nil, nil)
+	chA, err := env.wargameSvc.CreateChallenge(context.Background(), "Sort A", "Desc", "Web", 100, "FLAG{A}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge A: %v", err)
 	}
 
-	chB, err := env.wargameSvc.CreateChallenge(context.Background(), "Sort B", "Desc", "Web", nil, 100, "FLAG{B}", true, false, nil, nil, nil)
+	chB, err := env.wargameSvc.CreateChallenge(context.Background(), "Sort B", "Desc", "Web", 100, "FLAG{B}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge B: %v", err)
 	}
 
-	chC, err := env.wargameSvc.CreateChallenge(context.Background(), "Sort C", "Desc", "Web", nil, 100, "FLAG{C}", true, false, nil, nil, nil)
+	chC, err := env.wargameSvc.CreateChallenge(context.Background(), "Sort C", "Desc", "Web", 100, "FLAG{C}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge C: %v", err)
 	}
 
-	chD, err := env.wargameSvc.CreateChallenge(context.Background(), "Sort D", "Desc", "Web", nil, 100, "FLAG{D}", true, false, nil, nil, nil)
+	chD, err := env.wargameSvc.CreateChallenge(context.Background(), "Sort D", "Desc", "Web", 100, "FLAG{D}", true, false, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateChallenge D: %v", err)
 	}
@@ -426,17 +438,12 @@ func TestWargameServiceValidationAndNotFound(t *testing.T) {
 		t.Fatalf("expected ErrChallengeNotFound, got %v", err)
 	}
 
-	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "", "", "Nope", nil, -1, "", true, false, nil, nil, nil); err == nil {
+	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "", "", "Nope", -1, "", true, false, nil, nil, nil); err == nil {
 		t.Fatalf("expected create validation error")
 	}
-	badLevel := 11
-	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "BadLevel", "Desc", "Web", &badLevel, 100, "FLAG{L}", true, false, nil, nil, nil); err == nil {
-		t.Fatalf("expected level validation error")
-	}
-
 	badPts := 50
 	challenge := createChallenge(t, env, "X", 100, "FLAG{X}", true)
-	if _, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, &badPts, nil, nil, nil, nil, nil, nil, false); err != nil {
+	if _, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, &badPts, nil, nil, nil, nil, nil, nil, false); err != nil {
 		t.Fatalf("unexpected update error in fixed scoring mode: %v", err)
 	}
 }
@@ -504,11 +511,12 @@ func TestWargameServiceFileErrorPaths(t *testing.T) {
 		t.Fatalf("expected filename validation error")
 	}
 
-	if _, _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, env.redis, nil).RequestChallengeFileUpload(context.Background(), challenge.ID, "bundle.zip"); !errors.Is(err, ErrStorageUnavailable) {
+	voteRepo := repo.NewChallengeVoteRepo(serviceDB)
+	if _, _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, env.redis, nil).RequestChallengeFileUpload(context.Background(), challenge.ID, "bundle.zip"); !errors.Is(err, ErrStorageUnavailable) {
 		t.Fatalf("expected ErrStorageUnavailable, got %v", err)
 	}
 
-	if _, _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, env.redis, errorFileStore{uploadErr: errors.New("presign fail")}).RequestChallengeFileUpload(context.Background(), challenge.ID, "bundle.zip"); err == nil || !strings.Contains(err.Error(), "presign") {
+	if _, _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, env.redis, errorFileStore{uploadErr: errors.New("presign fail")}).RequestChallengeFileUpload(context.Background(), challenge.ID, "bundle.zip"); err == nil || !strings.Contains(err.Error(), "presign") {
 		t.Fatalf("expected presign error, got %v", err)
 	}
 
@@ -521,15 +529,15 @@ func TestWargameServiceFileErrorPaths(t *testing.T) {
 		t.Fatalf("upload seed: %v", err)
 	}
 
-	if _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, env.redis, errorFileStore{downloadErr: errors.New("download fail")}).RequestChallengeFileDownload(context.Background(), 0, challenge.ID); err == nil || !strings.Contains(err.Error(), "presign") {
+	if _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, env.redis, errorFileStore{downloadErr: errors.New("download fail")}).RequestChallengeFileDownload(context.Background(), 0, challenge.ID); err == nil || !strings.Contains(err.Error(), "presign") {
 		t.Fatalf("expected download presign error, got %v", err)
 	}
 
-	if _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, env.redis, nil).RequestChallengeFileDownload(context.Background(), 0, challenge.ID); !errors.Is(err, ErrStorageUnavailable) {
+	if _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, env.redis, nil).RequestChallengeFileDownload(context.Background(), 0, challenge.ID); !errors.Is(err, ErrStorageUnavailable) {
 		t.Fatalf("expected ErrStorageUnavailable, got %v", err)
 	}
 
-	if _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, env.redis, errorFileStore{deleteErr: errors.New("delete fail")}).DeleteChallengeFile(context.Background(), challenge.ID); err == nil || !strings.Contains(err.Error(), "delete") {
+	if _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, env.redis, errorFileStore{deleteErr: errors.New("delete fail")}).DeleteChallengeFile(context.Background(), challenge.ID); err == nil || !strings.Contains(err.Error(), "delete") {
 		t.Fatalf("expected delete error, got %v", err)
 	}
 }
@@ -538,12 +546,12 @@ func TestWargameServiceStackValidationAndSolvedIDsEdge(t *testing.T) {
 	env := setupServiceTest(t)
 	podSpec := "apiVersion: v1\nkind: Pod\nmetadata:\n  name: test\nspec:\n  containers:\n    - name: app\n      image: nginx\n      ports:\n        - containerPort: 80\n"
 
-	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "StackBad", "Desc", "Web", nil, 100, "FLAG{S}", true, true, nil, &podSpec, nil); err == nil {
+	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "StackBad", "Desc", "Web", 100, "FLAG{S}", true, true, nil, &podSpec, nil); err == nil {
 		t.Fatalf("expected missing stack_target_ports validation error")
 	}
 
 	badPorts := stack.TargetPortSpecs{{ContainerPort: 80, Protocol: "ICMP"}}
-	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "StackBad2", "Desc", "Web", nil, 100, "FLAG{S2}", true, true, badPorts, &podSpec, nil); err == nil {
+	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "StackBad2", "Desc", "Web", 100, "FLAG{S2}", true, true, badPorts, &podSpec, nil); err == nil {
 		t.Fatalf("expected invalid protocol validation error")
 	}
 
@@ -552,7 +560,8 @@ func TestWargameServiceStackValidationAndSolvedIDsEdge(t *testing.T) {
 		t.Fatalf("expected empty solved ids for user 0, ids=%v err=%v", ids, err)
 	}
 
-	nilRepoSvc := NewWargameService(env.cfg, env.challengeRepo, nil, env.redis, storage.NewMemoryChallengeFileStore(10*time.Minute))
+	voteRepo := repo.NewChallengeVoteRepo(serviceDB)
+	nilRepoSvc := NewWargameService(env.cfg, env.challengeRepo, nil, voteRepo, env.redis, storage.NewMemoryChallengeFileStore(10*time.Minute))
 	ids, err = nilRepoSvc.SolvedChallengeIDs(context.Background(), 1)
 	if err != nil || len(ids) != 0 {
 		t.Fatalf("expected empty solved ids with nil repo, ids=%v err=%v", ids, err)
@@ -567,8 +576,9 @@ func TestWargameServiceErrorPathsWithClosedDB(t *testing.T) {
 	closedDB := newClosedServiceDB(t)
 	challengeRepo := repo.NewChallengeRepo(closedDB)
 	submissionRepo := repo.NewSubmissionRepo(closedDB)
+	voteRepo := repo.NewChallengeVoteRepo(closedDB)
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
-	wargameSvc := NewWargameService(serviceCfg, challengeRepo, submissionRepo, serviceRedis, fileStore)
+	wargameSvc := NewWargameService(serviceCfg, challengeRepo, submissionRepo, voteRepo, serviceRedis, fileStore)
 
 	if _, _, err := wargameSvc.ListChallenges(context.Background(), 1, 20, ChallengeQueryFilter{}); err == nil {
 		t.Fatalf("expected ListChallenges error")
@@ -584,7 +594,7 @@ func TestWargameServiceUpdateChallengeFlagHashAndPrevious(t *testing.T) {
 	prev := createChallenge(t, env, "Prev", 50, "FLAG{PREV}", true)
 	newFlag := "FLAG{NEW}"
 
-	updated, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, nil, &newFlag, nil, nil, nil, nil, &prev.ID, true)
+	updated, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, &newFlag, nil, nil, nil, nil, &prev.ID, true)
 	if err != nil {
 		t.Fatalf("UpdateChallenge with flag/previous: %v", err)
 	}
@@ -597,12 +607,12 @@ func TestWargameServiceUpdateChallengeFlagHashAndPrevious(t *testing.T) {
 	}
 
 	selfID := challenge.ID
-	if _, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &selfID, true); err == nil {
+	if _, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, nil, nil, nil, nil, nil, &selfID, true); err == nil {
 		t.Fatalf("expected self previous_challenge_id validation error")
 	}
 
 	nilPrev := (*int64)(nil)
-	if _, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nilPrev, true); err != nil {
+	if _, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, nil, nil, nil, nil, nil, nilPrev, true); err != nil {
 		t.Fatalf("expected previous_challenge_id clear, got %v", err)
 	}
 }
@@ -620,12 +630,146 @@ func TestWargameServiceUploadReplacesOldFileBestEffort(t *testing.T) {
 		t.Fatalf("seed old file: %v", err)
 	}
 
-	svc := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, env.redis, errorFileStore{deleteErr: errors.New("best effort")})
+	voteRepo := repo.NewChallengeVoteRepo(serviceDB)
+	svc := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, env.redis, errorFileStore{deleteErr: errors.New("best effort")})
 	updated, _, err := svc.RequestChallengeFileUpload(context.Background(), challenge.ID, "new.zip")
 	if err != nil {
 		t.Fatalf("expected upload success despite delete failure, got %v", err)
 	}
 	if updated.FileKey == nil || *updated.FileKey == oldKey {
 		t.Fatalf("expected file key replaced, got %+v", updated.FileKey)
+	}
+}
+func TestWargameServiceVoteChallengeLevelAndChallengeVotesPage(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "vote-user@example.com", "vote-user", "pass", models.UserRole)
+	challenge := createChallenge(t, env, "level-target", 100, "FLAG{LV}", true)
+
+	if err := env.wargameSvc.VoteChallengeLevel(context.Background(), user.ID, challenge.ID, 7); !errors.Is(err, ErrChallengeNotSolvedByUser) {
+		t.Fatalf("expected ErrChallengeNotSolvedByUser, got %v", err)
+	}
+
+	createSubmission(t, env, user.ID, challenge.ID, true, time.Now().UTC())
+
+	if err := env.wargameSvc.VoteChallengeLevel(context.Background(), user.ID, challenge.ID, 7); err != nil {
+		t.Fatalf("VoteChallengeLevel: %v", err)
+	}
+
+	votes, pagination, err := env.wargameSvc.ChallengeVotesPage(context.Background(), challenge.ID, 1, 10)
+	if err != nil {
+		t.Fatalf("ChallengeVotesPage: %v", err)
+	}
+
+	if len(votes) != 1 || votes[0].Level != 7 || votes[0].UserID != user.ID {
+		t.Fatalf("unexpected votes: %+v", votes)
+	}
+
+	if pagination.TotalCount != 1 {
+		t.Fatalf("unexpected pagination: %+v", pagination)
+	}
+
+	detail, err := env.wargameSvc.GetChallengeByID(context.Background(), challenge.ID)
+	if err != nil {
+		t.Fatalf("GetChallengeByID: %v", err)
+	}
+
+	if detail.Level != 7 {
+		t.Fatalf("expected representative level 7, got %d", detail.Level)
+	}
+
+	if len(detail.LevelVotes) != 1 || detail.LevelVotes[0].Level != 7 || detail.LevelVotes[0].Count != 1 {
+		t.Fatalf("unexpected level vote counts: %+v", detail.LevelVotes)
+	}
+}
+
+func TestWargameServiceVoteChallengeLevelValidationAndNotFound(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "vote2@example.com", "vote2", "pass", models.UserRole)
+
+	err := env.wargameSvc.VoteChallengeLevel(context.Background(), user.ID, 1, 0)
+	var ve *ValidationError
+	if !errors.As(err, &ve) {
+		t.Fatalf("expected validation error for level=0, got %v", err)
+	}
+
+	if err := env.wargameSvc.VoteChallengeLevel(context.Background(), user.ID, 999999, 3); !errors.Is(err, ErrChallengeNotFound) {
+		t.Fatalf("expected ErrChallengeNotFound, got %v", err)
+	}
+
+	_, _, err = env.wargameSvc.ChallengeVotesPage(context.Background(), 0, 1, 10)
+	if !errors.As(err, &ve) {
+		t.Fatalf("expected validation error for challenge id, got %v", err)
+	}
+}
+
+func TestWargameServiceApplyChallengeLevelsUnknownByDefault(t *testing.T) {
+	env := setupServiceTest(t)
+	ch1 := createChallenge(t, env, "no-votes-1", 100, "FLAG{N1}", true)
+	ch2 := createChallenge(t, env, "no-votes-2", 100, "FLAG{N2}", true)
+
+	rows, _, err := env.wargameSvc.ListChallenges(context.Background(), 1, 20, ChallengeQueryFilter{})
+	if err != nil {
+		t.Fatalf("ListChallenges: %v", err)
+	}
+
+	levels := map[int64]int{}
+	for _, row := range rows {
+		levels[row.ID] = row.Level
+	}
+
+	if levels[ch1.ID] != models.UnknownLevel || levels[ch2.ID] != models.UnknownLevel {
+		t.Fatalf("expected unknown levels for no-vote challenges: %+v", levels)
+	}
+}
+
+func TestWargameServiceChallengeVotesPageNotFound(t *testing.T) {
+	env := setupServiceTest(t)
+	if _, _, err := env.wargameSvc.ChallengeVotesPage(context.Background(), 999999, 1, 10); !errors.Is(err, ErrChallengeNotFound) {
+		t.Fatalf("expected ErrChallengeNotFound, got %v", err)
+	}
+}
+
+func TestWargameServiceChallengeVoteLevelByUser(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "myvote@example.com", "myvote", "pass", models.UserRole)
+	challenge := createChallenge(t, env, "myvote-target", 100, "FLAG{MYV}", true)
+
+	level, err := env.wargameSvc.ChallengeVoteLevelByUser(context.Background(), user.ID, challenge.ID)
+	if err != nil {
+		t.Fatalf("ChallengeVoteLevelByUser empty: %v", err)
+	}
+
+	if level != nil {
+		t.Fatalf("expected nil level before vote, got %+v", level)
+	}
+
+	createSubmission(t, env, user.ID, challenge.ID, true, time.Now().UTC())
+	if err := env.wargameSvc.VoteChallengeLevel(context.Background(), user.ID, challenge.ID, 6); err != nil {
+		t.Fatalf("VoteChallengeLevel: %v", err)
+	}
+
+	level, err = env.wargameSvc.ChallengeVoteLevelByUser(context.Background(), user.ID, challenge.ID)
+	if err != nil {
+		t.Fatalf("ChallengeVoteLevelByUser: %v", err)
+	}
+
+	if level == nil || *level != 6 {
+		t.Fatalf("expected level=6, got %+v", level)
+	}
+}
+
+func TestWargameServiceVoteChallengeLevelRepoFailures(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "vote3@example.com", "vote3", "pass", models.UserRole)
+	challenge := createChallenge(t, env, "repo-fail", 100, "FLAG{RF}", true)
+	createSubmission(t, env, user.ID, challenge.ID, true, time.Now().UTC())
+
+	closedDB := newClosedServiceDB(t)
+	voteRepo := repo.NewChallengeVoteRepo(closedDB)
+	origSvc := env.wargameSvc
+	env.wargameSvc = NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, env.redis, origSvc.fileStore)
+
+	if err := env.wargameSvc.VoteChallengeLevel(context.Background(), user.ID, challenge.ID, 5); err == nil {
+		t.Fatalf("expected vote repo failure")
 	}
 }

@@ -19,7 +19,6 @@ const CreateChallenge = () => {
     const [title, setTitle] = useState('Example title: Enter a concise and clear title')
     const [description, setDescription] = useState('')
     const [category, setCategory] = useState<string>(CHALLENGE_CATEGORIES[0])
-    const [level, setLevel] = useState(1)
     const [points, setPoints] = useState(100)
     const [flag, setFlag] = useState('')
     const [isActive, setIsActive] = useState(true)
@@ -78,7 +77,6 @@ const CreateChallenge = () => {
                 title,
                 description,
                 category,
-                level: Number(level),
                 points: Number(points),
                 flag,
                 is_active: isActive,
@@ -112,7 +110,6 @@ const CreateChallenge = () => {
             setTitle('')
             setDescription('')
             setCategory(CHALLENGE_CATEGORIES[0])
-            setLevel(1)
             setPoints(100)
             setFlag('')
             setIsActive(true)
@@ -192,25 +189,6 @@ const CreateChallenge = () => {
                             {fieldErrors.category ? (
                                 <p className='mt-2 text-xs text-danger'>
                                     {t('common.category')}: {fieldErrors.category}
-                                </p>
-                            ) : null}
-                        </div>
-                        <div>
-                            <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor='admin-level'>
-                                {t('common.level')}
-                            </label>
-                            <input
-                                id='admin-level'
-                                className='mt-2 w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text focus:border-accent focus:outline-none'
-                                type='number'
-                                min={1}
-                                max={10}
-                                value={level}
-                                onChange={(event) => setLevel(Number(event.target.value))}
-                            />
-                            {fieldErrors.level ? (
-                                <p className='mt-2 text-xs text-danger'>
-                                    {t('common.level')}: {fieldErrors.level}
                                 </p>
                             ) : null}
                         </div>

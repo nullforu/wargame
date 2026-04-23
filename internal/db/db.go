@@ -41,12 +41,10 @@ func AutoMigrate(ctx context.Context, db *bun.DB) error {
 		(*models.Challenge)(nil),
 		(*models.Stack)(nil),
 		(*models.Submission)(nil),
+		(*models.ChallengeVote)(nil),
 	}
 
 	if err := createTables(ctx, db, modelsToCreate); err != nil {
-		return err
-	}
-	if err := ensureColumns(ctx, db); err != nil {
 		return err
 	}
 
@@ -68,11 +66,14 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 		name  string
 		query string
 	}{
-		{name: "idx_challenges_category_level", query: "CREATE INDEX IF NOT EXISTS idx_challenges_category_level ON challenges (category, level)"},
+		{name: "idx_challenges_category", query: "CREATE INDEX IF NOT EXISTS idx_challenges_category ON challenges (category)"},
 		{name: "idx_submissions_user", query: "CREATE INDEX IF NOT EXISTS idx_submissions_user ON submissions (user_id)"},
 		{name: "idx_submissions_challenge", query: "CREATE INDEX IF NOT EXISTS idx_submissions_challenge ON submissions (challenge_id)"},
 		{name: "idx_submissions_user_challenge", query: "CREATE INDEX IF NOT EXISTS idx_submissions_user_challenge ON submissions (user_id, challenge_id)"},
 		{name: "idx_submissions_correct_time", query: "CREATE INDEX IF NOT EXISTS idx_submissions_correct_time ON submissions (correct, submitted_at) WHERE correct = true"},
+		{name: "idx_challenge_votes_challenge", query: "CREATE INDEX IF NOT EXISTS idx_challenge_votes_challenge ON challenge_votes (challenge_id)"},
+		{name: "idx_challenge_votes_challenge_level", query: "CREATE INDEX IF NOT EXISTS idx_challenge_votes_challenge_level ON challenge_votes (challenge_id, level)"},
+		{name: "idx_challenge_votes_user_challenge", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_challenge_votes_user_challenge ON challenge_votes (user_id, challenge_id)"},
 		{name: "idx_stacks_user_id", query: "CREATE INDEX IF NOT EXISTS idx_stacks_user_id ON stacks (user_id)"},
 		{name: "idx_stacks_user_challenge", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_stacks_user_challenge ON stacks (user_id, challenge_id)"},
 		{name: "idx_stacks_stack_id", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_stacks_stack_id ON stacks (stack_id)"},
@@ -81,24 +82,6 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 	for _, idx := range indexes {
 		if _, err := db.ExecContext(ctx, idx.query); err != nil {
 			return fmt.Errorf("auto migrate create index %s: %w", idx.name, err)
-		}
-	}
-
-	return nil
-}
-
-func ensureColumns(ctx context.Context, db *bun.DB) error {
-	queries := []struct {
-		name  string
-		query string
-	}{
-		{name: "challenges.level", query: "ALTER TABLE challenges ADD COLUMN IF NOT EXISTS level integer NOT NULL DEFAULT 1"},
-		{name: "challenges.created_by_user_id", query: "ALTER TABLE challenges ADD COLUMN IF NOT EXISTS created_by_user_id bigint NULL REFERENCES users(id) ON DELETE SET NULL"},
-	}
-
-	for _, q := range queries {
-		if _, err := db.ExecContext(ctx, q.query); err != nil {
-			return fmt.Errorf("auto migrate ensure column %s: %w", q.name, err)
 		}
 	}
 

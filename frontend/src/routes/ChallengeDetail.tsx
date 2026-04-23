@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ApiError } from '../lib/api'
-import type { Challenge, ChallengeSolver, PaginationMeta, Stack } from '../lib/types'
+import type { Challenge, ChallengeSolver, ChallengeVote, LevelVoteCount, PaginationMeta, Stack } from '../lib/types'
 import { formatApiError, formatDateTime, parseRouteId } from '../lib/utils'
 import { getCategoryKey, getLocaleTag, useLocale, useT } from '../lib/i18n'
 import { navigate } from '../lib/router'
@@ -9,7 +9,9 @@ import { useApi } from '../lib/useApi'
 import LoginRequired from '../components/LoginRequired'
 import Markdown from '../components/Markdown'
 import UserAvatar from '../components/UserAvatar'
-import { DifficultyBadge } from './Challenges'
+import { LevelBadge } from './Challenges'
+import { LEVEL_VOTE_OPTIONS, levelBarClass, normalizeLevel } from '../lib/level'
+import FlagIcon from '../components/FlagIcon'
 
 interface RouteProps {
     routeParams?: Record<string, string>
@@ -21,6 +23,7 @@ interface SubmissionState {
 }
 
 const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: 5, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
+const EMPTY_VOTE_PAGINATION: PaginationMeta = { page: 1, page_size: 3, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
 
 const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const t = useT()
@@ -52,6 +55,14 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const [stackInfo, setStackInfo] = useState<Stack | null>(null)
     const [stackLoading, setStackLoading] = useState(false)
     const [stackMessage, setStackMessage] = useState('')
+    const [votes, setVotes] = useState<ChallengeVote[]>([])
+    const [votePage, setVotePage] = useState(1)
+    const [votePagination, setVotePagination] = useState<PaginationMeta>(EMPTY_VOTE_PAGINATION)
+    const [voteSubmitting, setVoteSubmitting] = useState(false)
+    const [voteMessage, setVoteMessage] = useState('')
+    const [myVoteLevel, setMyVoteLevel] = useState<number | null>(null)
+    const [myVoteLoaded, setMyVoteLoaded] = useState(false)
+    const [selectedLevel, setSelectedLevel] = useState<number | null>(null)
 
     const pushSolverPageQuery = (nextPage: number) => {
         if (typeof window === 'undefined') return
@@ -95,6 +106,30 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         }
     }
 
+    const loadVotes = async (page: number) => {
+        if (!challengeId) return
+        try {
+            const data = await api.challengeVotes(challengeId, page, 3)
+            setVotes(data.votes)
+            setVotePagination(data.pagination)
+        } catch {
+            setVotes([])
+            setVotePagination(EMPTY_VOTE_PAGINATION)
+        }
+    }
+
+    const loadMyVote = async () => {
+        if (!challengeId) return
+        try {
+            const data = await api.challengeMyVote(challengeId)
+            setMyVoteLevel(data.level)
+        } catch {
+            setMyVoteLevel(null)
+        } finally {
+            setMyVoteLoaded(true)
+        }
+    }
+
     useEffect(() => {
         if (!auth.user || !challengeId) return
         void loadChallenge()
@@ -124,6 +159,24 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }, [auth.user?.id, challengeId, solverPage])
 
     useEffect(() => {
+        if (!auth.user || !challengeId) return
+        void loadVotes(votePage)
+    }, [auth.user?.id, challengeId, votePage])
+
+    useEffect(() => {
+        if (!auth.user || !challengeId) return
+        setMyVoteLoaded(false)
+        void loadMyVote()
+    }, [auth.user?.id, challengeId])
+
+    useEffect(() => {
+        setVotePage(1)
+        setMyVoteLevel(null)
+        setMyVoteLoaded(false)
+        setSelectedLevel(null)
+    }, [challengeId])
+
+    useEffect(() => {
         if (!auth.user || !challengeId || !challenge || challenge.is_locked || challenge.is_solved || !('stack_enabled' in challenge) || challenge.stack_enabled !== true) return
         void loadStack()
     }, [auth.user?.id, challengeId, challenge?.id, challenge?.is_locked])
@@ -135,6 +188,17 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         window.addEventListener('popstate', onPopState)
         return () => window.removeEventListener('popstate', onPopState)
     }, [])
+
+    useEffect(() => {
+        if (!myVoteLoaded) return
+        if (myVoteLevel !== null) {
+            setSelectedLevel(myVoteLevel)
+            return
+        }
+        if (selectedLevel !== null) return
+        const currentLevel = normalizeLevel(challenge?.level)
+        setSelectedLevel(currentLevel > 0 ? currentLevel : 0)
+    }, [challenge?.level, myVoteLevel, myVoteLoaded, selectedLevel])
 
     const submitFlag = async () => {
         if (!challengeId || !challenge || challenge.is_locked || challenge.is_active === false) return
@@ -165,6 +229,25 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                 return
             }
             setSubmission({ status: 'error', message: formatApiError(error, t).message })
+        }
+    }
+
+    const submitLevelVote = async (level: number) => {
+        if (!challengeId || voteSubmitting) return
+        setVoteSubmitting(true)
+        setVoteMessage('')
+        try {
+            await api.voteChallengeLevel(challengeId, level)
+            setMyVoteLevel(level)
+            setMyVoteLoaded(true)
+            setSelectedLevel(level)
+            setVoteMessage(t('challenge.voteSubmitted'))
+            await loadChallenge()
+            await loadVotes(votePage)
+        } catch (error) {
+            setVoteMessage(formatApiError(error, t).message)
+        } finally {
+            setVoteSubmitting(false)
         }
     }
 
@@ -212,6 +295,23 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
 
     const formatTimestamp = (value: string) => formatDateTime(value, localeTag)
     const firstBloodSolver = useMemo(() => solvers.find((solver) => solver.is_first_blood) ?? null, [solvers])
+    const currentLevel = normalizeLevel(challenge?.level)
+    const levelLabel = currentLevel > 0 ? String(currentLevel) : t('level.unknown')
+    const voteCountsByLevel = useMemo(() => {
+        const source = challenge && 'level_vote_counts' in challenge ? (challenge.level_vote_counts ?? []) : []
+        const mapped = new Map<number, number>()
+        source.forEach((item: LevelVoteCount) => {
+            mapped.set(item.level, item.count)
+        })
+        return mapped
+    }, [challenge])
+    const maxVoteCount = useMemo(() => {
+        let max = 0
+        LEVEL_VOTE_OPTIONS.forEach((level) => {
+            max = Math.max(max, voteCountsByLevel.get(level) ?? 0)
+        })
+        return max
+    }, [voteCountsByLevel])
 
     if (!auth.user) {
         return <LoginRequired title={t('challenges.title')} />
@@ -251,11 +351,14 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                 <div className='space-y-4'>
                     <div className='rounded-2xl border border-border/20 bg-surface p-5 shadow-sm lg:hidden'>
                         <div className='flex items-center gap-3 min-w-0'>
-                            <DifficultyBadge level={challenge.level} />
-                            <span className='text-sm font-semibold text-accent'>{t('challenge.levelLabel', { level: challenge.level })}</span>
+                            <LevelBadge level={challenge.level} />
+                            <span className='text-sm font-semibold text-accent'>{t('challenge.levelLabel', { level: levelLabel })}</span>
                         </div>
 
-                        <h1 className='mt-3 wrap-break-word text-xl font-semibold leading-tight text-text sm:text-2xl lg:text-3xl'>{challenge.title}</h1>
+                        <div className='mt-3 wrap-break-word text-xl font-semibold leading-tight text-text sm:text-2xl lg:text-3xl flex items-center'>
+                            <h1>{challenge.title}</h1>
+                            {challenge.is_solved && <FlagIcon className='shrink-0 w-4 h-4 text-accent inline-block ml-2' />}
+                        </div>
 
                         <div className='mt-4 inline-flex rounded-lg bg-surface-muted px-2.5 py-1 text-xs text-text-muted'>{t(getCategoryKey(challenge.category))}</div>
 
@@ -290,7 +393,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                             </div>
                         )}
 
-                        <div className='mt-6 space-y-8 lg:hidden'>
+                        <div className='mt-12 space-y-8 lg:hidden'>
                             <section className='space-y-3 px-1'>
                                 <h2 className='text-xl font-semibold text-text'>{t('challenges.tableAuthor')}</h2>
 
@@ -466,7 +569,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
 
                         {!challenge.is_locked && !challenge.is_solved && (
                             <form
-                                className='rounded-md bg-surface-muted p-4 sm:p-5 mt-4 shadow-sm border border-border/30'
+                                className='rounded-md bg-surface-muted p-3 sm:p-4 mt-4 shadow-sm border border-border/30'
                                 onSubmit={(e) => {
                                     e.preventDefault()
                                     void submitFlag()
@@ -491,6 +594,95 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                 {submission.message && <p className={`mt-2 text-sm ${submission.status === 'success' ? 'text-success' : 'text-danger'}`}>{submission.message}</p>}
                             </form>
                         )}
+
+                        {!challenge.is_locked ? (
+                            <section className='mt-7'>
+                                <h3 className='text-lg font-semibold text-text'>
+                                    {t('challenge.voteTitle')} <span className='text-accent'>{votePagination.total_count}</span>
+                                </h3>
+                                <div className='mt-3 rounded-lg border border-accent/25 bg-accent/7 px-3 py-2 text-sm text-text-muted'>{challenge.is_solved ? t('challenge.voteEnabledHint') : t('challenge.voteDisabledHint')}</div>
+
+                                <div className='mt-4 grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]'>
+                                    <div className='flex min-h-105 flex-col'>
+                                        <p className='text-sm font-semibold text-text'>{t('challenge.voteResults')}</p>
+                                        <div className='mt-3 flex-1 rounded-xl bg-surface-muted/60 px-3 py-4 dark:bg-surface-muted/80'>
+                                            <div className='flex h-full min-h-75 items-end justify-between gap-2'>
+                                                {LEVEL_VOTE_OPTIONS.map((level) => {
+                                                    const count = voteCountsByLevel.get(level) ?? 0
+                                                    const height = maxVoteCount > 0 ? Math.max(8, Math.round((count / maxVoteCount) * 180)) : 8
+                                                    const isSelected = selectedLevel === level
+                                                    return (
+                                                        <button
+                                                            key={level}
+                                                            type='button'
+                                                            className='flex w-full min-w-0 flex-col items-center justify-end gap-2'
+                                                            onClick={() => void submitLevelVote(level)}
+                                                            disabled={!challenge.is_solved || voteSubmitting}
+                                                        >
+                                                            <div className='flex w-full items-end justify-center'>
+                                                                <div className={`w-3 rounded-full transition-all ${levelBarClass(level)} ${count > 0 ? 'opacity-100' : 'opacity-35'}`} style={{ height: `${height}px` }} />
+                                                            </div>
+                                                            <span
+                                                                className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-[11px] font-semibold transition ${
+                                                                    isSelected ? 'border-accent bg-accent text-white shadow-sm' : 'border-border/70 bg-surface text-text dark:border-border dark:bg-surface-subtle dark:text-text'
+                                                                }`}
+                                                            >
+                                                                {level}
+                                                            </span>
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                        {voteMessage ? <p className={`mt-2 text-xs ${voteMessage === t('challenge.voteSubmitted') ? 'text-success' : 'text-danger'}`}>{voteMessage}</p> : null}
+                                    </div>
+
+                                    <div className='flex min-h-105 flex-col'>
+                                        <div className='flex items-center justify-between gap-2'>
+                                            <p className='text-sm font-semibold text-text'>{t('challenge.voteLogTitle')}</p>
+                                            <div className='flex items-center gap-2 text-xs text-text-muted'>
+                                                <button
+                                                    type='button'
+                                                    className='rounded-md border border-border/70 px-2 py-1 disabled:opacity-40'
+                                                    disabled={!votePagination.has_prev}
+                                                    onClick={() => setVotePage((prev) => Math.max(1, prev - 1))}
+                                                >
+                                                    {t('common.previous')}
+                                                </button>
+                                                <span>
+                                                    {votePagination.page} / {votePagination.total_pages || 1}
+                                                </span>
+                                                <button type='button' className='rounded-md border border-border/70 px-2 py-1 disabled:opacity-40' disabled={!votePagination.has_next} onClick={() => setVotePage((prev) => prev + 1)}>
+                                                    {t('common.next')}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className='mt-3 flex-1 space-y-3'>
+                                            {votes.length === 0 ? (
+                                                <p className='flex h-full min-h-75 items-center text-sm text-text-muted'>{t('challenge.voteLogEmpty')}</p>
+                                            ) : (
+                                                votes.map((vote) => (
+                                                    <div key={`${vote.user_id}-${vote.updated_at}`} className='flex min-h-24 items-start gap-3 rounded-xl bg-surface-muted/60 p-2.5'>
+                                                        <UserAvatar username={vote.username} size='sm' />
+                                                        <div className='min-w-0 flex-1'>
+                                                            <button className='block max-w-full truncate text-left text-sm font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${vote.user_id}`)}>
+                                                                {vote.username}
+                                                            </button>
+                                                            <p className='mt-1 text-sm text-text-muted'>
+                                                                {t('challenge.voteLogLine', {
+                                                                    level: vote.level,
+                                                                })}
+                                                            </p>
+                                                        </div>
+                                                        <span className='shrink-0 text-xs text-text-subtle'>{formatTimestamp(vote.updated_at)}</span>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        ) : null}
                     </div>
                 </div>
 
@@ -498,11 +690,14 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                     <div className='space-y-8'>
                         <div className='rounded-2xl border border-border/20 bg-surface p-5 shadow-sm'>
                             <div className='flex items-center gap-3 min-w-0'>
-                                <DifficultyBadge level={challenge.level} />
-                                <span className='text-sm font-semibold text-accent'>{t('challenge.levelLabel', { level: challenge.level })}</span>
+                                <LevelBadge level={challenge.level} />
+                                <span className='text-sm font-semibold text-accent'>{t('challenge.levelLabel', { level: levelLabel })}</span>
                             </div>
 
-                            <h1 className='mt-3 wrap-break-word text-xl font-semibold leading-tight text-text sm:text-2xl lg:text-3xl'>{challenge.title}</h1>
+                            <div className='mt-3 wrap-break-word text-xl font-semibold leading-tight text-text sm:text-2xl lg:text-3xl flex items-center'>
+                                <h1>{challenge.title}</h1>
+                                {challenge.is_solved && <FlagIcon className='shrink-0 w-4 h-4 text-accent inline-block ml-2' />}
+                            </div>
 
                             <div className='mt-4 inline-flex rounded-lg bg-surface-muted px-2.5 py-1 text-xs text-text-muted'>{t(getCategoryKey(challenge.category))}</div>
 

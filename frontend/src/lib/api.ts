@@ -8,6 +8,8 @@ import type {
     ChallengeCreateResponse,
     ChallengeUpdatePayload,
     ChallengeFileUploadResponse,
+    ChallengeMyVoteResponse,
+    ChallengeVotesResponse,
     AdminChallengeDetail,
     AdminStackDeleteResponse,
     AdminStackListItem,
@@ -333,6 +335,25 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
                 pagination: normalizePagination(data?.pagination),
             } as ChallengeSolversResponse
         },
+        challengeVotes: async (id: number, page?: number, pageSize?: number) => {
+            const data = await request<Partial<ChallengeVotesResponse>>(withPagination(`/api/challenges/${id}/votes`, page, pageSize))
+            return {
+                votes: Array.isArray(data?.votes) ? data.votes : [],
+                pagination: normalizePagination(data?.pagination),
+            } as ChallengeVotesResponse
+        },
+        challengeMyVote: async (id: number) => {
+            const data = await request<Partial<ChallengeMyVoteResponse>>(`/api/challenges/${id}/my-vote`, { auth: true })
+            return {
+                level: typeof data?.level === 'number' ? data.level : null,
+            } as ChallengeMyVoteResponse
+        },
+        voteChallengeLevel: (id: number, level: number) =>
+            request<{ status: string }>(`/api/challenges/${id}/vote`, {
+                method: 'POST',
+                body: { level },
+                auth: true,
+            }),
         submitFlag: (id: number, flag: string) =>
             request<FlagSubmissionResult>(`/api/challenges/${id}/submit`, {
                 method: 'POST',

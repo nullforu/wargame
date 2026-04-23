@@ -23,11 +23,10 @@ const ChallengeManagement = () => {
     const [expandedChallengeId, setExpandedChallengeId] = useState<number | null>(null)
     const [manageLoading, setManageLoading] = useState(false)
     const [manageFieldErrors, setManageFieldErrors] = useState<FieldErrors>({})
-    const [editingField, setEditingField] = useState<'title' | 'description' | 'category' | 'level' | 'points' | 'previous_challenge_id' | 'flag' | 'is_active' | 'stack' | null>(null)
+    const [editingField, setEditingField] = useState<'title' | 'description' | 'category' | 'points' | 'previous_challenge_id' | 'flag' | 'is_active' | 'stack' | null>(null)
     const [editTitle, setEditTitle] = useState('')
     const [editDescription, setEditDescription] = useState('')
     const [editCategory, setEditCategory] = useState<string>(CHALLENGE_CATEGORIES[0])
-    const [editLevel, setEditLevel] = useState(1)
     const [editPoints, setEditPoints] = useState(100)
     const [editPreviousChallengeId, setEditPreviousChallengeId] = useState<number | ''>('')
     const [editFlag, setEditFlag] = useState('')
@@ -159,7 +158,6 @@ const ChallengeManagement = () => {
         setEditTitle(challenge.title)
         setEditDescription('description' in challenge ? challenge.description : '')
         setEditCategory('category' in challenge ? challenge.category : CHALLENGE_CATEGORIES[0])
-        setEditLevel('level' in challenge ? challenge.level : 1)
         setEditPoints(challenge.points)
         setEditIsActive(challenge.is_active)
         setEditPreviousChallengeId('previous_challenge_id' in challenge && challenge.previous_challenge_id !== undefined ? (challenge.previous_challenge_id ?? '') : '')
@@ -176,7 +174,6 @@ const ChallengeManagement = () => {
             setEditTitle(detail.title)
             setEditDescription(detail.description)
             setEditCategory(detail.category)
-            setEditLevel(detail.level)
             setEditPoints(detail.points)
             setEditIsActive(detail.is_active)
             setEditPreviousChallengeId(detail.previous_challenge_id ?? '')
@@ -212,7 +209,6 @@ const ChallengeManagement = () => {
         if (field === 'title') setEditTitle(challenge.title)
         if (field === 'description') setEditDescription(detail?.description ?? '')
         if (field === 'category') setEditCategory(detail?.category ?? CHALLENGE_CATEGORIES[0])
-        if (field === 'level') setEditLevel(detail?.level ?? 1)
         if (field === 'points') setEditPoints(detail?.points ?? challenge.points)
         if (field === 'previous_challenge_id') setEditPreviousChallengeId(loadedPreviousChallengeId ?? '')
         if (field === 'flag') setEditFlag('')
@@ -256,14 +252,6 @@ const ChallengeManagement = () => {
                 return
             }
             payload.category = editCategory
-        }
-
-        if (field === 'level') {
-            if (detail && Number(editLevel) === detail.level) {
-                setEditingField(null)
-                return
-            }
-            payload.level = Number(editLevel)
         }
 
         if (field === 'points') {
@@ -340,7 +328,6 @@ const ChallengeManagement = () => {
             setEditTitle(updated.title)
             setEditDescription(updated.description)
             setEditCategory(updated.category)
-            setEditLevel(updated.level)
             setEditPoints(updated.points)
             setEditIsActive(updated.is_active)
             setEditPreviousChallengeId(updated.previous_challenge_id ?? '')
@@ -787,56 +774,6 @@ const ChallengeManagement = () => {
                                                                     {t('common.category')}: {manageFieldErrors.category}
                                                                 </p>
                                                             ) : null}
-                                                        </div>
-                                                        <div>
-                                                            <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor={`manage-level-${challenge.id}`}>
-                                                                LEVEL
-                                                            </label>
-                                                            {editingField === 'level' ? (
-                                                                <div className='mt-2 space-y-2'>
-                                                                    <input
-                                                                        id={`manage-level-${challenge.id}`}
-                                                                        className='w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text focus:border-accent focus:outline-none'
-                                                                        type='number'
-                                                                        min={1}
-                                                                        max={10}
-                                                                        value={editLevel}
-                                                                        onChange={(event) => setEditLevel(Number(event.target.value))}
-                                                                        disabled={manageLoading}
-                                                                    />
-                                                                    <div className='flex flex-wrap items-center gap-3'>
-                                                                        <button
-                                                                            className='rounded-lg bg-accent px-3 py-2 text-xs font-medium text-contrast-foreground transition hover:bg-accent-strong disabled:opacity-60 cursor-pointer'
-                                                                            type='button'
-                                                                            onClick={() => saveField(challenge, 'level')}
-                                                                            disabled={manageLoading}
-                                                                        >
-                                                                            {manageLoading ? t('admin.site.saving') : t('common.save')}
-                                                                        </button>
-                                                                        <button
-                                                                            className='rounded-lg border border-border px-3 py-2 text-xs text-text transition hover:border-border disabled:opacity-60 cursor-pointer'
-                                                                            type='button'
-                                                                            onClick={() => cancelEdit('level', challenge)}
-                                                                            disabled={manageLoading}
-                                                                        >
-                                                                            {t('common.cancel')}
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            ) : (
-                                                                <div className='mt-2 flex items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text'>
-                                                                    <span>{editLevel}</span>
-                                                                    <button
-                                                                        className='text-xs text-accent hover:underline cursor-pointer disabled:opacity-60'
-                                                                        type='button'
-                                                                        onClick={() => beginEdit('level')}
-                                                                        disabled={manageLoading || editingField !== null}
-                                                                    >
-                                                                        {t('common.edit')}
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                            {manageFieldErrors.level ? <p className='mt-2 text-xs text-danger'>LEVEL: {manageFieldErrors.level}</p> : null}
                                                         </div>
                                                         <div>
                                                             <label className='text-xs uppercase tracking-wide text-text-muted' htmlFor={`manage-points-${challenge.id}`}>

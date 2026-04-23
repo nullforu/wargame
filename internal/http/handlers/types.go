@@ -69,7 +69,6 @@ type createChallengeRequest struct {
 	Title               string                    `json:"title" binding:"required"`
 	Description         string                    `json:"description" binding:"required"`
 	Category            string                    `json:"category" binding:"required"`
-	Level               *int                      `json:"level"`
 	Points              int                       `json:"points" binding:"required"`
 	Flag                string                    `json:"flag" binding:"required"`
 	PreviousChallengeID *int64                    `json:"previous_challenge_id"`
@@ -83,7 +82,6 @@ type updateChallengeRequest struct {
 	Title               optionalString             `json:"title"`
 	Description         optionalString             `json:"description"`
 	Category            optionalString             `json:"category"`
-	Level               *int                       `json:"level"`
 	Points              *int                       `json:"points"`
 	Flag                optionalString             `json:"flag"`
 	PreviousChallengeID optionalInt64              `json:"previous_challenge_id"`
@@ -99,6 +97,10 @@ type challengeFileUploadRequest struct {
 
 type submitRequest struct {
 	Flag string `json:"flag" binding:"required"`
+}
+
+type levelVoteRequest struct {
+	Level int `json:"level" binding:"required"`
 }
 
 type adminBlockUserRequest struct {
@@ -160,6 +162,7 @@ type challengeResponse struct {
 	Level               int                       `json:"level"`
 	Points              int                       `json:"points"`
 	SolveCount          int                       `json:"solve_count"`
+	LevelVoteCounts     []models.LevelVoteCount   `json:"level_vote_counts,omitempty"`
 	CreatedByUserID     *int64                    `json:"created_by_user_id,omitempty"`
 	CreatedByUsername   string                    `json:"created_by_username,omitempty"`
 	PreviousChallengeID *int64                    `json:"previous_challenge_id,omitempty"`
@@ -187,6 +190,15 @@ type lockedChallengeResponse struct {
 	IsActive                  bool    `json:"is_active"`
 	IsLocked                  bool    `json:"is_locked"`
 	IsSolved                  bool    `json:"is_solved"`
+}
+
+type challengeVotesResponse struct {
+	Votes      []models.ChallengeVoteDetail `json:"votes,omitempty"`
+	Pagination models.Pagination            `json:"pagination"`
+}
+
+type challengeMyVoteResponse struct {
+	Level *int `json:"level"`
 }
 
 type challengesListResponse struct {
@@ -320,6 +332,7 @@ func newChallengeResponse(challenge *models.Challenge, isSolved bool) challengeR
 		Level:               challenge.Level,
 		Points:              challenge.Points,
 		SolveCount:          challenge.SolveCount,
+		LevelVoteCounts:     challenge.LevelVotes,
 		CreatedByUserID:     challenge.CreatedByUserID,
 		CreatedByUsername:   challenge.CreatedByUsername,
 		PreviousChallengeID: challenge.PreviousChallengeID,

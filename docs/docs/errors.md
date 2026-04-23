@@ -89,6 +89,12 @@ For blocked users:
 { "error": "user blocked" }
 ```
 
+For voting without solving:
+
+```json
+{ "error": "challenge not solved by user" }
+```
+
 Notes:
 
 - Returned only on endpoints that require an active (non-blocked) user. Some read-only endpoints are still available to blocked users (e.g. stack listing and stack detail).

@@ -80,6 +80,7 @@ type WargameService struct {
 	cfg            config.Config
 	challengeRepo  *repo.ChallengeRepo
 	submissionRepo *repo.SubmissionRepo
+	voteRepo       *repo.ChallengeVoteRepo
 	redis          *redis.Client
 	fileStore      storage.ChallengeFileStore
 }
@@ -93,8 +94,8 @@ type ChallengeQueryFilter struct {
 	Sort     string
 }
 
-func NewWargameService(cfg config.Config, challengeRepo *repo.ChallengeRepo, submissionRepo *repo.SubmissionRepo, redis *redis.Client, fileStore storage.ChallengeFileStore) *WargameService {
-	return &WargameService{cfg: cfg, challengeRepo: challengeRepo, submissionRepo: submissionRepo, redis: redis, fileStore: fileStore}
+func NewWargameService(cfg config.Config, challengeRepo *repo.ChallengeRepo, submissionRepo *repo.SubmissionRepo, voteRepo *repo.ChallengeVoteRepo, redis *redis.Client, fileStore storage.ChallengeFileStore) *WargameService {
+	return &WargameService{cfg: cfg, challengeRepo: challengeRepo, submissionRepo: submissionRepo, voteRepo: voteRepo, redis: redis, fileStore: fileStore}
 }
 
 func (s *WargameService) ListChallenges(ctx context.Context, page, pageSize int, filter ChallengeQueryFilter) ([]models.Challenge, models.Pagination, error) {
@@ -117,10 +118,10 @@ func (s *WargameService) ListChallenges(ctx context.Context, page, pageSize int,
 		queryFilter.Solved = filter.Solved
 		queryFilter.SolvedByUserID = &filter.UserID
 	}
-
-	if queryFilter.Level != nil && (*queryFilter.Level < 1 || *queryFilter.Level > 10) {
-		return nil, models.Pagination{}, NewValidationError(FieldError{Field: "level", Reason: "must be between 1 and 10"})
+	if queryFilter.Level != nil && (*queryFilter.Level < models.UnknownLevel || *queryFilter.Level > models.MaxVoteLevel) {
+		return nil, models.Pagination{}, NewValidationError(FieldError{Field: "level", Reason: "must be between 0 and 10"})
 	}
+
 	if queryFilter.Sort != "" {
 		switch queryFilter.Sort {
 		case "latest", "oldest", "most_solved", "least_solved":
@@ -141,6 +142,10 @@ func (s *WargameService) ListChallenges(ctx context.Context, page, pageSize int,
 
 	if err := s.applyChallengePoints(ctx, ptrs); err != nil {
 		return nil, models.Pagination{}, fmt.Errorf("wargame.ListChallenges score: %w", err)
+	}
+
+	if err := s.applyChallengeLevels(ctx, ptrs); err != nil {
+		return nil, models.Pagination{}, fmt.Errorf("wargame.ListChallenges level: %w", err)
 	}
 
 	return challenges, BuildPagination(params.Page, params.PageSize, totalCount), nil
@@ -174,10 +179,18 @@ func (s *WargameService) GetChallengeByID(ctx context.Context, id int64) (*model
 		return nil, fmt.Errorf("wargame.GetChallengeByID score: %w", err)
 	}
 
+	if err := s.applyChallengeLevels(ctx, []*models.Challenge{challenge}); err != nil {
+		return nil, fmt.Errorf("wargame.GetChallengeByID level: %w", err)
+	}
+
+	if err := s.applyChallengeLevelVoteCounts(ctx, challenge); err != nil {
+		return nil, fmt.Errorf("wargame.GetChallengeByID vote counts: %w", err)
+	}
+
 	return challenge, nil
 }
 
-func (s *WargameService) CreateChallenge(ctx context.Context, title, description, category string, level *int, points int, flag string, active bool, stackEnabled bool, stackTargetPorts stack.TargetPortSpecs, stackPodSpec *string, previousChallengeID *int64) (*models.Challenge, error) {
+func (s *WargameService) CreateChallenge(ctx context.Context, title, description, category string, points int, flag string, active bool, stackEnabled bool, stackTargetPorts stack.TargetPortSpecs, stackPodSpec *string, previousChallengeID *int64) (*models.Challenge, error) {
 	title = normalizeTrim(title)
 	description = normalizeTrim(description)
 	category = normalizeTrim(category)
@@ -187,16 +200,6 @@ func (s *WargameService) CreateChallenge(ctx context.Context, title, description
 	validator.Required("description", description)
 	validator.Required("category", category)
 	validator.Required("flag", flag)
-	challengeLevel := 1
-
-	if level != nil {
-		challengeLevel = *level
-	}
-
-	if challengeLevel < 1 || challengeLevel > 10 {
-		validator.fields = append(validator.fields, FieldError{Field: "level", Reason: "must be between 1 and 10"})
-	}
-
 	validator.NonNegative("points", points)
 	if previousChallengeID != nil {
 		validator.PositiveID("previous_challenge_id", *previousChallengeID)
@@ -239,7 +242,6 @@ func (s *WargameService) CreateChallenge(ctx context.Context, title, description
 		Title:               title,
 		Description:         description,
 		Category:            category,
-		Level:               challengeLevel,
 		Points:              points,
 		PreviousChallengeID: previousChallengeID,
 		StackEnabled:        stackEnabled,
@@ -267,7 +269,7 @@ func (s *WargameService) CreateChallenge(ctx context.Context, title, description
 	return challenge, nil
 }
 
-func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, description, category *string, level *int, points *int, flag *string, active *bool, stackEnabled *bool, stackTargetPorts *[]stack.TargetPortSpec, stackPodSpec *string, previousChallengeID *int64, previousChallengeSet bool) (*models.Challenge, error) {
+func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, description, category *string, points *int, flag *string, active *bool, stackEnabled *bool, stackTargetPorts *[]stack.TargetPortSpec, stackPodSpec *string, previousChallengeID *int64, previousChallengeSet bool) (*models.Challenge, error) {
 	validator := newFieldValidator()
 	validator.PositiveID("id", id)
 
@@ -314,10 +316,6 @@ func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, d
 		validator.NonNegative("points", *points)
 	}
 
-	if level != nil && (*level < 1 || *level > 10) {
-		validator.fields = append(validator.fields, FieldError{Field: "level", Reason: "must be between 1 and 10"})
-	}
-
 	if previousChallengeSet && previousChallengeID != nil {
 		validator.PositiveID("previous_challenge_id", *previousChallengeID)
 	}
@@ -362,10 +360,6 @@ func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, d
 
 	if points != nil {
 		challenge.Points = *points
-	}
-
-	if level != nil {
-		challenge.Level = *level
 	}
 
 	if previousChallengeSet {
@@ -438,6 +432,106 @@ func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, d
 	}
 
 	return challenge, nil
+}
+
+func (s *WargameService) VoteChallengeLevel(ctx context.Context, userID, challengeID int64, level int) error {
+	validator := newFieldValidator()
+	validator.PositiveID("challenge_id", challengeID)
+	if userID <= 0 {
+		validator.fields = append(validator.fields, FieldError{Field: "user_id", Reason: "invalid"})
+	}
+
+	if level < models.MinVoteLevel || level > models.MaxVoteLevel {
+		validator.fields = append(validator.fields, FieldError{Field: "level", Reason: "invalid"})
+	}
+
+	if err := validator.Error(); err != nil {
+		return err
+	}
+
+	if _, err := s.challengeRepo.GetByID(ctx, challengeID); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return ErrChallengeNotFound
+		}
+		return fmt.Errorf("wargame.VoteChallengeLevel challenge lookup: %w", err)
+	}
+
+	solved, err := s.submissionRepo.HasCorrect(ctx, userID, challengeID)
+	if err != nil {
+		return fmt.Errorf("wargame.VoteChallengeLevel solved check: %w", err)
+	}
+
+	if !solved {
+		return ErrChallengeNotSolvedByUser
+	}
+
+	now := time.Now().UTC()
+	if err := s.voteRepo.Upsert(ctx, &models.ChallengeVote{
+		ChallengeID: challengeID,
+		UserID:      userID,
+		Level:       level,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}); err != nil {
+		return fmt.Errorf("wargame.VoteChallengeLevel upsert: %w", err)
+	}
+
+	return nil
+}
+
+func (s *WargameService) ChallengeVotesPage(ctx context.Context, challengeID int64, page, pageSize int) ([]models.ChallengeVoteDetail, models.Pagination, error) {
+	validator := newFieldValidator()
+	validator.PositiveID("challenge_id", challengeID)
+	if err := validator.Error(); err != nil {
+		return nil, models.Pagination{}, err
+	}
+
+	if _, err := s.challengeRepo.GetByID(ctx, challengeID); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, models.Pagination{}, ErrChallengeNotFound
+		}
+
+		return nil, models.Pagination{}, fmt.Errorf("wargame.ChallengeVotesPage challenge lookup: %w", err)
+	}
+
+	params, err := NormalizePagination(page, pageSize)
+	if err != nil {
+		return nil, models.Pagination{}, err
+	}
+
+	rows, totalCount, err := s.voteRepo.VotesByChallengePage(ctx, challengeID, params.Page, params.PageSize)
+	if err != nil {
+		return nil, models.Pagination{}, fmt.Errorf("wargame.ChallengeVotesPage: %w", err)
+	}
+
+	return rows, BuildPagination(params.Page, params.PageSize, totalCount), nil
+}
+
+func (s *WargameService) ChallengeVoteLevelByUser(ctx context.Context, userID, challengeID int64) (*int, error) {
+	validator := newFieldValidator()
+	validator.PositiveID("challenge_id", challengeID)
+	if userID <= 0 {
+		validator.fields = append(validator.fields, FieldError{Field: "user_id", Reason: "invalid"})
+	}
+
+	if err := validator.Error(); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.challengeRepo.GetByID(ctx, challengeID); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrChallengeNotFound
+		}
+
+		return nil, fmt.Errorf("wargame.ChallengeVoteLevelByUser challenge lookup: %w", err)
+	}
+
+	level, err := s.voteRepo.VoteLevelByUserAndChallengeID(ctx, userID, challengeID)
+	if err != nil {
+		return nil, fmt.Errorf("wargame.ChallengeVoteLevelByUser: %w", err)
+	}
+
+	return level, nil
 }
 
 func (s *WargameService) DeleteChallenge(ctx context.Context, id int64) error {
@@ -791,6 +885,42 @@ func (s *WargameService) applyChallengePoints(ctx context.Context, challenges []
 
 		challenge.SolveCount = solveCounts[challenge.ID]
 	}
+
+	return nil
+}
+
+func (s *WargameService) applyChallengeLevels(ctx context.Context, challenges []*models.Challenge) error {
+	if len(challenges) == 0 {
+		return nil
+	}
+
+	ids := make([]int64, 0, len(challenges))
+	for _, challenge := range challenges {
+		ids = append(ids, challenge.ID)
+	}
+
+	levels, err := s.voteRepo.RepresentativeLevelsByChallengeIDs(ctx, ids)
+	if err != nil {
+		return err
+	}
+
+	for _, challenge := range challenges {
+		challenge.Level = levels[challenge.ID]
+	}
+
+	return nil
+}
+
+func (s *WargameService) applyChallengeLevelVoteCounts(ctx context.Context, challenge *models.Challenge) error {
+	if challenge == nil {
+		return nil
+	}
+
+	counts, err := s.voteRepo.VoteCountsByChallengeID(ctx, challenge.ID)
+	if err != nil {
+		return err
+	}
+	challenge.LevelVotes = counts
 
 	return nil
 }

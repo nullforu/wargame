@@ -53,10 +53,20 @@ func (r *ChallengeRepo) ListActiveFiltered(ctx context.Context, filter Challenge
 		countQuery = countQuery.Where("category = ?", category)
 		listQuery = listQuery.Where("category = ?", category)
 	}
-
 	if filter.Level != nil {
-		countQuery = countQuery.Where("level = ?", *filter.Level)
-		listQuery = listQuery.Where("level = ?", *filter.Level)
+		representativeLevels := r.db.NewSelect().
+			TableExpr("challenge_votes AS cv").
+			ColumnExpr("cv.challenge_id").
+			ColumnExpr("cv.level").
+			ColumnExpr("ROW_NUMBER() OVER (PARTITION BY cv.challenge_id ORDER BY COUNT(*) DESC, MAX(cv.updated_at) DESC, cv.level DESC) AS rn").
+			GroupExpr("cv.challenge_id, cv.level")
+
+		countQuery = countQuery.
+			Join("LEFT JOIN (?) AS level_rank ON level_rank.challenge_id = challenge.id AND level_rank.rn = 1", representativeLevels).
+			Where("COALESCE(level_rank.level, 0) = ?", *filter.Level)
+		listQuery = listQuery.
+			Join("LEFT JOIN (?) AS level_rank ON level_rank.challenge_id = challenge.id AND level_rank.rn = 1", representativeLevels).
+			Where("COALESCE(level_rank.level, 0) = ?", *filter.Level)
 	}
 
 	if filter.Solved != nil && filter.SolvedByUserID != nil {
