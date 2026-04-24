@@ -125,6 +125,127 @@ func (r *ScoreboardRepo) Leaderboard(ctx context.Context, page, pageSize int) (m
 	return models.LeaderboardResponse{Challenges: challenges, Entries: rows}, totalCount, nil
 }
 
+func (r *ScoreboardRepo) UserRanking(ctx context.Context, page, pageSize int) ([]models.UserRankingEntry, int, error) {
+	totalCount, err := r.db.NewSelect().
+		TableExpr("users AS u").
+		Where("u.role != ?", models.BlockedRole).
+		Count(ctx)
+	if err != nil {
+		return nil, 0, wrapError("scoreboardRepo.UserRanking count", err)
+	}
+
+	rows := make([]models.UserRankingEntry, 0, pageSize)
+	offset := (page - 1) * pageSize
+	if err := r.db.NewSelect().
+		With("solved", r.db.NewSelect().
+			TableExpr("submissions AS s").
+			ColumnExpr("s.user_id AS user_id").
+			ColumnExpr("s.challenge_id AS challenge_id").
+			Where("s.correct = true").
+			GroupExpr("s.user_id, s.challenge_id")).
+		TableExpr("users AS u").
+		ColumnExpr("u.id AS user_id").
+		ColumnExpr("u.username AS username").
+		ColumnExpr("u.affiliation_id AS affiliation_id").
+		ColumnExpr("a.name AS affiliation_name").
+		ColumnExpr("COALESCE(SUM(c.points), 0) AS score").
+		ColumnExpr("COALESCE(COUNT(s.challenge_id), 0) AS solved_count").
+		Join("LEFT JOIN affiliations AS a ON a.id = u.affiliation_id").
+		Join("LEFT JOIN solved AS s ON s.user_id = u.id").
+		Join("LEFT JOIN challenges AS c ON c.id = s.challenge_id").
+		Where("u.role != ?", models.BlockedRole).
+		GroupExpr("u.id, u.username, u.affiliation_id, a.name").
+		OrderExpr("score DESC, solved_count DESC, u.id ASC").
+		Limit(pageSize).
+		Offset(offset).
+		Scan(ctx, &rows); err != nil {
+		return nil, 0, wrapError("scoreboardRepo.UserRanking", err)
+	}
+
+	return rows, totalCount, nil
+}
+
+func (r *ScoreboardRepo) AffiliationRanking(ctx context.Context, page, pageSize int) ([]models.AffiliationRankingEntry, int, error) {
+	var totalCount int
+	if err := r.db.NewSelect().
+		TableExpr("affiliations AS a").
+		ColumnExpr("COUNT(DISTINCT a.id)").
+		Join("JOIN users AS u ON u.affiliation_id = a.id AND u.role != ?", models.BlockedRole).
+		Scan(ctx, &totalCount); err != nil {
+		return nil, 0, wrapError("scoreboardRepo.AffiliationRanking count", err)
+	}
+
+	rows := make([]models.AffiliationRankingEntry, 0, pageSize)
+	offset := (page - 1) * pageSize
+	if err := r.db.NewSelect().
+		With("solved", r.db.NewSelect().
+			TableExpr("submissions AS s").
+			ColumnExpr("s.user_id AS user_id").
+			ColumnExpr("s.challenge_id AS challenge_id").
+			Where("s.correct = true").
+			GroupExpr("s.user_id, s.challenge_id")).
+		TableExpr("affiliations AS a").
+		ColumnExpr("a.id AS affiliation_id").
+		ColumnExpr("a.name AS name").
+		ColumnExpr("COALESCE(SUM(c.points), 0) AS score").
+		ColumnExpr("COALESCE(COUNT(s.challenge_id), 0) AS solved_count").
+		ColumnExpr("COALESCE(COUNT(DISTINCT u.id), 0) AS user_count").
+		Join("JOIN users AS u ON u.affiliation_id = a.id AND u.role != ?", models.BlockedRole).
+		Join("LEFT JOIN solved AS s ON s.user_id = u.id").
+		Join("LEFT JOIN challenges AS c ON c.id = s.challenge_id").
+		GroupExpr("a.id, a.name").
+		OrderExpr("score DESC, solved_count DESC, LOWER(a.name) ASC, a.id ASC").
+		Limit(pageSize).
+		Offset(offset).
+		Scan(ctx, &rows); err != nil {
+		return nil, 0, wrapError("scoreboardRepo.AffiliationRanking", err)
+	}
+
+	return rows, totalCount, nil
+}
+
+func (r *ScoreboardRepo) AffiliationUserRanking(ctx context.Context, affiliationID int64, page, pageSize int) ([]models.UserRankingEntry, int, error) {
+	totalCount, err := r.db.NewSelect().
+		TableExpr("users AS u").
+		Where("u.role != ?", models.BlockedRole).
+		Where("u.affiliation_id = ?", affiliationID).
+		Count(ctx)
+	if err != nil {
+		return nil, 0, wrapError("scoreboardRepo.AffiliationUserRanking count", err)
+	}
+
+	rows := make([]models.UserRankingEntry, 0, pageSize)
+	offset := (page - 1) * pageSize
+	if err := r.db.NewSelect().
+		With("solved", r.db.NewSelect().
+			TableExpr("submissions AS s").
+			ColumnExpr("s.user_id AS user_id").
+			ColumnExpr("s.challenge_id AS challenge_id").
+			Where("s.correct = true").
+			GroupExpr("s.user_id, s.challenge_id")).
+		TableExpr("users AS u").
+		ColumnExpr("u.id AS user_id").
+		ColumnExpr("u.username AS username").
+		ColumnExpr("u.affiliation_id AS affiliation_id").
+		ColumnExpr("a.name AS affiliation_name").
+		ColumnExpr("COALESCE(SUM(c.points), 0) AS score").
+		ColumnExpr("COALESCE(COUNT(s.challenge_id), 0) AS solved_count").
+		Join("LEFT JOIN affiliations AS a ON a.id = u.affiliation_id").
+		Join("LEFT JOIN solved AS s ON s.user_id = u.id").
+		Join("LEFT JOIN challenges AS c ON c.id = s.challenge_id").
+		Where("u.role != ?", models.BlockedRole).
+		Where("u.affiliation_id = ?", affiliationID).
+		GroupExpr("u.id, u.username, u.affiliation_id, a.name").
+		OrderExpr("score DESC, solved_count DESC, u.id ASC").
+		Limit(pageSize).
+		Offset(offset).
+		Scan(ctx, &rows); err != nil {
+		return nil, 0, wrapError("scoreboardRepo.AffiliationUserRanking", err)
+	}
+
+	return rows, totalCount, nil
+}
+
 func (r *ScoreboardRepo) TimelineSubmissions(ctx context.Context, since *time.Time) ([]models.UserTimelineRow, error) {
 	pointsMap, err := fixedPointsMap(ctx, r.db)
 	if err != nil {

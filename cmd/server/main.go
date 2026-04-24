@@ -64,6 +64,7 @@ func main() {
 	}
 
 	userRepo := repo.NewUserRepo(database)
+	affiliationRepo := repo.NewAffiliationRepo(database)
 	challengeRepo := repo.NewChallengeRepo(database)
 	submissionRepo := repo.NewSubmissionRepo(database)
 	voteRepo := repo.NewChallengeVoteRepo(database)
@@ -81,7 +82,8 @@ func main() {
 	}
 
 	authSvc := service.NewAuthService(cfg, userRepo, redisClient)
-	userSvc := service.NewUserService(userRepo)
+	userSvc := service.NewUserService(userRepo, affiliationRepo)
+	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, redisClient, fileStore)
 
@@ -110,7 +112,7 @@ func main() {
 	leaderboardBus := realtime.NewScoreboardBus(redisClient, cfg, scoreSvc, logger)
 	leaderboardBus.Start(ctx)
 
-	router := httpserver.NewRouter(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, redisClient, logger)
+	router := httpserver.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, redisClient, logger)
 	srv := &nethttp.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           router,

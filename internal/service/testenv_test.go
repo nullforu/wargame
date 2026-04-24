@@ -25,19 +25,21 @@ import (
 )
 
 type serviceEnv struct {
-	cfg            config.Config
-	db             *bun.DB
-	redis          *redis.Client
-	userRepo       *repo.UserRepo
-	challengeRepo  *repo.ChallengeRepo
-	submissionRepo *repo.SubmissionRepo
-	scoreRepo      *repo.ScoreboardRepo
-	stackRepo      *repo.StackRepo
-	authSvc        *AuthService
-	userSvc        *UserService
-	scoreSvc       *ScoreboardService
-	wargameSvc     *WargameService
-	stackSvc       *StackService
+	cfg             config.Config
+	db              *bun.DB
+	redis           *redis.Client
+	userRepo        *repo.UserRepo
+	affiliationRepo *repo.AffiliationRepo
+	challengeRepo   *repo.ChallengeRepo
+	submissionRepo  *repo.SubmissionRepo
+	scoreRepo       *repo.ScoreboardRepo
+	stackRepo       *repo.StackRepo
+	authSvc         *AuthService
+	userSvc         *UserService
+	affiliationSvc  *AffiliationService
+	scoreSvc        *ScoreboardService
+	wargameSvc      *WargameService
+	stackSvc        *StackService
 }
 
 var (
@@ -186,6 +188,7 @@ func setupServiceTest(t *testing.T) serviceEnv {
 	resetServiceState(t)
 
 	userRepo := repo.NewUserRepo(serviceDB)
+	affiliationRepo := repo.NewAffiliationRepo(serviceDB)
 	challengeRepo := repo.NewChallengeRepo(serviceDB)
 	submissionRepo := repo.NewSubmissionRepo(serviceDB)
 	voteRepo := repo.NewChallengeVoteRepo(serviceDB)
@@ -195,25 +198,28 @@ func setupServiceTest(t *testing.T) serviceEnv {
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
 
 	authSvc := NewAuthService(serviceCfg, userRepo, serviceRedis)
-	userSvc := NewUserService(userRepo)
+	userSvc := NewUserService(userRepo, affiliationRepo)
+	affiliationSvc := NewAffiliationService(affiliationRepo)
 	scoreSvc := NewScoreboardService(scoreRepo)
 	wargameSvc := NewWargameService(serviceCfg, challengeRepo, submissionRepo, voteRepo, serviceRedis, fileStore)
 	stackSvc := NewStackService(serviceCfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, serviceRedis)
 
 	env := serviceEnv{
-		cfg:            serviceCfg,
-		db:             serviceDB,
-		redis:          serviceRedis,
-		userRepo:       userRepo,
-		challengeRepo:  challengeRepo,
-		submissionRepo: submissionRepo,
-		scoreRepo:      scoreRepo,
-		stackRepo:      stackRepo,
-		authSvc:        authSvc,
-		userSvc:        userSvc,
-		scoreSvc:       scoreSvc,
-		wargameSvc:     wargameSvc,
-		stackSvc:       stackSvc,
+		cfg:             serviceCfg,
+		db:              serviceDB,
+		redis:           serviceRedis,
+		userRepo:        userRepo,
+		affiliationRepo: affiliationRepo,
+		challengeRepo:   challengeRepo,
+		submissionRepo:  submissionRepo,
+		scoreRepo:       scoreRepo,
+		stackRepo:       stackRepo,
+		authSvc:         authSvc,
+		userSvc:         userSvc,
+		affiliationSvc:  affiliationSvc,
+		scoreSvc:        scoreSvc,
+		wargameSvc:      wargameSvc,
+		stackSvc:        stackSvc,
 	}
 
 	return env
@@ -222,7 +228,7 @@ func setupServiceTest(t *testing.T) serviceEnv {
 func resetServiceState(t *testing.T) {
 	t.Helper()
 
-	if _, err := serviceDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := serviceDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 

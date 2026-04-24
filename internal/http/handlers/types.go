@@ -47,7 +47,12 @@ func (o *optionalInt64) UnmarshalJSON(data []byte) error {
 }
 
 type meUpdateRequest struct {
-	Username *string `json:"username"`
+	Username      *string       `json:"username"`
+	AffiliationID optionalInt64 `json:"affiliation_id"`
+}
+
+type adminAffiliationCreateRequest struct {
+	Name string `json:"name" binding:"required"`
 }
 
 type registerRequest struct {
@@ -131,6 +136,8 @@ type userMeResponse struct {
 	Email         string     `json:"email"`
 	Username      string     `json:"username"`
 	Role          string     `json:"role"`
+	AffiliationID *int64     `json:"affiliation_id"`
+	Affiliation   *string    `json:"affiliation"`
 	StackCount    int        `json:"stack_count"`
 	StackLimit    int        `json:"stack_limit"`
 	BlockedReason *string    `json:"blocked_reason"`
@@ -141,6 +148,8 @@ type userDetailResponse struct {
 	ID            int64      `json:"id"`
 	Username      string     `json:"username"`
 	Role          string     `json:"role"`
+	AffiliationID *int64     `json:"affiliation_id"`
+	Affiliation   *string    `json:"affiliation"`
 	BlockedReason *string    `json:"blocked_reason"`
 	BlockedAt     *time.Time `json:"blocked_at"`
 }
@@ -150,6 +159,8 @@ type adminUserResponse struct {
 	Email         string     `json:"email"`
 	Username      string     `json:"username"`
 	Role          string     `json:"role"`
+	AffiliationID *int64     `json:"affiliation_id"`
+	Affiliation   *string    `json:"affiliation"`
 	BlockedReason *string    `json:"blocked_reason"`
 	BlockedAt     *time.Time `json:"blocked_at"`
 }
@@ -253,10 +264,30 @@ type timelineResponse struct {
 	Submissions []models.TimelineSubmission `json:"submissions"`
 }
 
+type affiliationResponse struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+type affiliationsListResponse struct {
+	Affiliations []affiliationResponse `json:"affiliations,omitempty"`
+	Pagination   models.Pagination     `json:"pagination"`
+}
+
 type leaderboardListResponse struct {
 	Challenges []models.LeaderboardChallenge `json:"challenges"`
 	Entries    []models.LeaderboardEntry     `json:"entries"`
 	Pagination models.Pagination             `json:"pagination"`
+}
+
+type userRankingListResponse struct {
+	Entries    []models.UserRankingEntry `json:"entries"`
+	Pagination models.Pagination         `json:"pagination"`
+}
+
+type affiliationRankingListResponse struct {
+	Entries    []models.AffiliationRankingEntry `json:"entries"`
+	Pagination models.Pagination                `json:"pagination"`
 }
 
 type stackResponse struct {
@@ -311,15 +342,43 @@ func timePtrUTC(value *time.Time) *time.Time {
 }
 
 func newUserMeResponse(user *models.User, stackCount, stackLimit int) userMeResponse {
-	return userMeResponse{ID: user.ID, Email: user.Email, Username: user.Username, Role: user.Role, StackCount: stackCount, StackLimit: stackLimit, BlockedReason: user.BlockedReason, BlockedAt: user.BlockedAt}
+	return userMeResponse{
+		ID:            user.ID,
+		Email:         user.Email,
+		Username:      user.Username,
+		Role:          user.Role,
+		AffiliationID: user.AffiliationID,
+		Affiliation:   user.Affiliation,
+		StackCount:    stackCount,
+		StackLimit:    stackLimit,
+		BlockedReason: user.BlockedReason,
+		BlockedAt:     user.BlockedAt,
+	}
 }
 
 func newUserDetailResponse(user *models.User) userDetailResponse {
-	return userDetailResponse{ID: user.ID, Username: user.Username, Role: user.Role, BlockedReason: user.BlockedReason, BlockedAt: user.BlockedAt}
+	return userDetailResponse{
+		ID:            user.ID,
+		Username:      user.Username,
+		Role:          user.Role,
+		AffiliationID: user.AffiliationID,
+		Affiliation:   user.Affiliation,
+		BlockedReason: user.BlockedReason,
+		BlockedAt:     user.BlockedAt,
+	}
 }
 
 func newAdminUserResponse(user *models.User) adminUserResponse {
-	return adminUserResponse{ID: user.ID, Email: user.Email, Username: user.Username, Role: user.Role, BlockedReason: user.BlockedReason, BlockedAt: user.BlockedAt}
+	return adminUserResponse{
+		ID:            user.ID,
+		Email:         user.Email,
+		Username:      user.Username,
+		Role:          user.Role,
+		AffiliationID: user.AffiliationID,
+		Affiliation:   user.Affiliation,
+		BlockedReason: user.BlockedReason,
+		BlockedAt:     user.BlockedAt,
+	}
 }
 
 func newChallengeResponse(challenge *models.Challenge, isSolved bool) challengeResponse {

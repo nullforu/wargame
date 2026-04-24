@@ -23,17 +23,18 @@ import (
 )
 
 type Handler struct {
-	cfg     config.Config
-	auth    *service.AuthService
-	wargame *service.WargameService
-	users   *service.UserService
-	score   *service.ScoreboardService
-	stacks  *service.StackService
-	redis   *redis.Client
+	cfg          config.Config
+	auth         *service.AuthService
+	wargame      *service.WargameService
+	users        *service.UserService
+	affiliations *service.AffiliationService
+	score        *service.ScoreboardService
+	stacks       *service.StackService
+	redis        *redis.Client
 }
 
-func New(cfg config.Config, auth *service.AuthService, wargame *service.WargameService, users *service.UserService, score *service.ScoreboardService, stacks *service.StackService, redis *redis.Client) *Handler {
-	return &Handler{cfg: cfg, auth: auth, wargame: wargame, users: users, score: score, stacks: stacks, redis: redis}
+func New(cfg config.Config, auth *service.AuthService, wargame *service.WargameService, users *service.UserService, affiliations *service.AffiliationService, score *service.ScoreboardService, stacks *service.StackService, redis *redis.Client) *Handler {
+	return &Handler{cfg: cfg, auth: auth, wargame: wargame, users: users, affiliations: affiliations, score: score, stacks: stacks, redis: redis}
 }
 
 func (h *Handler) respondFromCache(ctx *gin.Context, cacheKey string) bool {
@@ -321,7 +322,7 @@ func (h *Handler) UpdateMe(ctx *gin.Context) {
 		return
 	}
 
-	user, err := h.users.UpdateProfile(ctx.Request.Context(), middleware.UserID(ctx), req.Username)
+	user, err := h.users.UpdateProfile(ctx.Request.Context(), middleware.UserID(ctx), req.Username, req.AffiliationID.Value, req.AffiliationID.Set)
 	if err != nil {
 		writeError(ctx, err)
 		return
@@ -998,6 +999,82 @@ func (h *Handler) ListUsers(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, usersListResponse{Users: resp, Pagination: pagination})
 }
 
+func (h *Handler) ListAffiliations(ctx *gin.Context) {
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	rows, pagination, err := h.affiliations.List(ctx.Request.Context(), page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]affiliationResponse, 0, len(rows))
+	for _, row := range rows {
+		resp = append(resp, affiliationResponse{ID: row.ID, Name: row.Name})
+	}
+
+	ctx.JSON(http.StatusOK, affiliationsListResponse{Affiliations: resp, Pagination: pagination})
+}
+
+func (h *Handler) SearchAffiliations(ctx *gin.Context) {
+	query, ok := parseSearchQuery(ctx)
+	if !ok {
+		return
+	}
+
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	rows, pagination, err := h.affiliations.Search(ctx.Request.Context(), query, page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]affiliationResponse, 0, len(rows))
+	for _, row := range rows {
+		resp = append(resp, affiliationResponse{ID: row.ID, Name: row.Name})
+	}
+
+	ctx.JSON(http.StatusOK, affiliationsListResponse{Affiliations: resp, Pagination: pagination})
+}
+
+func (h *Handler) ListAffiliationUsers(ctx *gin.Context) {
+	affiliationID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	if _, err := h.affiliations.GetByID(ctx.Request.Context(), affiliationID); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	users, pagination, err := h.users.ListByAffiliation(ctx.Request.Context(), affiliationID, page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]userDetailResponse, 0, len(users))
+	for _, user := range users {
+		u := user
+		resp = append(resp, newUserDetailResponse(&u))
+	}
+
+	ctx.JSON(http.StatusOK, usersListResponse{Users: resp, Pagination: pagination})
+}
+
 func (h *Handler) SearchUsers(ctx *gin.Context) {
 	query, ok := parseSearchQuery(ctx)
 	if !ok {
@@ -1022,6 +1099,61 @@ func (h *Handler) SearchUsers(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, usersListResponse{Users: resp, Pagination: pagination})
+}
+
+func (h *Handler) RankingUsers(ctx *gin.Context) {
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	rows, pagination, err := h.score.UserRanking(ctx.Request.Context(), page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, userRankingListResponse{Entries: rows, Pagination: pagination})
+}
+
+func (h *Handler) RankingAffiliations(ctx *gin.Context) {
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	rows, pagination, err := h.score.AffiliationRanking(ctx.Request.Context(), page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, affiliationRankingListResponse{Entries: rows, Pagination: pagination})
+}
+
+func (h *Handler) RankingAffiliationUsers(ctx *gin.Context) {
+	affiliationID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	if _, err := h.affiliations.GetByID(ctx.Request.Context(), affiliationID); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	rows, pagination, err := h.score.AffiliationUserRanking(ctx.Request.Context(), affiliationID, page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, userRankingListResponse{Entries: rows, Pagination: pagination})
 }
 
 func (h *Handler) GetUser(ctx *gin.Context) {
@@ -1100,4 +1232,20 @@ func (h *Handler) AdminUnblockUser(ctx *gin.Context) {
 
 	h.notifyScoreboardChanged(ctx.Request.Context(), "user_unblocked")
 	ctx.JSON(http.StatusOK, newAdminUserResponse(updated))
+}
+
+func (h *Handler) AdminCreateAffiliation(ctx *gin.Context) {
+	var req adminAffiliationCreateRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	affiliation, err := h.affiliations.Create(ctx.Request.Context(), req.Name)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, affiliationResponse{ID: affiliation.ID, Name: affiliation.Name})
 }

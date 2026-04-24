@@ -153,3 +153,82 @@ func TestScoreboardLeaderboardInvalidPagination(t *testing.T) {
 		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestRankingEndpoints(t *testing.T) {
+	env := setupTest(t, testCfg)
+	affA := createAffiliation(t, env, "Team A")
+	affB := createAffiliation(t, env, "Team B")
+
+	user1 := createUser(t, env, "u1@example.com", "u1", "pass", models.UserRole)
+	user2 := createUser(t, env, "u2@example.com", "u2", "pass", models.UserRole)
+	user3 := createUser(t, env, "u3@example.com", "u3", "pass", models.UserRole)
+	user1.AffiliationID = &affA.ID
+	user2.AffiliationID = &affA.ID
+	user3.AffiliationID = &affB.ID
+	if err := env.userRepo.Update(context.Background(), user1); err != nil {
+		t.Fatalf("update user1: %v", err)
+	}
+
+	if err := env.userRepo.Update(context.Background(), user2); err != nil {
+		t.Fatalf("update user2: %v", err)
+	}
+
+	if err := env.userRepo.Update(context.Background(), user3); err != nil {
+		t.Fatalf("update user3: %v", err)
+	}
+
+	ch1 := createChallenge(t, env, "Ch1", 100, "flag{1}", true)
+	ch2 := createChallenge(t, env, "Ch2", 200, "flag{2}", true)
+	createSubmission(t, env, user1.ID, ch1.ID, true, time.Now().UTC())
+	createSubmission(t, env, user2.ID, ch1.ID, true, time.Now().UTC())
+	createSubmission(t, env, user3.ID, ch2.ID, true, time.Now().UTC())
+
+	userRec := doRequest(t, env.router, http.MethodGet, "/api/rankings/users?page=1&page_size=10", nil, nil)
+	if userRec.Code != http.StatusOK {
+		t.Fatalf("ranking users status %d: %s", userRec.Code, userRec.Body.String())
+	}
+
+	var userResp struct {
+		Entries []struct {
+			UserID      int64 `json:"user_id"`
+			Score       int   `json:"score"`
+			SolvedCount int   `json:"solved_count"`
+		} `json:"entries"`
+	}
+	decodeJSON(t, userRec, &userResp)
+	if len(userResp.Entries) != 3 || userResp.Entries[0].UserID != user3.ID || userResp.Entries[0].Score != 200 || userResp.Entries[0].SolvedCount != 1 {
+		t.Fatalf("unexpected users ranking: %+v", userResp.Entries)
+	}
+
+	affRec := doRequest(t, env.router, http.MethodGet, "/api/rankings/affiliations?page=1&page_size=10", nil, nil)
+	if affRec.Code != http.StatusOK {
+		t.Fatalf("ranking affiliations status %d: %s", affRec.Code, affRec.Body.String())
+	}
+
+	var affResp struct {
+		Entries []struct {
+			AffiliationID int64 `json:"affiliation_id"`
+			Score         int   `json:"score"`
+			UserCount     int   `json:"user_count"`
+		} `json:"entries"`
+	}
+	decodeJSON(t, affRec, &affResp)
+	if len(affResp.Entries) != 2 || affResp.Entries[0].AffiliationID != affA.ID || affResp.Entries[0].Score != 200 || affResp.Entries[0].UserCount != 2 {
+		t.Fatalf("unexpected affiliations ranking: %+v", affResp.Entries)
+	}
+
+	affUsersRec := doRequest(t, env.router, http.MethodGet, "/api/rankings/affiliations/"+itoa(affA.ID)+"/users?page=1&page_size=10", nil, nil)
+	if affUsersRec.Code != http.StatusOK {
+		t.Fatalf("ranking affiliation users status %d: %s", affUsersRec.Code, affUsersRec.Body.String())
+	}
+
+	var affUsersResp struct {
+		Entries []struct {
+			UserID int64 `json:"user_id"`
+		} `json:"entries"`
+	}
+	decodeJSON(t, affUsersRec, &affUsersResp)
+	if len(affUsersResp.Entries) != 2 {
+		t.Fatalf("unexpected affiliation users ranking entries: %+v", affUsersResp.Entries)
+	}
+}

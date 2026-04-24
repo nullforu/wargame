@@ -41,6 +41,54 @@ func (s *ScoreboardService) UserTimeline(ctx context.Context, since *time.Time) 
 	return aggregateUserTimeline(raw), nil
 }
 
+func (s *ScoreboardService) UserRanking(ctx context.Context, page, pageSize int) ([]models.UserRankingEntry, models.Pagination, error) {
+	params, err := NormalizePagination(page, pageSize)
+	if err != nil {
+		return nil, models.Pagination{}, err
+	}
+
+	rows, totalCount, err := s.repo.UserRanking(ctx, params.Page, params.PageSize)
+	if err != nil {
+		return nil, models.Pagination{}, fmt.Errorf("scoreboard.UserRanking: %w", err)
+	}
+
+	return rows, BuildPagination(params.Page, params.PageSize, totalCount), nil
+}
+
+func (s *ScoreboardService) AffiliationRanking(ctx context.Context, page, pageSize int) ([]models.AffiliationRankingEntry, models.Pagination, error) {
+	params, err := NormalizePagination(page, pageSize)
+	if err != nil {
+		return nil, models.Pagination{}, err
+	}
+
+	rows, totalCount, err := s.repo.AffiliationRanking(ctx, params.Page, params.PageSize)
+	if err != nil {
+		return nil, models.Pagination{}, fmt.Errorf("scoreboard.AffiliationRanking: %w", err)
+	}
+
+	return rows, BuildPagination(params.Page, params.PageSize, totalCount), nil
+}
+
+func (s *ScoreboardService) AffiliationUserRanking(ctx context.Context, affiliationID int64, page, pageSize int) ([]models.UserRankingEntry, models.Pagination, error) {
+	validator := newFieldValidator()
+	validator.PositiveID("id", affiliationID)
+	if err := validator.Error(); err != nil {
+		return nil, models.Pagination{}, err
+	}
+
+	params, err := NormalizePagination(page, pageSize)
+	if err != nil {
+		return nil, models.Pagination{}, err
+	}
+
+	rows, totalCount, err := s.repo.AffiliationUserRanking(ctx, affiliationID, params.Page, params.PageSize)
+	if err != nil {
+		return nil, models.Pagination{}, fmt.Errorf("scoreboard.AffiliationUserRanking: %w", err)
+	}
+
+	return rows, BuildPagination(params.Page, params.PageSize, totalCount), nil
+}
+
 func aggregateUserTimeline(raw []models.UserTimelineRow) []models.TimelineSubmission {
 	if len(raw) == 0 {
 		return []models.TimelineSubmission{}

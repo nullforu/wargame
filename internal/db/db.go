@@ -38,6 +38,7 @@ func AutoMigrate(ctx context.Context, db *bun.DB) error {
 
 	modelsToCreate := []any{
 		(*models.User)(nil),
+		(*models.Affiliation)(nil),
 		(*models.Challenge)(nil),
 		(*models.Stack)(nil),
 		(*models.Submission)(nil),

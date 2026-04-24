@@ -86,3 +86,54 @@ func TestScoreboardServiceLeaderboardPaginationValidation(t *testing.T) {
 		t.Fatalf("expected invalid pagination error")
 	}
 }
+
+func TestScoreboardServiceRankings(t *testing.T) {
+	env := setupServiceTest(t)
+	affiliation, err := env.affiliationSvc.Create(context.Background(), "Blue Team")
+	if err != nil {
+		t.Fatalf("create affiliation: %v", err)
+	}
+
+	user1 := createUser(t, env, "u1@example.com", "u1", "pass", models.UserRole)
+	user2 := createUser(t, env, "u2@example.com", "u2", "pass", models.UserRole)
+	user1.AffiliationID = &affiliation.ID
+	if err := env.userRepo.Update(context.Background(), user1); err != nil {
+		t.Fatalf("update user affiliation: %v", err)
+	}
+
+	ch1 := createChallenge(t, env, "Ch1", 100, "flag{1}", true)
+	ch2 := createChallenge(t, env, "Ch2", 200, "flag{2}", true)
+	createSubmission(t, env, user1.ID, ch2.ID, true, time.Now().UTC())
+	createSubmission(t, env, user2.ID, ch1.ID, true, time.Now().UTC())
+
+	userRows, userPagination, err := env.scoreSvc.UserRanking(context.Background(), 1, 20)
+	if err != nil {
+		t.Fatalf("user ranking: %v", err)
+	}
+
+	if len(userRows) != 2 || userPagination.TotalCount != 2 {
+		t.Fatalf("unexpected user ranking response: rows=%d pagination=%+v", len(userRows), userPagination)
+	}
+
+	affRows, affPagination, err := env.scoreSvc.AffiliationRanking(context.Background(), 1, 20)
+	if err != nil {
+		t.Fatalf("affiliation ranking: %v", err)
+	}
+
+	if len(affRows) != 1 || affPagination.TotalCount != 1 {
+		t.Fatalf("unexpected affiliation ranking response: rows=%d pagination=%+v", len(affRows), affPagination)
+	}
+
+	affUserRows, affUserPagination, err := env.scoreSvc.AffiliationUserRanking(context.Background(), affiliation.ID, 1, 20)
+	if err != nil {
+		t.Fatalf("affiliation user ranking: %v", err)
+	}
+
+	if len(affUserRows) != 1 || affUserPagination.TotalCount != 1 {
+		t.Fatalf("unexpected affiliation user ranking response: rows=%d pagination=%+v", len(affUserRows), affUserPagination)
+	}
+
+	if _, _, err := env.scoreSvc.AffiliationUserRanking(context.Background(), 0, 1, 20); err == nil {
+		t.Fatalf("expected validation error for invalid affiliation id")
+	}
+}

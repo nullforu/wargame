@@ -6,24 +6,35 @@
 
 BEGIN;
 
-TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users RESTART IDENTITY CASCADE;
+TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE;
+
+INSERT INTO affiliations (id, name, created_at, updated_at)
+VALUES
+    (1, '세명컴퓨터고등학교', NOW() - INTERVAL '100 days', NOW()),
+    (2, '널포유', NOW() - INTERVAL '95 days', NOW()),
+    (3, '삼셩전자', NOW() - INTERVAL '90 days', NOW()),
+    (4, '서울에있는모대학교', NOW() - INTERVAL '85 days', NOW());
 
 -- bcrypt("pass1234!", cost=10)
 -- generated value: $2a$10$bsyMO/LWwVSIFN.LS09qbuPjVxwIvOqC3i79lJ6hzHw722cwLRa4m
 
-INSERT INTO users (id, email, username, password_hash, role, blocked_reason, blocked_at, created_at, updated_at)
+INSERT INTO users (id, email, username, password_hash, role, affiliation_id, blocked_reason, blocked_at, created_at, updated_at)
 VALUES
-    (1, 'admin@wargame.local', 'admin', '$2a$10$bsyMO/LWwVSIFN.LS09qbuPjVxwIvOqC3i79lJ6hzHw722cwLRa4m', 'admin', NULL, NULL, NOW() - INTERVAL '100 days', NOW()),
-    (2, 'mod@wargame.local', 'moderator', '$2a$10$bsyMO/LWwVSIFN.LS09qbuPjVxwIvOqC3i79lJ6hzHw722cwLRa4m', 'user', NULL, NULL, NOW() - INTERVAL '95 days', NOW()),
-    (3, 'blocked@wargame.local', 'blocked-user', '$2a$10$bsyMO/LWwVSIFN.LS09qbuPjVxwIvOqC3i79lJ6hzHw722cwLRa4m', 'blocked', 'spam submissions', NOW() - INTERVAL '10 days', NOW() - INTERVAL '90 days', NOW());
+    (1, 'admin@wargame.local', 'admin', '$2a$10$bsyMO/LWwVSIFN.LS09qbuPjVxwIvOqC3i79lJ6hzHw722cwLRa4m', 'admin', 1, NULL, NULL, NOW() - INTERVAL '100 days', NOW()),
+    (2, 'mod@wargame.local', 'moderator', '$2a$10$bsyMO/LWwVSIFN.LS09qbuPjVxwIvOqC3i79lJ6hzHw722cwLRa4m', 'user', 2, NULL, NULL, NOW() - INTERVAL '95 days', NOW()),
+    (3, 'blocked@wargame.local', 'blocked-user', '$2a$10$bsyMO/LWwVSIFN.LS09qbuPjVxwIvOqC3i79lJ6hzHw722cwLRa4m', 'blocked', NULL, 'spam submissions', NOW() - INTERVAL '10 days', NOW() - INTERVAL '90 days', NOW());
 
-INSERT INTO users (id, email, username, password_hash, role, created_at, updated_at)
+INSERT INTO users (id, email, username, password_hash, role, affiliation_id, created_at, updated_at)
 SELECT
     gs,
     format('user%s@wargame.local', gs - 3),
     format('user%s', gs - 3),
     '$2a$10$bsyMO/LWwVSIFN.LS09qbuPjVxwIvOqC3i79lJ6hzHw722cwLRa4m',
     'user',
+    CASE
+        WHEN gs % 5 = 0 THEN NULL
+        ELSE ((gs % 4) + 1)
+    END,
     NOW() - ((120 - gs) || ' days')::interval,
     NOW() - ((gs % 15) || ' hours')::interval
 FROM generate_series(4, 34) AS gs;
@@ -168,6 +179,7 @@ LIMIT 30;
 
 -- Keep sequence values aligned after explicit IDs.
 SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users), TRUE);
+SELECT setval('affiliations_id_seq', (SELECT COALESCE(MAX(id), 1) FROM affiliations), TRUE);
 SELECT setval('challenges_id_seq', (SELECT COALESCE(MAX(id), 1) FROM challenges), TRUE);
 SELECT setval('submissions_id_seq', (SELECT COALESCE(MAX(id), 1) FROM submissions), TRUE);
 SELECT setval('stacks_id_seq', (SELECT COALESCE(MAX(id), 1) FROM stacks), TRUE);

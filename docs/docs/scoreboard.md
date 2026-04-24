@@ -1,9 +1,9 @@
 ---
-title: Leaderboard & Timeline
+title: Ranking, Leaderboard & Timeline
 nav_order: 5
 ---
 
-## Get Leaderboard
+## Get Leaderboard (Legacy)
 
 `GET /api/leaderboard?page=1&page_size=20`
 
@@ -42,13 +42,109 @@ Response 200
         "has_next": true
     }
 }
+
+```
+
+---
+
+## Get User Ranking
+
+`GET /api/rankings/users?page=1&page_size=20`
+
+Response 200
+
+```json
+{
+    "entries": [
+        {
+            "user_id": 3,
+            "username": "user3",
+            "score": 500,
+            "solved_count": 4,
+            "affiliation_id": 2,
+            "affiliation_name": "Blue Team"
+        }
+    ],
+    "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total_count": 37,
+        "total_pages": 2,
+        "has_prev": false,
+        "has_next": true
+    }
+}
 ```
 
 Notes:
 
-- Users are sorted by score (descending).
-- Blocked users are excluded from score and solve aggregation.
-- Pagination applies to leaderboard entries. Challenge columns are returned in full for matrix rendering.
+- Users are sorted by `score DESC`, `solved_count DESC`, `user_id ASC`.
+- Blocked users are excluded.
+
+---
+
+## Get Affiliation Total Ranking
+
+`GET /api/rankings/affiliations?page=1&page_size=20`
+
+Response 200
+
+```json
+{
+    "entries": [
+        {
+            "affiliation_id": 2,
+            "name": "Blue Team",
+            "score": 1200,
+            "solved_count": 9,
+            "user_count": 4
+        }
+    ],
+    "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total_count": 8,
+        "total_pages": 1,
+        "has_prev": false,
+        "has_next": false
+    }
+}
+```
+
+Notes:
+
+- Ranking contains affiliations only. Unaffiliated users are not part of this table.
+
+---
+
+## Get Ranking Users in an Affiliation
+
+`GET /api/rankings/affiliations/:id/users?page=1&page_size=20`
+
+Response 200
+
+```json
+{
+    "entries": [
+        {
+            "user_id": 3,
+            "username": "user3",
+            "score": 500,
+            "solved_count": 4,
+            "affiliation_id": 2,
+            "affiliation_name": "Blue Team"
+        }
+    ],
+    "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total_count": 4,
+        "total_pages": 1,
+        "has_prev": false,
+        "has_next": false
+    }
+}
+```
 
 ---
 
@@ -72,14 +168,3 @@ Response 200
 }
 ```
 
-Notes:
-
-- Solves are grouped by user in time windows.
-- Blocked users are excluded.
-
----
-
-## Cache Refresh Behavior
-
-Leaderboard and timeline caches are invalidated and rebuilt asynchronously when scoreboard-affecting actions occur (for example correct submissions or admin challenge/user status changes).  
-The API no longer provides an SSE stream endpoint.

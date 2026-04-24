@@ -354,6 +354,10 @@ Errors (all admin stack endpoints):
 
 ---
 
+Affiliation-specific admin APIs are documented in `affiliations.md`.
+
+---
+
 ## Upload Challenge File
 
 `POST /api/admin/challenges/{id}/file/upload`
