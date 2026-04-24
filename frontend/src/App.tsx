@@ -6,6 +6,7 @@ import Register from './routes/Register'
 import Challenges from './routes/Challenges'
 import ChallengeDetail from './routes/ChallengeDetail'
 import Scoreboard from './routes/Scoreboard'
+import Ranking from './routes/Ranking'
 import Users from './routes/Users'
 import UserProfile from './routes/UserProfile'
 import Admin from './routes/Admin'
@@ -27,6 +28,7 @@ const routes: Record<string, RouteComponent> = {
     '/login': Login,
     '/register': Register,
     '/challenges': Challenges,
+    '/ranking': Ranking,
     '/scoreboard': Scoreboard,
     '/profile': UserProfile,
     '/users': Users,

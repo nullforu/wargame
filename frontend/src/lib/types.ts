@@ -3,6 +3,8 @@ export interface AuthUser {
     email: string
     username: string
     role: string
+    affiliation_id: number | null
+    affiliation: string | null
     stack_count: number
     stack_limit: number
     blocked_reason: string | null
@@ -271,6 +273,8 @@ export interface UserListItem {
     id: number
     username: string
     role: string
+    affiliation_id?: number | null
+    affiliation?: string | null
     blocked_reason: string | null
     blocked_at: string | null
 }
@@ -279,8 +283,47 @@ export interface UserDetail {
     id: number
     username: string
     role: string
+    affiliation_id: number | null
+    affiliation: string | null
     blocked_reason: string | null
     blocked_at: string | null
+}
+
+export interface Affiliation {
+    id: number
+    name: string
+}
+
+export interface AffiliationsResponse {
+    affiliations: Affiliation[]
+    pagination: PaginationMeta
+}
+
+export interface UserRankingEntry {
+    user_id: number
+    username: string
+    score: number
+    solved_count: number
+    affiliation_id: number | null
+    affiliation_name: string | null
+}
+
+export interface UserRankingResponse {
+    entries: UserRankingEntry[]
+    pagination: PaginationMeta
+}
+
+export interface AffiliationRankingEntry {
+    affiliation_id: number
+    name: string
+    score: number
+    solved_count: number
+    user_count: number
+}
+
+export interface AffiliationRankingResponse {
+    entries: AffiliationRankingEntry[]
+    pagination: PaginationMeta
 }
 
 export interface PaginationMeta {

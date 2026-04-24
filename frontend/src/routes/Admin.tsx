@@ -3,6 +3,7 @@ import CreateChallenge from './admin/CreateChallenge'
 import ChallengeManagement from './admin/ChallengeManagement'
 import Users from './admin/Users'
 import Stacks from './admin/Stacks'
+import Affiliations from './admin/Affiliations'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/auth'
 
@@ -10,9 +11,9 @@ interface RouteProps {
     routeParams?: Record<string, string>
 }
 
-type AdminTabId = 'challenge_create' | 'challenge_management' | 'users' | 'stacks'
+type AdminTabId = 'challenge_create' | 'challenge_management' | 'users' | 'stacks' | 'affiliations'
 const TAB_PARAM = 'tab'
-const ADMIN_TAB_IDS: AdminTabId[] = ['challenge_create', 'challenge_management', 'users', 'stacks']
+const ADMIN_TAB_IDS: AdminTabId[] = ['challenge_create', 'challenge_management', 'users', 'stacks', 'affiliations']
 
 const getTabFromUrl = (): AdminTabId | null => {
     const params = new URLSearchParams(window.location.search)
@@ -30,6 +31,7 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
             { id: 'challenge_management', label: t('admin.tab.challengeManagement') },
             { id: 'users', label: t('admin.tab.users') },
             { id: 'stacks', label: t('admin.tab.stacks') },
+            { id: 'affiliations', label: t('admin.tab.affiliations') },
         ],
         [t],
     )
@@ -89,7 +91,17 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
                         </nav>
 
                         <div className='min-w-0 flex-1'>
-                            {activeTab === 'challenge_create' ? <CreateChallenge /> : activeTab === 'challenge_management' ? <ChallengeManagement /> : activeTab === 'stacks' ? <Stacks /> : activeTab === 'users' ? <Users /> : null}
+                            {activeTab === 'challenge_create' ? (
+                                <CreateChallenge />
+                            ) : activeTab === 'challenge_management' ? (
+                                <ChallengeManagement />
+                            ) : activeTab === 'stacks' ? (
+                                <Stacks />
+                            ) : activeTab === 'users' ? (
+                                <Users />
+                            ) : activeTab === 'affiliations' ? (
+                                <Affiliations />
+                            ) : null}
                         </div>
                     </div>
                 </>

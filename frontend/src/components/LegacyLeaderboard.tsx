@@ -6,7 +6,7 @@ import { useT } from '../lib/i18n'
 import { useApi } from '../lib/useApi'
 import UserAvatar from './UserAvatar'
 
-interface ScoreboardLeaderboardProps {
+interface LegacyLeaderboardProps {
     refreshTrigger?: number
 }
 
@@ -35,7 +35,7 @@ const pushQueryState = (nextPage: number) => {
     }
 }
 
-const ScoreboardLeaderboard = ({ refreshTrigger = 0 }: ScoreboardLeaderboardProps) => {
+const LegacyLeaderboard = ({ refreshTrigger = 0 }: LegacyLeaderboardProps) => {
     const t = useT()
     const api = useApi()
     const [challenges, setChallenges] = useState<LeaderboardChallenge[]>([])
@@ -67,9 +67,9 @@ const ScoreboardLeaderboard = ({ refreshTrigger = 0 }: ScoreboardLeaderboardProp
         setLoading(scores.length === 0)
         setErrorMessage('')
 
-        const loadScoreboard = async () => {
+        const loadLegacyLeaderboard = async () => {
             try {
-                const payload = await api.leaderboard(page, PAGE_SIZE)
+                const payload = await api.legacyLeaderboard(page, PAGE_SIZE)
                 if (!active || currentRequest !== requestIdRef.current) return
 
                 setChallenges(payload.challenges)
@@ -92,7 +92,7 @@ const ScoreboardLeaderboard = ({ refreshTrigger = 0 }: ScoreboardLeaderboardProp
             }
         }
 
-        loadScoreboard()
+        loadLegacyLeaderboard()
         return () => {
             active = false
         }
@@ -113,7 +113,7 @@ const ScoreboardLeaderboard = ({ refreshTrigger = 0 }: ScoreboardLeaderboardProp
     return (
         <div className='min-w-0 rounded-xl border border-border bg-surface p-4'>
             <div className='flex items-center justify-between'>
-                <h3 className='text-lg text-text'>{t('leaderboard.title')}</h3>
+                <h3 className='text-lg text-text'>{t('legacyLeaderboard.title')}</h3>
                 <span className='text-xs text-text-subtle'>{t('leaderboard.challengesCount', { count: challenges.length })}</span>
             </div>
             {loading ? (
@@ -222,4 +222,4 @@ const ScoreboardLeaderboard = ({ refreshTrigger = 0 }: ScoreboardLeaderboardProp
     )
 }
 
-export default ScoreboardLeaderboard
+export default LegacyLeaderboard

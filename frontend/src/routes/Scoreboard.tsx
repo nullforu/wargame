@@ -1,5 +1,5 @@
 import ScoreboardTimeline from '../components/ScoreboardTimeline'
-import ScoreboardLeaderboard from '../components/ScoreboardLeaderboard'
+import LegacyLeaderboard from '../components/LegacyLeaderboard'
 import LoginRequired from '../components/LoginRequired'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/auth'
@@ -23,7 +23,7 @@ const Scoreboard = ({ routeParams = {} }: RouteProps) => {
 
             <div className='grid min-w-0 grid-cols-1 gap-4'>
                 <ScoreboardTimeline />
-                <ScoreboardLeaderboard />
+                <LegacyLeaderboard />
             </div>
         </section>
     )
