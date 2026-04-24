@@ -50,7 +50,9 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
     const [loadingUsers, setLoadingUsers] = useState(true)
     const [loadingAffiliations, setLoadingAffiliations] = useState(true)
     const [loadingAffiliationUsers, setLoadingAffiliationUsers] = useState(false)
-    const [errorMessage, setErrorMessage] = useState('')
+    const [userErrorMessage, setUserErrorMessage] = useState('')
+    const [affiliationErrorMessage, setAffiliationErrorMessage] = useState('')
+    const [affiliationUserErrorMessage, setAffiliationUserErrorMessage] = useState('')
     const [activeTab, setActiveTab] = useState<RankingTabId>(() => getTabFromUrl() ?? 'overall')
 
     const rankingTabs = useMemo(
@@ -85,15 +87,17 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
         if (activeTab !== 'overall') return
         let active = true
         setLoadingUsers(true)
+        setUserErrorMessage('')
         const load = async () => {
             try {
                 const data = await api.rankingUsers(userPage, PAGE_SIZE)
                 if (!active) return
                 setUserRows(data.entries)
                 setUserPagination(data.pagination)
+                setUserErrorMessage('')
             } catch (error) {
                 if (!active) return
-                setErrorMessage(formatApiError(error, t).message)
+                setUserErrorMessage(formatApiError(error, t).message)
                 setUserRows([])
                 setUserPagination(EMPTY_PAGINATION)
             } finally {
@@ -110,15 +114,17 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
         if (activeTab !== 'affiliations') return
         let active = true
         setLoadingAffiliations(true)
+        setAffiliationErrorMessage('')
         const load = async () => {
             try {
                 const data = await api.rankingAffiliations(affiliationPage, PAGE_SIZE)
                 if (!active) return
                 setAffiliationRows(data.entries)
                 setAffiliationPagination(data.pagination)
+                setAffiliationErrorMessage('')
             } catch (error) {
                 if (!active) return
-                setErrorMessage(formatApiError(error, t).message)
+                setAffiliationErrorMessage(formatApiError(error, t).message)
                 setAffiliationRows([])
                 setAffiliationPagination(EMPTY_PAGINATION)
             } finally {
@@ -136,19 +142,22 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
         if (!selectedAffiliation) {
             setAffiliationUserRows([])
             setAffiliationUserPagination(EMPTY_PAGINATION)
+            setAffiliationUserErrorMessage('')
             return
         }
         let active = true
         setLoadingAffiliationUsers(true)
+        setAffiliationUserErrorMessage('')
         const load = async () => {
             try {
                 const data = await api.rankingAffiliationUsers(selectedAffiliation.affiliation_id, affiliationUserPage, PAGE_SIZE)
                 if (!active) return
                 setAffiliationUserRows(data.entries)
                 setAffiliationUserPagination(data.pagination)
+                setAffiliationUserErrorMessage('')
             } catch (error) {
                 if (!active) return
-                setErrorMessage(formatApiError(error, t).message)
+                setAffiliationUserErrorMessage(formatApiError(error, t).message)
                 setAffiliationUserRows([])
                 setAffiliationUserPagination(EMPTY_PAGINATION)
             } finally {
@@ -162,6 +171,13 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
     }, [activeTab, affiliationUserPage, api, selectedAffiliation, t])
 
     const selectedTitle = useMemo(() => selectedAffiliation?.name ?? '', [selectedAffiliation])
+    const errorMessage = useMemo(() => {
+        if (activeTab === 'overall') {
+            return userErrorMessage
+        }
+
+        return affiliationUserErrorMessage || affiliationErrorMessage
+    }, [activeTab, userErrorMessage, affiliationErrorMessage, affiliationUserErrorMessage])
 
     if (!auth.user) {
         return <LoginRequired title={t('ranking.title')} />

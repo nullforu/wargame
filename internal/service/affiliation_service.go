@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"wargame/internal/db"
 	"wargame/internal/models"
 	"wargame/internal/repo"
 )
@@ -41,8 +42,7 @@ func (s *AffiliationService) Create(ctx context.Context, name string) (*models.A
 	}
 
 	if err := s.repo.Create(ctx, affiliation); err != nil {
-		msg := strings.ToLower(err.Error())
-		if strings.Contains(msg, "idx_affiliations_name_unique_lower") || strings.Contains(msg, "duplicate key") {
+		if db.IsUniqueViolation(err) {
 			return nil, NewValidationError(FieldError{Field: "name", Reason: "duplicate"})
 		}
 

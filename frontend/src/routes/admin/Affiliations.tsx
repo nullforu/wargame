@@ -19,11 +19,11 @@ const AdminAffiliations = () => {
     const [errorMessage, setErrorMessage] = useState('')
     const [successMessage, setSuccessMessage] = useState('')
 
-    const loadRows = useCallback(async () => {
+    const loadRows = useCallback(async (targetPage: number) => {
         setLoading(true)
         setErrorMessage('')
         try {
-            const data = await api.affiliations(page, 20)
+            const data = await api.affiliations(targetPage, 20)
             setRows(data.affiliations)
             setPagination(data.pagination)
         } catch (error) {
@@ -33,11 +33,11 @@ const AdminAffiliations = () => {
         } finally {
             setLoading(false)
         }
-    }, [api, page, t])
+    }, [api, t])
 
     useEffect(() => {
-        loadRows()
-    }, [loadRows])
+        void loadRows(page)
+    }, [loadRows, page])
 
     const create = async () => {
         const trimmed = name.trim()
@@ -53,8 +53,11 @@ const AdminAffiliations = () => {
             const created = await api.createAffiliation(trimmed)
             setSuccessMessage(t('admin.affiliations.created', { name: created.name }))
             setName('')
-            setPage(1)
-            await loadRows()
+            if (page === 1) {
+                await loadRows(1)
+            } else {
+                setPage(1)
+            }
         } catch (error) {
             setErrorMessage(formatApiError(error, t).message)
         } finally {
