@@ -286,6 +286,22 @@ func TestHandlerAffiliationsAndRankings(t *testing.T) {
 		t.Fatalf("unexpected created affiliation: %+v", created)
 	}
 
+	t.Run("create affiliation validation", func(t *testing.T) {
+		invalidCtx, invalidRec := newJSONContext(t, http.MethodPost, "/api/admin/affiliations", []byte(`{"name":123}`))
+		invalidCtx.Set("userID", admin.ID)
+		env.handler.AdminCreateAffiliation(invalidCtx)
+		if invalidRec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for invalid body, got %d", invalidRec.Code)
+		}
+
+		dupCtx, dupRec := newJSONContext(t, http.MethodPost, "/api/admin/affiliations", []byte(`{"name":"blue team"}`))
+		dupCtx.Set("userID", admin.ID)
+		env.handler.AdminCreateAffiliation(dupCtx)
+		if dupRec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for duplicate affiliation, got %d", dupRec.Code)
+		}
+	})
+
 	user1.AffiliationID = &created.ID
 	if err := env.userRepo.Update(context.Background(), user1); err != nil {
 		t.Fatalf("update user1 affiliation: %v", err)
@@ -330,6 +346,20 @@ func TestHandlerAffiliationsAndRankings(t *testing.T) {
 		}
 	})
 
+	t.Run("search affiliations validation", func(t *testing.T) {
+		ctxMissingQ, recMissingQ := newJSONContext(t, http.MethodGet, "/api/affiliations/search?page=1&page_size=20", nil)
+		env.handler.SearchAffiliations(ctxMissingQ)
+		if recMissingQ.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for missing q, got %d", recMissingQ.Code)
+		}
+
+		ctxBadPage, recBadPage := newJSONContext(t, http.MethodGet, "/api/affiliations/search?q=blue&page=bad&page_size=20", nil)
+		env.handler.SearchAffiliations(ctxBadPage)
+		if recBadPage.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for bad page, got %d", recBadPage.Code)
+		}
+	})
+
 	t.Run("list affiliation users", func(t *testing.T) {
 		ctx, rec := newJSONContext(t, http.MethodGet, "/api/affiliations/"+toStringID(created.ID)+"/users?page=1&page_size=20", nil)
 		ctx.Params = append(ctx.Params, ginParam("id", toStringID(created.ID)))
@@ -345,6 +375,22 @@ func TestHandlerAffiliationsAndRankings(t *testing.T) {
 
 		if len(resp.Users) != 1 || resp.Users[0].ID != user1.ID {
 			t.Fatalf("unexpected affiliation users: %+v", resp.Users)
+		}
+	})
+
+	t.Run("list affiliation users validation", func(t *testing.T) {
+		ctxInvalidID, recInvalidID := newJSONContext(t, http.MethodGet, "/api/affiliations/bad/users?page=1&page_size=20", nil)
+		ctxInvalidID.Params = append(ctxInvalidID.Params, ginParam("id", "bad"))
+		env.handler.ListAffiliationUsers(ctxInvalidID)
+		if recInvalidID.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for invalid affiliation id, got %d", recInvalidID.Code)
+		}
+
+		ctxMissingAff, recMissingAff := newJSONContext(t, http.MethodGet, "/api/affiliations/999999/users?page=1&page_size=20", nil)
+		ctxMissingAff.Params = append(ctxMissingAff.Params, ginParam("id", "999999"))
+		env.handler.ListAffiliationUsers(ctxMissingAff)
+		if recMissingAff.Code != http.StatusNotFound {
+			t.Fatalf("expected 404 for missing affiliation, got %d", recMissingAff.Code)
 		}
 	})
 
@@ -365,6 +411,14 @@ func TestHandlerAffiliationsAndRankings(t *testing.T) {
 		}
 	})
 
+	t.Run("ranking users invalid pagination", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/rankings/users?page=bad&page_size=20", nil)
+		env.handler.RankingUsers(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rec.Code)
+		}
+	})
+
 	t.Run("ranking affiliations", func(t *testing.T) {
 		ctx, rec := newJSONContext(t, http.MethodGet, "/api/rankings/affiliations?page=1&page_size=20", nil)
 		env.handler.RankingAffiliations(ctx)
@@ -379,6 +433,14 @@ func TestHandlerAffiliationsAndRankings(t *testing.T) {
 
 		if len(resp.Entries) != 1 || resp.Entries[0].AffiliationID != created.ID {
 			t.Fatalf("unexpected ranking affiliations: %+v", resp.Entries)
+		}
+	})
+
+	t.Run("ranking affiliations invalid pagination", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/rankings/affiliations?page=1&page_size=bad", nil)
+		env.handler.RankingAffiliations(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rec.Code)
 		}
 	})
 
@@ -397,6 +459,22 @@ func TestHandlerAffiliationsAndRankings(t *testing.T) {
 
 		if len(resp.Entries) != 1 || resp.Entries[0].UserID != user1.ID {
 			t.Fatalf("unexpected ranking affiliation users: %+v", resp.Entries)
+		}
+	})
+
+	t.Run("ranking affiliation users validation", func(t *testing.T) {
+		ctxInvalidID, recInvalidID := newJSONContext(t, http.MethodGet, "/api/rankings/affiliations/bad/users?page=1&page_size=20", nil)
+		ctxInvalidID.Params = append(ctxInvalidID.Params, ginParam("id", "bad"))
+		env.handler.RankingAffiliationUsers(ctxInvalidID)
+		if recInvalidID.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", recInvalidID.Code)
+		}
+
+		ctxMissingAff, recMissingAff := newJSONContext(t, http.MethodGet, "/api/rankings/affiliations/999999/users?page=1&page_size=20", nil)
+		ctxMissingAff.Params = append(ctxMissingAff.Params, ginParam("id", "999999"))
+		env.handler.RankingAffiliationUsers(ctxMissingAff)
+		if recMissingAff.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", recMissingAff.Code)
 		}
 	})
 }

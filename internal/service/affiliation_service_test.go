@@ -85,4 +85,12 @@ func TestAffiliationServiceValidationAndNotFound(t *testing.T) {
 	if _, err := env.affiliationSvc.GetByID(context.Background(), 99999); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected not found error, got %v", err)
 	}
+
+	if _, _, err := env.affiliationSvc.Search(context.Background(), " ", 1, 10); err == nil {
+		t.Fatalf("expected required query validation for search")
+	}
+
+	if _, _, err := env.affiliationSvc.List(context.Background(), -1, 10); err == nil {
+		t.Fatalf("expected invalid pagination validation for list")
+	}
 }

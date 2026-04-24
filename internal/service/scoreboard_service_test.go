@@ -136,4 +136,12 @@ func TestScoreboardServiceRankings(t *testing.T) {
 	if _, _, err := env.scoreSvc.AffiliationUserRanking(context.Background(), 0, 1, 20); err == nil {
 		t.Fatalf("expected validation error for invalid affiliation id")
 	}
+
+	if _, _, err := env.scoreSvc.UserRanking(context.Background(), -1, 20); err == nil {
+		t.Fatalf("expected validation error for invalid user ranking pagination")
+	}
+
+	if _, _, err := env.scoreSvc.AffiliationRanking(context.Background(), 1, MaxPageSize+1); err == nil {
+		t.Fatalf("expected validation error for invalid affiliation ranking pagination")
+	}
 }

@@ -63,6 +63,16 @@ func TestAffiliationsAndProfileUpdate(t *testing.T) {
 		t.Fatalf("unexpected search affiliation list: %+v", searchResp.Affiliations)
 	}
 
+	searchMissingQRec := doRequest(t, env.router, http.MethodGet, "/api/affiliations/search?page=1&page_size=10", nil, nil)
+	if searchMissingQRec.Code != http.StatusBadRequest {
+		t.Fatalf("search missing q status %d: %s", searchMissingQRec.Code, searchMissingQRec.Body.String())
+	}
+
+	searchBadPageRec := doRequest(t, env.router, http.MethodGet, "/api/affiliations/search?q=blue&page=bad&page_size=10", nil, nil)
+	if searchBadPageRec.Code != http.StatusBadRequest {
+		t.Fatalf("search bad page status %d: %s", searchBadPageRec.Code, searchBadPageRec.Body.String())
+	}
+
 	user := createUser(t, env, "aff-user@example.com", "aff-user", "pass", models.UserRole)
 	userToken, _, _ := loginUser(t, env.router, user.Email, "pass")
 

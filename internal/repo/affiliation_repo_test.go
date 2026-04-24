@@ -62,6 +62,24 @@ func TestAffiliationRepoCreateListGetExists(t *testing.T) {
 	if searchTotal != 1 || len(searchRows) != 1 || searchRows[0].Name != "Blue Team" {
 		t.Fatalf("unexpected search result: total=%d rows=%+v", searchTotal, searchRows)
 	}
+
+	existsByName, err := repo.ExistsByNameCI(context.Background(), "blue team")
+	if err != nil {
+		t.Fatalf("exists by name ci: %v", err)
+	}
+
+	if !existsByName {
+		t.Fatalf("expected ExistsByNameCI to return true")
+	}
+
+	notExistsByName, err := repo.ExistsByNameCI(context.Background(), "missing team")
+	if err != nil {
+		t.Fatalf("exists by name ci missing: %v", err)
+	}
+
+	if notExistsByName {
+		t.Fatalf("expected ExistsByNameCI to return false")
+	}
 }
 
 func TestAffiliationRepoGetNotFound(t *testing.T) {
