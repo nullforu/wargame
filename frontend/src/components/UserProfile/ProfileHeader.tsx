@@ -15,7 +15,15 @@ const ProfileHeader = ({ user }: ProfileHeaderProps) => {
         <div className='flex flex-wrap items-end justify-between gap-4'>
             <div className='flex items-center gap-4.75'>
                 <UserAvatar username={user.username} size='lg' />
-                <h2 className='text-2xl text-text sm:text-3xl'>{user.username}</h2>
+                <div>
+                    <h2 className='text-2xl text-text sm:text-3xl'>{user.username}</h2>
+                    <p className='mt-1 text-sm text-text-muted'>{user.affiliation ?? t('profile.noAffiliation')}</p>
+                    {user.bio ? (
+                        <p className='mt-1 max-w-xl text-sm text-text-subtle' style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            {user.bio}
+                        </p>
+                    ) : null}
+                </div>
             </div>
 
             <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium uppercase ${roleClasses(user.role)}`}>{t(getRoleKey(user.role))}</span>

@@ -40,6 +40,9 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     const [editingUsername, setEditingUsername] = useState(false)
     const [usernameInput, setUsernameInput] = useState('')
     const [savingUsername, setSavingUsername] = useState(false)
+    const [editingBio, setEditingBio] = useState(false)
+    const [bioInput, setBioInput] = useState('')
+    const [savingBio, setSavingBio] = useState(false)
     const [editingAffiliation, setEditingAffiliation] = useState(false)
     const [savingAffiliation, setSavingAffiliation] = useState(false)
     const [affiliationPage, setAffiliationPage] = useState(1)
@@ -166,6 +169,22 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
         }
     }, [api, selectedAffiliationID, t, user])
 
+    const saveBio = useCallback(async () => {
+        if (!user) return
+        setSavingBio(true)
+        setErrorMessage('')
+        try {
+            const trimmed = bioInput.trim()
+            const updated = await api.updateMe({ bio: trimmed === '' ? null : trimmed })
+            setUser(updated)
+            setEditingBio(false)
+        } catch (error) {
+            setErrorMessage(formatApiError(error, t).message)
+        } finally {
+            setSavingBio(false)
+        }
+    }, [api, bioInput, t, user])
+
     const pushSolvedPageQuery = useCallback((nextPage: number) => {
         if (typeof window === 'undefined') return
         const params = new URLSearchParams(window.location.search)
@@ -190,6 +209,7 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     useEffect(() => {
         if (user && isOwnProfile) {
             setUsernameInput(user.username)
+            setBioInput(user.bio ?? '')
             setSelectedAffiliationID(user.affiliation_id)
             setAffiliationQuery('')
             setDebouncedAffiliationQuery('')
@@ -274,6 +294,12 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
                                 usernameInput={usernameInput}
                                 onEditingUsernameChange={setEditingUsername}
                                 onUsernameInputChange={setUsernameInput}
+                                editingBio={editingBio}
+                                bioInput={bioInput}
+                                savingBio={savingBio}
+                                onEditingBioChange={setEditingBio}
+                                onBioInputChange={setBioInput}
+                                onSaveBio={saveBio}
                                 editingAffiliation={editingAffiliation}
                                 onEditingAffiliationChange={setEditingAffiliation}
                                 affiliationQuery={affiliationQuery}

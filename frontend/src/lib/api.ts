@@ -301,7 +301,7 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
             clearAuth()
         },
         me: () => request<AuthUser>(`/api/me`, { auth: true }),
-        updateMe: (payload: { username?: string; affiliation_id?: number | null }) => request<AuthUser>(`/api/me`, { method: 'PUT', body: payload, auth: true }),
+        updateMe: (payload: { username?: string; affiliation_id?: number | null; bio?: string | null }) => request<AuthUser>(`/api/me`, { method: 'PUT', body: payload, auth: true }),
         challenges: async (page?: number, pageSize?: number) => {
             const data = await request<{ challenges?: Challenge[]; pagination?: PaginationMeta }>(withPagination(`/api/challenges`, page, pageSize), { auth: true })
             return {

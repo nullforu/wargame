@@ -426,7 +426,8 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                         const category = 'category' in challenge ? challenge.category : t('common.na')
                                         const solveCount = 'solve_count' in challenge ? challenge.solve_count : 0
                                         const inactive = challenge.is_active === false
-                                        const author = challenge.created_by_username && challenge.created_by_username.trim() !== '' ? challenge.created_by_username : t('common.na')
+                                        const authorName = challenge.created_by?.username?.trim()
+                                        const author = authorName && authorName !== '' ? authorName : t('common.na')
 
                                         return (
                                             <button
@@ -486,7 +487,8 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                                 const category = 'category' in challenge ? challenge.category : t('common.na')
                                                 const solveCount = 'solve_count' in challenge ? challenge.solve_count : 0
                                                 const inactive = challenge.is_active === false
-                                                const author = challenge.created_by_username && challenge.created_by_username.trim() !== '' ? challenge.created_by_username : t('common.na')
+                                                const authorName = challenge.created_by?.username?.trim()
+                                                const author = authorName && authorName !== '' ? authorName : t('common.na')
 
                                                 return (
                                                     <button

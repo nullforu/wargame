@@ -16,7 +16,7 @@ const UserAvatar = ({ username, size = 'md' }: UserAvatarProps) => {
     }
 
     return (
-        <div className={`${sizeClasses[size]} inline-flex items-center justify-center rounded-full font-semibold text-white`} style={{ backgroundColor }} title={username}>
+        <div className={`${sizeClasses[size]} shrink-0 inline-flex items-center justify-center rounded-full font-semibold text-white`} style={{ backgroundColor }} title={username}>
             {firstLetter}
         </div>
     )

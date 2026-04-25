@@ -11,6 +11,12 @@ interface AccountCardProps {
     usernameInput: string
     onEditingUsernameChange: (value: boolean) => void
     onUsernameInputChange: (value: string) => void
+    editingBio: boolean
+    bioInput: string
+    savingBio: boolean
+    onEditingBioChange: (value: boolean) => void
+    onBioInputChange: (value: string) => void
+    onSaveBio: () => void
     editingAffiliation: boolean
     onEditingAffiliationChange: (value: boolean) => void
     affiliationQuery: string
@@ -34,6 +40,12 @@ const AccountCard = ({
     usernameInput,
     onEditingUsernameChange,
     onUsernameInputChange,
+    editingBio,
+    bioInput,
+    savingBio,
+    onEditingBioChange,
+    onBioInputChange,
+    onSaveBio,
     editingAffiliation,
     onEditingAffiliationChange,
     affiliationQuery,
@@ -57,6 +69,11 @@ const AccountCard = ({
     const cancelAffiliationEdit = () => {
         onEditingAffiliationChange(false)
         onSelectedAffiliationIDChange(user.affiliation_id)
+    }
+
+    const cancelBioEdit = () => {
+        onEditingBioChange(false)
+        onBioInputChange(user.bio ?? '')
     }
 
     return (
@@ -96,6 +113,39 @@ const AccountCard = ({
                 <div className='flex flex-col gap-1 sm:flex-row sm:justify-between'>
                     <span className='text-text-muted'>{t('common.role')}</span>
                     <span className='uppercase text-accent'>{t(getRoleKey(user.role))}</span>
+                </div>
+
+                <div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'>
+                    <span className='text-text-muted'>{t('profile.bio')}</span>
+                    {editingBio ? (
+                        <div className='w-full max-w-sm space-y-2'>
+                            <textarea
+                                className='h-24 w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none'
+                                value={bioInput}
+                                onChange={(event) => onBioInputChange(event.target.value)}
+                                maxLength={400}
+                                disabled={savingBio}
+                                placeholder={t('profile.bioPlaceholder')}
+                            />
+                            <div className='flex items-center gap-3'>
+                                <button className='text-sm text-accent hover:underline disabled:opacity-50 cursor-pointer' disabled={savingBio} onClick={onSaveBio}>
+                                    {t('profile.save')}
+                                </button>
+                                <button className='text-sm text-text-subtle hover:underline cursor-pointer' onClick={cancelBioEdit}>
+                                    {t('profile.cancel')}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className='flex max-w-sm items-start gap-2 self-start sm:self-auto'>
+                            <span className='text-right text-sm text-text-muted' style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                {(user.bio ?? '').trim() === '' ? t('profile.noBio') : user.bio}
+                            </span>
+                            <button className='text-xs text-accent hover:underline cursor-pointer' onClick={() => onEditingBioChange(true)}>
+                                {t('profile.edit')}
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'>

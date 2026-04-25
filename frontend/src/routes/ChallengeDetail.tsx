@@ -294,6 +294,16 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }
 
     const formatTimestamp = (value: string) => formatDateTime(value, localeTag)
+    const formatCompactDateTime = (value: string) => {
+        const date = new Date(value)
+        if (Number.isNaN(date.getTime())) return t('common.na')
+        const yyyy = date.getFullYear()
+        const mm = String(date.getMonth() + 1).padStart(2, '0')
+        const dd = String(date.getDate()).padStart(2, '0')
+        const hh = String(date.getHours()).padStart(2, '0')
+        const min = String(date.getMinutes()).padStart(2, '0')
+        return `${yyyy}-${mm}-${dd} ${hh}:${min}`
+    }
     const firstBloodSolver = useMemo(() => solvers.find((solver) => solver.is_first_blood) ?? null, [solvers])
     const currentLevel = normalizeLevel(challenge?.level)
     const levelLabel = currentLevel > 0 ? String(currentLevel) : t('level.unknown')
@@ -312,7 +322,6 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         })
         return max
     }, [voteCountsByLevel])
-
     if (!auth.user) {
         return <LoginRequired title={t('challenges.title')} />
     }
@@ -344,6 +353,43 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const detail = challenge.is_locked ? null : challenge
     const isChallengeActive = challenge.is_locked ? false : challenge.is_active !== false
     const isSubmissionDisabled = !isChallengeActive || challenge.is_solved || submission.status === 'loading'
+    const creatorName = challenge.created_by?.username?.trim()
+    const creatorAffiliation = challenge.created_by?.affiliation?.trim()
+    const creatorBio = challenge.created_by?.bio?.trim()
+    const createdSummary = challenge.created_at ? formatCompactDateTime(challenge.created_at) : t('common.na')
+    const authorDetailsCard = (
+        <section className='space-y-3 px-1'>
+            <h2 className='text-xl font-semibold text-text'>{t('challenges.tableAuthor')}</h2>
+
+            <div className='rounded-2xl bg-surface/70'>
+                {creatorName ? (
+                    <div className='flex items-start justify-between gap-4 py-2'>
+                        <div className='min-w-0 flex-1 flex items-center gap-3.75'>
+                            <UserAvatar username={creatorName} size='md' />
+                            <div className='min-w-0'>
+                                {challenge.created_by?.user_id ? (
+                                    <button className='block max-w-full truncate text-left text-lg font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${challenge.created_by?.user_id}`)}>
+                                        {creatorName}
+                                    </button>
+                                ) : (
+                                    <div className='block max-w-full truncate text-left text-lg font-semibold text-text'>{creatorName}</div>
+                                )}
+                                <p className='mt-1 text-sm text-text-subtle'>{creatorAffiliation ? creatorAffiliation : t('common.na')}</p>
+                                <p className='mt-1 max-w-full truncate text-sm text-text-subtle'>{creatorBio && creatorBio.length > 0 ? creatorBio : t('profile.noBio')}</p>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className='flex items-start justify-between gap-4 py-2'>
+                        <div className='min-w-0 flex-1'>
+                            <p className='text-lg font-semibold text-text'>{t('common.na')}</p>
+                            <p className='mt-1 text-sm text-text-subtle'>{t('common.na')}</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </section>
+    )
 
     return (
         <section className='animate space-y-4 px-0 sm:px-1 md:px-2 lg:px-0'>
@@ -365,6 +411,9 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                         <div className='mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-text-muted'>
                             <span>{t('common.pointsShort', { points: challenge.points })}</span>
                             <span>{t('challenge.solvedCount', { count: challenge.solve_count })}</span>
+                            <span>
+                                {t('common.createdAt')}: {createdSummary}
+                            </span>
                         </div>
                     </div>
 
@@ -394,20 +443,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                         )}
 
                         <div className='mt-12 space-y-8 lg:hidden'>
-                            <section className='space-y-3 px-1'>
-                                <h2 className='text-xl font-semibold text-text'>{t('challenges.tableAuthor')}</h2>
-
-                                <div className='rounded-2xl bg-surface/70'>
-                                    {challenge.created_by_username && challenge.created_by_username.trim() !== '' ? (
-                                        <div className='flex items-center gap-3.75'>
-                                            <UserAvatar username={challenge.created_by_username} size='md' />
-                                            <div className='text-lg font-semibold text-text'>{challenge.created_by_username}</div>
-                                        </div>
-                                    ) : (
-                                        <div className='text-lg font-semibold text-text'>{t('common.na')}</div>
-                                    )}
-                                </div>
-                            </section>
+                            {authorDetailsCard}
 
                             {firstBloodSolver ? (
                                 <section className='space-y-3 px-1'>
@@ -433,6 +469,10 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                     <button className='block max-w-full truncate text-left text-lg font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${firstBloodSolver.user_id}`)}>
                                                         {firstBloodSolver.username}
                                                     </button>
+                                                    <p className='mt-1 max-w-full truncate text-sm text-text-subtle'>
+                                                        {firstBloodSolver.affiliation && firstBloodSolver.affiliation.trim().length > 0 ? `${firstBloodSolver.affiliation} · ` : ''}
+                                                        {firstBloodSolver.bio && firstBloodSolver.bio.trim().length > 0 ? firstBloodSolver.bio : t('profile.noBio')}
+                                                    </p>
                                                     <p className='mt-1 text-sm text-text-subtle'>{formatTimestamp(firstBloodSolver.solved_at)}</p>
                                                 </div>
                                             </div>
@@ -457,6 +497,10 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                             {solver.username}
                                                         </button>
 
+                                                        <p className='mt-1 max-w-full truncate text-sm text-text-subtle'>
+                                                            {solver.affiliation && solver.affiliation.trim().length > 0 ? `${solver.affiliation} · ` : ''}
+                                                            {solver.bio && solver.bio.trim().length > 0 ? solver.bio : t('profile.noBio')}
+                                                        </p>
                                                         <p className='mt-1 text-sm text-text-subtle'>{formatTimestamp(solver.solved_at)}</p>
                                                     </div>
                                                 </div>
@@ -708,23 +752,13 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                             <div className='mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-text-muted'>
                                 <span>{t('common.pointsShort', { points: challenge.points })}</span>
                                 <span>{t('challenge.solvedCount', { count: challenge.solve_count })}</span>
+                                <span>
+                                    {t('common.createdAt')}: {createdSummary}
+                                </span>
                             </div>
                         </div>
 
-                        <section className='space-y-3 px-1'>
-                            <h2 className='text-xl font-semibold text-text'>{t('challenges.tableAuthor')}</h2>
-
-                            <div className='rounded-2xl bg-surface/70'>
-                                {challenge.created_by_username && challenge.created_by_username.trim() !== '' ? (
-                                    <div className='flex items-center gap-3.75'>
-                                        <UserAvatar username={challenge.created_by_username} size='md' />
-                                        <div className='text-lg font-semibold text-text'>{challenge.created_by_username}</div>
-                                    </div>
-                                ) : (
-                                    <div className='text-lg font-semibold text-text'>{t('common.na')}</div>
-                                )}
-                            </div>
-                        </section>
+                        {authorDetailsCard}
 
                         {firstBloodSolver ? (
                             <section className='space-y-3 px-1'>
@@ -750,6 +784,10 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                 <button className='block max-w-full truncate text-left text-lg font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${firstBloodSolver.user_id}`)}>
                                                     {firstBloodSolver.username}
                                                 </button>
+                                                <p className='mt-1 max-w-full truncate text-sm text-text-subtle'>
+                                                    {firstBloodSolver.affiliation && firstBloodSolver.affiliation.trim().length > 0 ? `${firstBloodSolver.affiliation} · ` : ''}
+                                                    {firstBloodSolver.bio && firstBloodSolver.bio.trim().length > 0 ? firstBloodSolver.bio : t('profile.noBio')}
+                                                </p>
                                                 <p className='mt-1 text-sm text-text-subtle'>{formatTimestamp(firstBloodSolver.solved_at)}</p>
                                             </div>
                                         </div>
@@ -774,6 +812,10 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                         {solver.username}
                                                     </button>
 
+                                                    <p className='mt-1 max-w-full truncate text-sm text-text-subtle'>
+                                                        {solver.affiliation && solver.affiliation.trim().length > 0 ? `${solver.affiliation} · ` : ''}
+                                                        {solver.bio && solver.bio.trim().length > 0 ? solver.bio : t('profile.noBio')}
+                                                    </p>
                                                     <p className='mt-1 text-sm text-text-subtle'>{formatTimestamp(solver.solved_at)}</p>
                                                 </div>
                                             </div>

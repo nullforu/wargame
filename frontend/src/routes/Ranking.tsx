@@ -241,6 +241,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                             <div className='min-w-0 flex-1'>
                                                                 <p className='truncate text-sm text-text'>{row.username}</p>
                                                                 <p className='truncate text-xs text-text-subtle'>{row.affiliation_name ?? t('profile.noAffiliation')}</p>
+                                                                <p className='truncate text-xs text-text-subtle'>{row.bio ?? t('profile.noBio')}</p>
                                                             </div>
                                                             <div className='w-full text-left sm:w-auto sm:text-right'>
                                                                 <p className='text-sm font-semibold text-text'>{t('common.pointsShort', { points: row.score })}</p>
@@ -364,6 +365,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                                 <div className='min-w-0 flex-1'>
                                                                     <p className='truncate text-sm text-text'>{row.username}</p>
                                                                     <p className='truncate text-xs text-text-subtle'>{selectedTitle}</p>
+                                                                    <p className='truncate text-xs text-text-subtle'>{row.bio ?? t('profile.noBio')}</p>
                                                                 </div>
                                                                 <div className='w-full text-left sm:w-auto sm:text-right'>
                                                                     <p className='text-sm font-semibold text-text'>{t('common.pointsShort', { points: row.score })}</p>

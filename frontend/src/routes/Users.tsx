@@ -152,6 +152,8 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                                                 <p className='mt-1 text-xs text-text-muted'>
                                                     #{user.id} · {t(getRoleKey(user.role))}
                                                 </p>
+                                                <p className='mt-1 truncate text-xs text-text-subtle'>{user.affiliation ?? t('profile.noAffiliation')}</p>
+                                                <p className='truncate text-xs text-text-subtle'>{user.bio ?? t('profile.noBio')}</p>
                                             </div>
                                         </div>
                                         <button
@@ -183,7 +185,11 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                                     <p className='text-sm text-text dark:text-text'>{user.id}</p>
                                     <div className='flex items-center gap-3.75 truncate'>
                                         <UserAvatar username={user.username} size='sm' />
-                                        <p className='truncate pr-3 text-sm text-text dark:text-text'>{user.username}</p>
+                                        <div className='min-w-0 pr-3'>
+                                            <p className='truncate text-sm text-text dark:text-text'>{user.username}</p>
+                                            <p className='truncate text-xs text-text-subtle'>{user.affiliation ?? t('profile.noAffiliation')}</p>
+                                            <p className='truncate text-xs text-text-subtle'>{user.bio ?? t('profile.noBio')}</p>
+                                        </div>
                                     </div>
                                     <p className='text-xs text-text-muted dark:text-text-muted'>{t(getRoleKey(user.role))}</p>
                                     <div className='text-right'>

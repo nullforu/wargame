@@ -5,6 +5,7 @@ export interface AuthUser {
     role: string
     affiliation_id: number | null
     affiliation: string | null
+    bio: string | null
     stack_count: number
     stack_limit: number
     blocked_reason: string | null
@@ -39,12 +40,12 @@ export interface ChallengeDetail {
     title: string
     description: string
     category: string
+    created_at: string
     level: number
     level_vote_counts?: LevelVoteCount[]
     points: number
     solve_count: number
-    created_by_user_id?: number | null
-    created_by_username?: string
+    created_by?: ChallengeCreator | null
     is_active: boolean
     has_file: boolean
     file_name?: string | null
@@ -59,11 +60,11 @@ export interface LockedChallenge {
     id: number
     title: string
     category: string
+    created_at: string
     level: number
     points: number
     solve_count: number
-    created_by_user_id?: number | null
-    created_by_username?: string
+    created_by?: ChallengeCreator | null
     is_active: boolean
     previous_challenge_id?: number | null
     previous_challenge_title?: string | null
@@ -73,6 +74,14 @@ export interface LockedChallenge {
 }
 
 export type Challenge = ChallengeDetail | LockedChallenge
+
+export interface ChallengeCreator {
+    user_id?: number | null
+    username?: string
+    affiliation_id?: number | null
+    affiliation?: string | null
+    bio?: string | null
+}
 
 export interface LevelVoteCount {
     level: number
@@ -222,6 +231,8 @@ export interface UserSolvedResponse {
 export interface ChallengeSolver {
     user_id: number
     username: string
+    affiliation?: string | null
+    bio?: string | null
     solved_at: string
     is_first_blood: boolean
 }
@@ -275,6 +286,7 @@ export interface UserListItem {
     role: string
     affiliation_id?: number | null
     affiliation?: string | null
+    bio?: string | null
     blocked_reason: string | null
     blocked_at: string | null
 }
@@ -285,6 +297,7 @@ export interface UserDetail {
     role: string
     affiliation_id: number | null
     affiliation: string | null
+    bio: string | null
     blocked_reason: string | null
     blocked_at: string | null
 }
@@ -306,6 +319,7 @@ export interface UserRankingEntry {
     solved_count: number
     affiliation_id: number | null
     affiliation_name: string | null
+    bio?: string | null
 }
 
 export interface UserRankingResponse {
