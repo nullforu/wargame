@@ -14,6 +14,9 @@ import type {
     AdminStackDeleteResponse,
     AdminStackListItem,
     AdminStacksResponse,
+    AffiliationRankingResponse,
+    AffiliationsResponse,
+    Affiliation,
     FlagSubmissionResult,
     LeaderboardResponse,
     PresignedURL,
@@ -27,6 +30,7 @@ import type {
     ChallengeSolversResponse,
     TimelineResponse,
     UserDetail,
+    UserRankingResponse,
     UsersResponse,
 } from './types'
 import type { AuthState } from './auth'
@@ -297,7 +301,7 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
             clearAuth()
         },
         me: () => request<AuthUser>(`/api/me`, { auth: true }),
-        updateMe: (username: string) => request<AuthUser>(`/api/me`, { method: 'PUT', body: { username }, auth: true }),
+        updateMe: (payload: { username?: string; affiliation_id?: number | null }) => request<AuthUser>(`/api/me`, { method: 'PUT', body: payload, auth: true }),
         challenges: async (page?: number, pageSize?: number) => {
             const data = await request<{ challenges?: Challenge[]; pagination?: PaginationMeta }>(withPagination(`/api/challenges`, page, pageSize), { auth: true })
             return {
@@ -368,6 +372,14 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
                 pagination: normalizePagination(data?.pagination),
             } as LeaderboardResponse
         },
+        legacyLeaderboard: async (page?: number, pageSize?: number) => {
+            const data = await request<Partial<LeaderboardResponse>>(withPagination(`/api/leaderboard`, page, pageSize))
+            return {
+                challenges: Array.isArray(data?.challenges) ? data.challenges : [],
+                entries: Array.isArray(data?.entries) ? data.entries : [],
+                pagination: normalizePagination(data?.pagination),
+            } as LeaderboardResponse
+        },
         timeline: async () => {
             const data = await request<Partial<TimelineResponse>>(`/api/timeline`, { auth: true })
             return {
@@ -424,6 +436,49 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
             } as UsersResponse
         },
         user: (id: number) => request<UserDetail>(`/api/users/${id}`),
+        affiliations: async (page?: number, pageSize?: number) => {
+            const data = await request<Partial<AffiliationsResponse>>(withPagination(`/api/affiliations`, page, pageSize))
+            return {
+                affiliations: Array.isArray(data?.affiliations) ? data.affiliations : [],
+                pagination: normalizePagination(data?.pagination),
+            } as AffiliationsResponse
+        },
+        searchAffiliations: async (q: string, page?: number, pageSize?: number) => {
+            const data = await request<Partial<AffiliationsResponse>>(withSearchAndPagination(`/api/affiliations/search`, q, page, pageSize))
+            return {
+                affiliations: Array.isArray(data?.affiliations) ? data.affiliations : [],
+                pagination: normalizePagination(data?.pagination),
+            } as AffiliationsResponse
+        },
+        affiliationUsers: async (id: number, page?: number, pageSize?: number) => {
+            const data = await request<UsersResponse>(withPagination(`/api/affiliations/${id}/users`, page, pageSize))
+            return {
+                users: Array.isArray(data?.users) ? data.users : [],
+                pagination: normalizePagination(data?.pagination),
+            } as UsersResponse
+        },
+        rankingUsers: async (page?: number, pageSize?: number) => {
+            const data = await request<Partial<UserRankingResponse>>(withPagination(`/api/rankings/users`, page, pageSize))
+            return {
+                entries: Array.isArray(data?.entries) ? data.entries : [],
+                pagination: normalizePagination(data?.pagination),
+            } as UserRankingResponse
+        },
+        rankingAffiliations: async (page?: number, pageSize?: number) => {
+            const data = await request<Partial<AffiliationRankingResponse>>(withPagination(`/api/rankings/affiliations`, page, pageSize))
+            return {
+                entries: Array.isArray(data?.entries) ? data.entries : [],
+                pagination: normalizePagination(data?.pagination),
+            } as AffiliationRankingResponse
+        },
+        rankingAffiliationUsers: async (id: number, page?: number, pageSize?: number) => {
+            const data = await request<Partial<UserRankingResponse>>(withPagination(`/api/rankings/affiliations/${id}/users`, page, pageSize))
+            return {
+                entries: Array.isArray(data?.entries) ? data.entries : [],
+                pagination: normalizePagination(data?.pagination),
+            } as UserRankingResponse
+        },
+        createAffiliation: (name: string) => request<Affiliation>(`/api/admin/affiliations`, { method: 'POST', body: { name }, auth: true }),
         userSolved: async (id: number, page?: number, pageSize?: number) => {
             const data = await request<Partial<UserSolvedResponse>>(withPagination(`/api/users/${id}/solved`, page, pageSize))
             return {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Stack, UserDetail, SolvedChallenge } from '../lib/types'
+import type { Affiliation, PaginationMeta, Stack, UserDetail, SolvedChallenge } from '../lib/types'
 import { formatApiError, formatDateTime, parseRouteId } from '../lib/utils'
 import { navigate } from '../lib/router'
 import ProfileHeader from '../components/UserProfile/ProfileHeader'
@@ -40,6 +40,15 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     const [editingUsername, setEditingUsername] = useState(false)
     const [usernameInput, setUsernameInput] = useState('')
     const [savingUsername, setSavingUsername] = useState(false)
+    const [editingAffiliation, setEditingAffiliation] = useState(false)
+    const [savingAffiliation, setSavingAffiliation] = useState(false)
+    const [affiliationPage, setAffiliationPage] = useState(1)
+    const [affiliationQuery, setAffiliationQuery] = useState('')
+    const [debouncedAffiliationQuery, setDebouncedAffiliationQuery] = useState('')
+    const [affiliations, setAffiliations] = useState<Affiliation[]>([])
+    const [affiliationPagination, setAffiliationPagination] = useState<PaginationMeta>({ page: 1, page_size: 20, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
+    const [selectedAffiliationID, setSelectedAffiliationID] = useState<number | null>(null)
+    const [loadingAffiliations, setLoadingAffiliations] = useState(false)
     const lastStacksLoadedForUserIdRef = useRef<number | null>(null)
 
     const routeUserId = useMemo(() => parseRouteId(routeParams.id), [routeParams.id])
@@ -116,7 +125,7 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
         setErrorMessage('')
 
         try {
-            const updated = await api.updateMe(usernameInput.trim())
+            const updated = await api.updateMe({ username: usernameInput.trim() })
             setUser(updated)
             setEditingUsername(false)
         } catch (error) {
@@ -125,6 +134,37 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
             setSavingUsername(false)
         }
     }, [api, t, user, usernameInput])
+
+    const loadAffiliations = useCallback(async () => {
+        setLoadingAffiliations(true)
+        setErrorMessage('')
+        try {
+            const data = debouncedAffiliationQuery ? await api.searchAffiliations(debouncedAffiliationQuery, affiliationPage, 10) : await api.affiliations(affiliationPage, 10)
+            setAffiliations(data.affiliations)
+            setAffiliationPagination(data.pagination)
+        } catch (error) {
+            setErrorMessage(formatApiError(error, t).message)
+            setAffiliations([])
+            setAffiliationPagination({ page: 1, page_size: 10, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
+        } finally {
+            setLoadingAffiliations(false)
+        }
+    }, [affiliationPage, api, debouncedAffiliationQuery, t])
+
+    const saveAffiliation = useCallback(async () => {
+        if (!user) return
+        setSavingAffiliation(true)
+        setErrorMessage('')
+        try {
+            const updated = await api.updateMe({ affiliation_id: selectedAffiliationID })
+            setUser(updated)
+            setEditingAffiliation(false)
+        } catch (error) {
+            setErrorMessage(formatApiError(error, t).message)
+        } finally {
+            setSavingAffiliation(false)
+        }
+    }, [api, selectedAffiliationID, t, user])
 
     const pushSolvedPageQuery = useCallback((nextPage: number) => {
         if (typeof window === 'undefined') return
@@ -150,8 +190,25 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     useEffect(() => {
         if (user && isOwnProfile) {
             setUsernameInput(user.username)
+            setSelectedAffiliationID(user.affiliation_id)
+            setAffiliationQuery('')
+            setDebouncedAffiliationQuery('')
+            setAffiliationPage(1)
         }
     }, [user, isOwnProfile])
+
+    useEffect(() => {
+        if (!editingAffiliation || !isOwnProfile) return
+        loadAffiliations()
+    }, [editingAffiliation, isOwnProfile, loadAffiliations])
+
+    useEffect(() => {
+        if (!editingAffiliation || !isOwnProfile) return
+        const timer = window.setTimeout(() => {
+            setDebouncedAffiliationQuery(affiliationQuery.trim())
+        }, 250)
+        return () => window.clearTimeout(timer)
+    }, [affiliationQuery, editingAffiliation, isOwnProfile])
 
     useEffect(() => {
         if (targetUserId === null) return
@@ -217,6 +274,21 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
                                 usernameInput={usernameInput}
                                 onEditingUsernameChange={setEditingUsername}
                                 onUsernameInputChange={setUsernameInput}
+                                editingAffiliation={editingAffiliation}
+                                onEditingAffiliationChange={setEditingAffiliation}
+                                affiliationQuery={affiliationQuery}
+                                onAffiliationQueryChange={(value) => {
+                                    setAffiliationQuery(value)
+                                    setAffiliationPage(1)
+                                }}
+                                selectedAffiliationID={selectedAffiliationID}
+                                onSelectedAffiliationIDChange={setSelectedAffiliationID}
+                                affiliations={affiliations}
+                                affiliationPagination={affiliationPagination}
+                                loadingAffiliations={loadingAffiliations}
+                                savingAffiliation={savingAffiliation}
+                                onAffiliationPageChange={setAffiliationPage}
+                                onSaveAffiliation={saveAffiliation}
                             />
 
                             <ActiveStacksCard

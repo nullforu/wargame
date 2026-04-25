@@ -12,11 +12,12 @@ import (
 )
 
 type UserService struct {
-	userRepo *repo.UserRepo
+	userRepo        *repo.UserRepo
+	affiliationRepo *repo.AffiliationRepo
 }
 
-func NewUserService(userRepo *repo.UserRepo) *UserService {
-	return &UserService{userRepo: userRepo}
+func NewUserService(userRepo *repo.UserRepo, affiliationRepo *repo.AffiliationRepo) *UserService {
+	return &UserService{userRepo: userRepo, affiliationRepo: affiliationRepo}
 }
 
 func (s *UserService) GetByID(ctx context.Context, id int64) (*models.User, error) {
@@ -80,7 +81,7 @@ func (s *UserService) Search(ctx context.Context, query string, page, pageSize i
 	return users, BuildPagination(params.Page, params.PageSize, totalCount), nil
 }
 
-func (s *UserService) UpdateProfile(ctx context.Context, userID int64, username *string) (*models.User, error) {
+func (s *UserService) UpdateProfile(ctx context.Context, userID int64, username *string, affiliationID *int64, affiliationSet bool) (*models.User, error) {
 	user, err := s.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -90,11 +91,37 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID int64, username 
 		user.Username = *username
 	}
 
+	if affiliationSet {
+		if affiliationID == nil {
+			user.AffiliationID = nil
+		} else {
+			if s.affiliationRepo == nil {
+				return nil, NewValidationError(FieldError{Field: "affiliation_id", Reason: "invalid"})
+			}
+
+			exists, err := s.affiliationRepo.ExistsByID(ctx, *affiliationID)
+			if err != nil {
+				return nil, fmt.Errorf("user.UpdateProfile affiliation exists: %w", err)
+			}
+
+			if !exists {
+				return nil, NewValidationError(FieldError{Field: "affiliation_id", Reason: "invalid"})
+			}
+
+			user.AffiliationID = affiliationID
+		}
+	}
+
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, fmt.Errorf("user.UpdateProfile: %w", err)
 	}
 
-	return user, nil
+	updated, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("user.UpdateProfile reload: %w", err)
+	}
+
+	return updated, nil
 }
 
 func (s *UserService) BlockUser(ctx context.Context, userID int64, reason string) (*models.User, error) {
@@ -132,6 +159,26 @@ func (s *UserService) BlockUser(ctx context.Context, userID int64, reason string
 	}
 
 	return updated, nil
+}
+
+func (s *UserService) ListByAffiliation(ctx context.Context, affiliationID int64, page, pageSize int) ([]models.User, models.Pagination, error) {
+	validator := newFieldValidator()
+	validator.PositiveID("id", affiliationID)
+	if err := validator.Error(); err != nil {
+		return nil, models.Pagination{}, err
+	}
+
+	params, err := NormalizePagination(page, pageSize)
+	if err != nil {
+		return nil, models.Pagination{}, err
+	}
+
+	rows, totalCount, err := s.userRepo.ListByAffiliation(ctx, affiliationID, params.Page, params.PageSize)
+	if err != nil {
+		return nil, models.Pagination{}, fmt.Errorf("user.ListByAffiliation: %w", err)
+	}
+
+	return rows, BuildPagination(params.Page, params.PageSize, totalCount), nil
 }
 
 func (s *UserService) UnblockUser(ctx context.Context, userID int64) (*models.User, error) {

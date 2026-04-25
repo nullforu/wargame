@@ -28,7 +28,8 @@ const Header = ({ user }: HeaderProps) => {
 
     const navItems = [
         { path: '/challenges', label: t('nav.challenges') },
-        { path: '/scoreboard', label: t('nav.scoreboard') },
+        { path: '/ranking', label: t('nav.ranking') },
+        // { path: '/scoreboard', label: t('nav.scoreboard') }, // Legacy page, remove in the future
         { path: '/users', label: t('nav.users') },
         { path: '/profile', label: t('nav.profile') },
     ]

@@ -27,6 +27,23 @@ type LeaderboardResponse struct {
 	Entries    []LeaderboardEntry     `json:"entries"`
 }
 
+type UserRankingEntry struct {
+	UserID        int64   `bun:"user_id" json:"user_id"`
+	Username      string  `bun:"username" json:"username"`
+	Score         int     `bun:"score" json:"score"`
+	SolvedCount   int     `bun:"solved_count" json:"solved_count"`
+	AffiliationID *int64  `bun:"affiliation_id" json:"affiliation_id"`
+	Affiliation   *string `bun:"affiliation_name" json:"affiliation_name"`
+}
+
+type AffiliationRankingEntry struct {
+	AffiliationID int64  `bun:"affiliation_id" json:"affiliation_id"`
+	Name          string `bun:"name" json:"name"`
+	Score         int    `bun:"score" json:"score"`
+	SolvedCount   int    `bun:"solved_count" json:"solved_count"`
+	UserCount     int    `bun:"user_count" json:"user_count"`
+}
+
 type UserTimelineRow struct {
 	SubmittedAt time.Time `bun:"submitted_at"`
 	UserID      int64     `bun:"user_id"`

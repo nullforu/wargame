@@ -49,6 +49,13 @@ const Home = ({ routeParams = {} }: RouteProps) => {
                     <p className='mt-1 text-sm text-text-muted dark:text-text-muted'>{t('home.quickBody')}</p>
                     <div className='mt-4 space-y-2'>
                         <a
+                            href='/ranking'
+                            className='block rounded-md border border-border bg-surface-muted px-3 py-2 text-sm text-text-muted transition hover:bg-surface-muted dark:border-border dark:bg-surface-muted dark:text-text dark:hover:bg-surface-subtle'
+                            onClick={(e) => navigate('/ranking', e)}
+                        >
+                            {t('nav.ranking')}
+                        </a>
+                        <a
                             href='/scoreboard'
                             className='block rounded-md border border-border bg-surface-muted px-3 py-2 text-sm text-text-muted transition hover:bg-surface-muted dark:border-border dark:bg-surface-muted dark:text-text dark:hover:bg-surface-subtle'
                             onClick={(e) => navigate('/scoreboard', e)}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"wargame/internal/models"
 )
@@ -32,7 +33,7 @@ func TestUserServiceGetByIDListUpdateProfile(t *testing.T) {
 	}
 
 	newName := "newname"
-	updated, err := env.userSvc.UpdateProfile(context.Background(), user.ID, &newName)
+	updated, err := env.userSvc.UpdateProfile(context.Background(), user.ID, &newName, nil, false)
 	if err != nil {
 		t.Fatalf("UpdateProfile: %v", err)
 	}
@@ -109,5 +110,54 @@ func TestUserServiceSearchAndPagination(t *testing.T) {
 
 	if _, _, err := env.userSvc.ListPage(context.Background(), 1, MaxPageSize+1); err == nil {
 		t.Fatalf("expected max page size validation error")
+	}
+}
+
+func TestUserServiceUpdateProfileAffiliationAndListByAffiliation(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "user@example.com", "user", "pass", models.UserRole)
+	affiliation := &models.Affiliation{Name: "Blue Team", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	if err := env.affiliationRepo.Create(context.Background(), affiliation); err != nil {
+		t.Fatalf("create affiliation: %v", err)
+	}
+
+	updated, err := env.userSvc.UpdateProfile(context.Background(), user.ID, nil, &affiliation.ID, true)
+	if err != nil {
+		t.Fatalf("update profile affiliation: %v", err)
+	}
+
+	if updated.AffiliationID == nil || *updated.AffiliationID != affiliation.ID {
+		t.Fatalf("unexpected affiliation id: %+v", updated.AffiliationID)
+	}
+
+	if updated.Affiliation == nil || *updated.Affiliation != affiliation.Name {
+		t.Fatalf("unexpected affiliation name: %+v", updated.Affiliation)
+	}
+
+	rows, pagination, err := env.userSvc.ListByAffiliation(context.Background(), affiliation.ID, 1, 20)
+	if err != nil {
+		t.Fatalf("list by affiliation: %v", err)
+	}
+
+	if len(rows) != 1 || rows[0].ID != user.ID {
+		t.Fatalf("unexpected rows: %+v", rows)
+	}
+
+	if pagination.TotalCount != 1 {
+		t.Fatalf("unexpected pagination: %+v", pagination)
+	}
+
+	cleared, err := env.userSvc.UpdateProfile(context.Background(), user.ID, nil, nil, true)
+	if err != nil {
+		t.Fatalf("clear affiliation: %v", err)
+	}
+
+	if cleared.AffiliationID != nil {
+		t.Fatalf("expected nil affiliation id, got %+v", cleared.AffiliationID)
+	}
+
+	badID := int64(99999)
+	if _, err := env.userSvc.UpdateProfile(context.Background(), user.ID, nil, &badID, true); err == nil {
+		t.Fatalf("expected invalid affiliation id error")
 	}
 }

@@ -262,6 +262,222 @@ func TestHandlerCreateChallengeSetsCreator(t *testing.T) {
 		t.Fatalf("expected unknown level for no votes, got %d", levels[resp.ID])
 	}
 }
+
+func TestHandlerAffiliationsAndRankings(t *testing.T) {
+	env := setupHandlerTest(t)
+
+	admin := createHandlerUser(t, env, "admin@example.com", "admin", "pass", models.AdminRole)
+	user1 := createHandlerUser(t, env, "user1@example.com", "user1", "pass", models.UserRole)
+	user2 := createHandlerUser(t, env, "user2@example.com", "user2", "pass", models.UserRole)
+
+	createCtx, createRec := newJSONContext(t, http.MethodPost, "/api/admin/affiliations", []byte(`{"name":"Blue Team"}`))
+	createCtx.Set("userID", admin.ID)
+	env.handler.AdminCreateAffiliation(createCtx)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d body=%s", createRec.Code, createRec.Body.String())
+	}
+
+	var created affiliationResponse
+	if err := json.Unmarshal(createRec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode create affiliation: %v", err)
+	}
+
+	if created.ID <= 0 || created.Name != "Blue Team" {
+		t.Fatalf("unexpected created affiliation: %+v", created)
+	}
+
+	t.Run("create affiliation validation", func(t *testing.T) {
+		invalidCtx, invalidRec := newJSONContext(t, http.MethodPost, "/api/admin/affiliations", []byte(`{"name":123}`))
+		invalidCtx.Set("userID", admin.ID)
+		env.handler.AdminCreateAffiliation(invalidCtx)
+		if invalidRec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for invalid body, got %d", invalidRec.Code)
+		}
+
+		dupCtx, dupRec := newJSONContext(t, http.MethodPost, "/api/admin/affiliations", []byte(`{"name":"blue team"}`))
+		dupCtx.Set("userID", admin.ID)
+		env.handler.AdminCreateAffiliation(dupCtx)
+		if dupRec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for duplicate affiliation, got %d", dupRec.Code)
+		}
+	})
+
+	user1.AffiliationID = &created.ID
+	if err := env.userRepo.Update(context.Background(), user1); err != nil {
+		t.Fatalf("update user1 affiliation: %v", err)
+	}
+
+	ch1 := createHandlerChallenge(t, env, "Ch1", 100, "FLAG{1}", true)
+	ch2 := createHandlerChallenge(t, env, "Ch2", 200, "FLAG{2}", true)
+	createHandlerSubmission(t, env, user1.ID, ch2.ID, true, time.Now().UTC())
+	createHandlerSubmission(t, env, user2.ID, ch1.ID, true, time.Now().UTC())
+
+	t.Run("list affiliations", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/affiliations?page=1&page_size=20", nil)
+		env.handler.ListAffiliations(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp affiliationsListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if len(resp.Affiliations) != 1 || resp.Affiliations[0].ID != created.ID {
+			t.Fatalf("unexpected affiliations list: %+v", resp.Affiliations)
+		}
+	})
+
+	t.Run("search affiliations", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/affiliations/search?q=blue&page=1&page_size=20", nil)
+		env.handler.SearchAffiliations(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp affiliationsListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if len(resp.Affiliations) != 1 || resp.Affiliations[0].ID != created.ID {
+			t.Fatalf("unexpected filtered affiliations list: %+v", resp.Affiliations)
+		}
+	})
+
+	t.Run("search affiliations validation", func(t *testing.T) {
+		ctxMissingQ, recMissingQ := newJSONContext(t, http.MethodGet, "/api/affiliations/search?page=1&page_size=20", nil)
+		env.handler.SearchAffiliations(ctxMissingQ)
+		if recMissingQ.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for missing q, got %d", recMissingQ.Code)
+		}
+
+		ctxBadPage, recBadPage := newJSONContext(t, http.MethodGet, "/api/affiliations/search?q=blue&page=bad&page_size=20", nil)
+		env.handler.SearchAffiliations(ctxBadPage)
+		if recBadPage.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for bad page, got %d", recBadPage.Code)
+		}
+	})
+
+	t.Run("list affiliation users", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/affiliations/"+toStringID(created.ID)+"/users?page=1&page_size=20", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(created.ID)))
+		env.handler.ListAffiliationUsers(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp usersListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if len(resp.Users) != 1 || resp.Users[0].ID != user1.ID {
+			t.Fatalf("unexpected affiliation users: %+v", resp.Users)
+		}
+	})
+
+	t.Run("list affiliation users validation", func(t *testing.T) {
+		ctxInvalidID, recInvalidID := newJSONContext(t, http.MethodGet, "/api/affiliations/bad/users?page=1&page_size=20", nil)
+		ctxInvalidID.Params = append(ctxInvalidID.Params, ginParam("id", "bad"))
+		env.handler.ListAffiliationUsers(ctxInvalidID)
+		if recInvalidID.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for invalid affiliation id, got %d", recInvalidID.Code)
+		}
+
+		ctxMissingAff, recMissingAff := newJSONContext(t, http.MethodGet, "/api/affiliations/999999/users?page=1&page_size=20", nil)
+		ctxMissingAff.Params = append(ctxMissingAff.Params, ginParam("id", "999999"))
+		env.handler.ListAffiliationUsers(ctxMissingAff)
+		if recMissingAff.Code != http.StatusNotFound {
+			t.Fatalf("expected 404 for missing affiliation, got %d", recMissingAff.Code)
+		}
+	})
+
+	t.Run("ranking users", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/rankings/users?page=1&page_size=20", nil)
+		env.handler.RankingUsers(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp userRankingListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if len(resp.Entries) < 2 || resp.Entries[0].UserID != user1.ID {
+			t.Fatalf("unexpected ranking users: %+v", resp.Entries)
+		}
+	})
+
+	t.Run("ranking users invalid pagination", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/rankings/users?page=bad&page_size=20", nil)
+		env.handler.RankingUsers(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("ranking affiliations", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/rankings/affiliations?page=1&page_size=20", nil)
+		env.handler.RankingAffiliations(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp affiliationRankingListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if len(resp.Entries) != 1 || resp.Entries[0].AffiliationID != created.ID {
+			t.Fatalf("unexpected ranking affiliations: %+v", resp.Entries)
+		}
+	})
+
+	t.Run("ranking affiliations invalid pagination", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/rankings/affiliations?page=1&page_size=bad", nil)
+		env.handler.RankingAffiliations(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("ranking affiliation users", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/rankings/affiliations/"+toStringID(created.ID)+"/users?page=1&page_size=20", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(created.ID)))
+		env.handler.RankingAffiliationUsers(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp userRankingListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if len(resp.Entries) != 1 || resp.Entries[0].UserID != user1.ID {
+			t.Fatalf("unexpected ranking affiliation users: %+v", resp.Entries)
+		}
+	})
+
+	t.Run("ranking affiliation users validation", func(t *testing.T) {
+		ctxInvalidID, recInvalidID := newJSONContext(t, http.MethodGet, "/api/rankings/affiliations/bad/users?page=1&page_size=20", nil)
+		ctxInvalidID.Params = append(ctxInvalidID.Params, ginParam("id", "bad"))
+		env.handler.RankingAffiliationUsers(ctxInvalidID)
+		if recInvalidID.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", recInvalidID.Code)
+		}
+
+		ctxMissingAff, recMissingAff := newJSONContext(t, http.MethodGet, "/api/rankings/affiliations/999999/users?page=1&page_size=20", nil)
+		ctxMissingAff.Params = append(ctxMissingAff.Params, ginParam("id", "999999"))
+		env.handler.RankingAffiliationUsers(ctxMissingAff)
+		if recMissingAff.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", recMissingAff.Code)
+		}
+	})
+}
 func TestHandlerSubmitFlagFlow(t *testing.T) {
 	env := setupHandlerTest(t)
 	user := createHandlerUser(t, env, "flag-user@example.com", "flag-user", "pass", models.UserRole)
@@ -338,7 +554,7 @@ func TestHandlerStackEndpoints(t *testing.T) {
 	env := setupHandlerTest(t)
 	provisioner := stackpkg.NewProvisionerMock()
 	env.stackSvc = service.NewStackService(env.cfg.Stack, env.stackRepo, env.challengeRepo, env.submissionRepo, provisioner.Client(), env.redis)
-	env.handler = New(env.cfg, env.authSvc, env.wargameSvc, env.userSvc, env.scoreSvc, env.stackSvc, env.redis)
+	env.handler = New(env.cfg, env.authSvc, env.wargameSvc, env.userSvc, env.affiliationSvc, env.scoreSvc, env.stackSvc, env.redis)
 
 	user := createHandlerUser(t, env, "stack-user@example.com", "stack-user", "pass", models.UserRole)
 	challenge := createHandlerChallenge(t, env, "Stack Target", 100, "FLAG{STACK}", true)

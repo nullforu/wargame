@@ -35,15 +35,16 @@ import (
 )
 
 type testEnv struct {
-	cfg            config.Config
-	router         *gin.Engine
-	userRepo       *repo.UserRepo
-	challengeRepo  *repo.ChallengeRepo
-	submissionRepo *repo.SubmissionRepo
-	stackRepo      *repo.StackRepo
-	authSvc        *service.AuthService
-	wargameSvc     *service.WargameService
-	stackSvc       *service.StackService
+	cfg             config.Config
+	router          *gin.Engine
+	userRepo        *repo.UserRepo
+	affiliationRepo *repo.AffiliationRepo
+	challengeRepo   *repo.ChallengeRepo
+	submissionRepo  *repo.SubmissionRepo
+	stackRepo       *repo.StackRepo
+	authSvc         *service.AuthService
+	wargameSvc      *service.WargameService
+	stackSvc        *service.StackService
 }
 
 type errorResp struct {
@@ -234,6 +235,7 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 	resetState(t)
 
 	userRepo := repo.NewUserRepo(testDB)
+	affiliationRepo := repo.NewAffiliationRepo(testDB)
 	challengeRepo := repo.NewChallengeRepo(testDB)
 	submissionRepo := repo.NewSubmissionRepo(testDB)
 	voteRepo := repo.NewChallengeVoteRepo(testDB)
@@ -243,23 +245,25 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
 
 	authSvc := service.NewAuthService(cfg, userRepo, testRedis)
-	userSvc := service.NewUserService(userRepo)
+	userSvc := service.NewUserService(userRepo, affiliationRepo)
+	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, testRedis, fileStore)
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, testRedis, testLogger)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, testRedis, testLogger)
 
 	env := testEnv{
-		cfg:            cfg,
-		router:         router,
-		userRepo:       userRepo,
-		challengeRepo:  challengeRepo,
-		submissionRepo: submissionRepo,
-		stackRepo:      stackRepo,
-		authSvc:        authSvc,
-		wargameSvc:     wargameSvc,
-		stackSvc:       stackSvc,
+		cfg:             cfg,
+		router:          router,
+		userRepo:        userRepo,
+		affiliationRepo: affiliationRepo,
+		challengeRepo:   challengeRepo,
+		submissionRepo:  submissionRepo,
+		stackRepo:       stackRepo,
+		authSvc:         authSvc,
+		wargameSvc:      wargameSvc,
+		stackSvc:        stackSvc,
 	}
 
 	return env
@@ -268,7 +272,7 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 func resetState(t *testing.T) {
 	t.Helper()
 
-	if _, err := testDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := testDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
@@ -507,6 +511,7 @@ func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testE
 	resetState(t)
 
 	userRepo := repo.NewUserRepo(testDB)
+	affiliationRepo := repo.NewAffiliationRepo(testDB)
 	challengeRepo := repo.NewChallengeRepo(testDB)
 	submissionRepo := repo.NewSubmissionRepo(testDB)
 	voteRepo := repo.NewChallengeVoteRepo(testDB)
@@ -516,23 +521,25 @@ func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testE
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
 
 	authSvc := service.NewAuthService(cfg, userRepo, testRedis)
-	userSvc := service.NewUserService(userRepo)
+	userSvc := service.NewUserService(userRepo, affiliationRepo)
+	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, testRedis, fileStore)
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, mockClient, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, testRedis, testLogger)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, testRedis, testLogger)
 
 	return testEnv{
-		cfg:            cfg,
-		router:         router,
-		userRepo:       userRepo,
-		challengeRepo:  challengeRepo,
-		submissionRepo: submissionRepo,
-		stackRepo:      stackRepo,
-		authSvc:        authSvc,
-		wargameSvc:     wargameSvc,
-		stackSvc:       stackSvc,
+		cfg:             cfg,
+		router:          router,
+		userRepo:        userRepo,
+		affiliationRepo: affiliationRepo,
+		challengeRepo:   challengeRepo,
+		submissionRepo:  submissionRepo,
+		stackRepo:       stackRepo,
+		authSvc:         authSvc,
+		wargameSvc:      wargameSvc,
+		stackSvc:        stackSvc,
 	}
 }
 
@@ -550,6 +557,22 @@ func createSubmission(t *testing.T, env testEnv, userID, challengeID int64, corr
 	if err := env.submissionRepo.Create(context.Background(), sub); err != nil {
 		t.Fatalf("create submission: %v", err)
 	}
+}
+
+func createAffiliation(t *testing.T, env testEnv, name string) *models.Affiliation {
+	t.Helper()
+
+	affiliation := &models.Affiliation{
+		Name:      name,
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+
+	if err := env.affiliationRepo.Create(context.Background(), affiliation); err != nil {
+		t.Fatalf("create affiliation: %v", err)
+	}
+
+	return affiliation
 }
 
 func assertFieldErrors(t *testing.T, got []service.FieldError, expected map[string]string) {

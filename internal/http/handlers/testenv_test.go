@@ -37,6 +37,7 @@ type handlerEnv struct {
 	stackRepo      *repo.StackRepo
 	authSvc        *service.AuthService
 	userSvc        *service.UserService
+	affiliationSvc *service.AffiliationService
 	scoreSvc       *service.ScoreboardService
 	wargameSvc     *service.WargameService
 	stackSvc       *service.StackService
@@ -195,6 +196,7 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 	resetHandlerState(t)
 
 	userRepo := repo.NewUserRepo(handlerDB)
+	affiliationRepo := repo.NewAffiliationRepo(handlerDB)
 	challengeRepo := repo.NewChallengeRepo(handlerDB)
 	submissionRepo := repo.NewSubmissionRepo(handlerDB)
 	voteRepo := repo.NewChallengeVoteRepo(handlerDB)
@@ -203,13 +205,14 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
 
-	userSvc := service.NewUserService(userRepo)
+	userSvc := service.NewUserService(userRepo, affiliationRepo)
+	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	authSvc := service.NewAuthService(handlerCfg, userRepo, handlerRedis)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(handlerCfg, challengeRepo, submissionRepo, voteRepo, handlerRedis, fileStore)
 	stackSvc := service.NewStackService(handlerCfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, handlerRedis)
 
-	handler := New(handlerCfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, handlerRedis)
+	handler := New(handlerCfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, handlerRedis)
 
 	env := handlerEnv{
 		cfg:            handlerCfg,
@@ -221,6 +224,7 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 		stackRepo:      stackRepo,
 		authSvc:        authSvc,
 		userSvc:        userSvc,
+		affiliationSvc: affiliationSvc,
 		scoreSvc:       scoreSvc,
 		wargameSvc:     wargameSvc,
 		stackSvc:       stackSvc,
@@ -233,7 +237,7 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 func resetHandlerState(t *testing.T) {
 	t.Helper()
 
-	if _, err := handlerDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := handlerDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 

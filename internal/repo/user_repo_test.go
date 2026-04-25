@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
+
+	"wargame/internal/models"
 )
 
 func TestUserRepoCreateGetByIDUpdate(t *testing.T) {
@@ -123,5 +126,39 @@ func TestUserRepoNotFoundCases(t *testing.T) {
 
 	if _, err := env.userRepo.GetByEmailOrUsername(context.Background(), "missing@example.com", "missing"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected GetByEmailOrUsername not found, got %v", err)
+	}
+}
+
+func TestUserRepoAffiliationJoinAndListByAffiliation(t *testing.T) {
+	env := setupRepoTest(t)
+	affiliationRepo := NewAffiliationRepo(env.db)
+
+	affiliation := &models.Affiliation{Name: "Blue Team", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	if err := affiliationRepo.Create(context.Background(), affiliation); err != nil {
+		t.Fatalf("create affiliation: %v", err)
+	}
+
+	user := createUserForTestUserScope(t, env, "aff@example.com", "aff-user", "pass", "user")
+	user.AffiliationID = &affiliation.ID
+	if err := env.userRepo.Update(context.Background(), user); err != nil {
+		t.Fatalf("update user affiliation: %v", err)
+	}
+
+	got, err := env.userRepo.GetByID(context.Background(), user.ID)
+	if err != nil {
+		t.Fatalf("get user by id: %v", err)
+	}
+
+	if got.Affiliation == nil || *got.Affiliation != "Blue Team" {
+		t.Fatalf("expected affiliation name in user row, got %+v", got.Affiliation)
+	}
+
+	rows, totalCount, err := env.userRepo.ListByAffiliation(context.Background(), affiliation.ID, 1, 20)
+	if err != nil {
+		t.Fatalf("list by affiliation: %v", err)
+	}
+
+	if totalCount != 1 || len(rows) != 1 || rows[0].ID != user.ID {
+		t.Fatalf("unexpected list by affiliation result: total=%d rows=%+v", totalCount, rows)
 	}
 }

@@ -15,7 +15,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, userSvc *service.UserService, scoreSvc *service.ScoreboardService, stackSvc *service.StackService, redis *redis.Client, logger *logging.Logger) *gin.Engine {
+func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, userSvc *service.UserService, affiliationSvc *service.AffiliationService, scoreSvc *service.ScoreboardService, stackSvc *service.StackService, redis *redis.Client, logger *logging.Logger) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -25,7 +25,7 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 	r.Use(middleware.RequestLogger(cfg.Logging, logger))
 	r.Use(middleware.CORS(cfg.AppEnv != "production", cfg.CORS.AllowedOrigins))
 
-	h := handlers.New(cfg, authSvc, wargameSvc, userSvc, scoreSvc, stackSvc, redis)
+	h := handlers.New(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, redis)
 
 	r.GET("/healthz", func(ctx *gin.Context) { ctx.JSON(nethttp.StatusOK, gin.H{"status": "ok"}) })
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
@@ -44,6 +44,12 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		api.GET("/challenges/:id/votes", h.ChallengeVotes)
 		api.GET("/leaderboard", h.Leaderboard)
 		api.GET("/timeline", h.Timeline)
+		api.GET("/rankings/users", h.RankingUsers)
+		api.GET("/rankings/affiliations", h.RankingAffiliations)
+		api.GET("/rankings/affiliations/:id/users", h.RankingAffiliationUsers)
+		api.GET("/affiliations", h.ListAffiliations)
+		api.GET("/affiliations/search", h.SearchAffiliations)
+		api.GET("/affiliations/:id/users", h.ListAffiliationUsers)
 		api.GET("/users", h.ListUsers)
 		api.GET("/users/search", h.SearchUsers)
 		api.GET("/users/:id", h.GetUser)
@@ -78,6 +84,7 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		admin.DELETE("/stacks/:stack_id", h.AdminDeleteStack)
 		admin.POST("/users/:id/block", h.AdminBlockUser)
 		admin.POST("/users/:id/unblock", h.AdminUnblockUser)
+		admin.POST("/affiliations", h.AdminCreateAffiliation)
 	}
 
 	return r

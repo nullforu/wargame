@@ -21,6 +21,8 @@ Response 200
     "email": "user@example.com",
     "username": "user1",
     "role": "user",
+    "affiliation_id": 2,
+    "affiliation": "Blue Team",
     "stack_count": 0,
     "stack_limit": 3,
     "blocked_reason": null,
@@ -48,7 +50,8 @@ Request
 
 ```json
 {
-    "username": "new_username"
+    "username": "new_username",
+    "affiliation_id": 2
 }
 ```
 
@@ -60,6 +63,8 @@ Response 200
     "email": "user@example.com",
     "username": "new_username",
     "role": "user",
+    "affiliation_id": 2,
+    "affiliation": "Blue Team",
     "stack_count": 0,
     "stack_limit": 3,
     "blocked_reason": null,
@@ -93,6 +98,8 @@ Response 200
             "id": 1,
             "username": "user1",
             "role": "user",
+            "affiliation_id": 2,
+            "affiliation": "Blue Team",
             "blocked_reason": null,
             "blocked_at": null
         },
@@ -100,6 +107,8 @@ Response 200
             "id": 2,
             "username": "admin",
             "role": "admin",
+            "affiliation_id": null,
+            "affiliation": null,
             "blocked_reason": null,
             "blocked_at": null
         }
@@ -140,6 +149,8 @@ Response 200
             "id": 1,
             "username": "user1",
             "role": "user",
+            "affiliation_id": 2,
+            "affiliation": "Blue Team",
             "blocked_reason": null,
             "blocked_at": null
         }
@@ -172,6 +183,8 @@ Response 200
     "id": 1,
     "username": "user1",
     "role": "user",
+    "affiliation_id": 2,
+    "affiliation": "Blue Team",
     "blocked_reason": null,
     "blocked_at": null
 }
