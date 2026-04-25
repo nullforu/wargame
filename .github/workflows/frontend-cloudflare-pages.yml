@@ -38,6 +38,8 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          VITE_API_BASE: https://internal.swua.kr/wargame
         run: npm run build
 
       - name: Deploy to Cloudflare Pages
