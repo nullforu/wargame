@@ -239,8 +239,8 @@ func TestHandlerCreateChallengeSetsCreator(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if resp.CreatedByUserID == nil || *resp.CreatedByUserID != admin.ID {
-		t.Fatalf("expected creator id %d, got %+v", admin.ID, resp.CreatedByUserID)
+	if resp.CreatedBy == nil || resp.CreatedBy.UserID == nil || *resp.CreatedBy.UserID != admin.ID {
+		t.Fatalf("expected creator id %d, got %+v", admin.ID, resp.CreatedBy)
 	}
 
 	challenge, err := env.challengeRepo.GetByID(context.Background(), resp.ID)

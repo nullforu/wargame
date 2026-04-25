@@ -16,6 +16,7 @@ type User struct {
 	Role          string     `bun:"role,notnull"`
 	AffiliationID *int64     `bun:"affiliation_id,nullzero"`
 	Affiliation   *string    `bun:"affiliation_name,scanonly"`
+	Bio           *string    `bun:"bio,nullzero"`
 	BlockedReason *string    `bun:"blocked_reason,nullzero"`
 	BlockedAt     *time.Time `bun:"blocked_at,nullzero"`
 	CreatedAt     time.Time  `bun:"created_at,nullzero,notnull,default:current_timestamp"`

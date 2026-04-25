@@ -23,6 +23,7 @@ Response 200
     "role": "user",
     "affiliation_id": 2,
     "affiliation": "Blue Team",
+    "bio": "Blue Team player",
     "stack_count": 0,
     "stack_limit": 3,
     "blocked_reason": null,
@@ -51,7 +52,8 @@ Request
 ```json
 {
     "username": "new_username",
-    "affiliation_id": 2
+    "affiliation_id": 2,
+    "bio": "Blue Team player"
 }
 ```
 
@@ -65,6 +67,7 @@ Response 200
     "role": "user",
     "affiliation_id": 2,
     "affiliation": "Blue Team",
+    "bio": "Blue Team player",
     "stack_count": 0,
     "stack_limit": 3,
     "blocked_reason": null,
@@ -100,6 +103,7 @@ Response 200
             "role": "user",
             "affiliation_id": 2,
             "affiliation": "Blue Team",
+            "bio": "Blue Team player",
             "blocked_reason": null,
             "blocked_at": null
         },
@@ -109,6 +113,7 @@ Response 200
             "role": "admin",
             "affiliation_id": null,
             "affiliation": null,
+            "bio": null,
             "blocked_reason": null,
             "blocked_at": null
         }
@@ -151,6 +156,7 @@ Response 200
             "role": "user",
             "affiliation_id": 2,
             "affiliation": "Blue Team",
+            "bio": "Blue Team player",
             "blocked_reason": null,
             "blocked_at": null
         }
@@ -185,6 +191,7 @@ Response 200
     "role": "user",
     "affiliation_id": 2,
     "affiliation": "Blue Team",
+    "bio": "Blue Team player",
     "blocked_reason": null,
     "blocked_at": null
 }

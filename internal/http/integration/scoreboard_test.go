@@ -162,9 +162,15 @@ func TestRankingEndpoints(t *testing.T) {
 	user1 := createUser(t, env, "u1@example.com", "u1", "pass", models.UserRole)
 	user2 := createUser(t, env, "u2@example.com", "u2", "pass", models.UserRole)
 	user3 := createUser(t, env, "u3@example.com", "u3", "pass", models.UserRole)
+	user1Bio := "user1 bio"
+	user2Bio := "user2 bio"
+	user3Bio := "user3 bio"
 	user1.AffiliationID = &affA.ID
 	user2.AffiliationID = &affA.ID
 	user3.AffiliationID = &affB.ID
+	user1.Bio = &user1Bio
+	user2.Bio = &user2Bio
+	user3.Bio = &user3Bio
 	if err := env.userRepo.Update(context.Background(), user1); err != nil {
 		t.Fatalf("update user1: %v", err)
 	}
@@ -190,14 +196,18 @@ func TestRankingEndpoints(t *testing.T) {
 
 	var userResp struct {
 		Entries []struct {
-			UserID      int64 `json:"user_id"`
-			Score       int   `json:"score"`
-			SolvedCount int   `json:"solved_count"`
+			UserID      int64   `json:"user_id"`
+			Score       int     `json:"score"`
+			SolvedCount int     `json:"solved_count"`
+			Bio         *string `json:"bio"`
 		} `json:"entries"`
 	}
 	decodeJSON(t, userRec, &userResp)
 	if len(userResp.Entries) != 3 || userResp.Entries[0].UserID != user3.ID || userResp.Entries[0].Score != 200 || userResp.Entries[0].SolvedCount != 1 {
 		t.Fatalf("unexpected users ranking: %+v", userResp.Entries)
+	}
+	if userResp.Entries[0].Bio == nil || *userResp.Entries[0].Bio != user3Bio {
+		t.Fatalf("unexpected user bio in ranking: %+v", userResp.Entries[0])
 	}
 
 	affRec := doRequest(t, env.router, http.MethodGet, "/api/rankings/affiliations?page=1&page_size=10", nil, nil)
@@ -224,11 +234,15 @@ func TestRankingEndpoints(t *testing.T) {
 
 	var affUsersResp struct {
 		Entries []struct {
-			UserID int64 `json:"user_id"`
+			UserID int64   `json:"user_id"`
+			Bio    *string `json:"bio"`
 		} `json:"entries"`
 	}
 	decodeJSON(t, affUsersRec, &affUsersResp)
 	if len(affUsersResp.Entries) != 2 {
 		t.Fatalf("unexpected affiliation users ranking entries: %+v", affUsersResp.Entries)
+	}
+	if affUsersResp.Entries[0].Bio == nil {
+		t.Fatalf("expected bio in affiliation users ranking entries: %+v", affUsersResp.Entries)
 	}
 }

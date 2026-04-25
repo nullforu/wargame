@@ -190,15 +190,19 @@ func TestMe(t *testing.T) {
 	}
 
 	var resp struct {
-		ID       int64  `json:"id"`
-		Email    string `json:"email"`
-		Username string `json:"username"`
-		Role     string `json:"role"`
+		ID       int64   `json:"id"`
+		Email    string  `json:"email"`
+		Username string  `json:"username"`
+		Role     string  `json:"role"`
+		Bio      *string `json:"bio"`
 	}
 	decodeJSON(t, rec, &resp)
 
 	if resp.Email != "user@example.com" || resp.Username != "user1" || resp.Role != models.UserRole {
 		t.Fatalf("unexpected response: %+v", resp)
+	}
+	if resp.Bio != nil {
+		t.Fatalf("expected nil bio by default, got %+v", resp.Bio)
 	}
 }
 
@@ -217,15 +221,35 @@ func TestUpdateMe(t *testing.T) {
 	}
 
 	var resp struct {
-		ID       int64  `json:"id"`
-		Email    string `json:"email"`
-		Username string `json:"username"`
-		Role     string `json:"role"`
+		ID       int64   `json:"id"`
+		Email    string  `json:"email"`
+		Username string  `json:"username"`
+		Role     string  `json:"role"`
+		Bio      *string `json:"bio"`
 	}
 	decodeJSON(t, rec, &resp)
 
 	if resp.ID != userID || resp.Email != "user@example.com" || resp.Username != "newuser" || resp.Role != models.UserRole {
 		t.Fatalf("unexpected response: %+v", resp)
+	}
+
+	bio := "Hello from profile"
+	rec = doRequest(t, env.router, http.MethodPut, "/api/me", map[string]any{"bio": bio}, authHeader(access))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	decodeJSON(t, rec, &resp)
+	if resp.Bio == nil || *resp.Bio != bio {
+		t.Fatalf("expected bio to be updated, got %+v", resp.Bio)
+	}
+
+	rec = doRequest(t, env.router, http.MethodPut, "/api/me", map[string]any{"bio": nil}, authHeader(access))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	decodeJSON(t, rec, &resp)
+	if resp.Bio != nil {
+		t.Fatalf("expected bio to be cleared, got %+v", resp.Bio)
 	}
 }
 

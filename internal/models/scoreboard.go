@@ -34,6 +34,7 @@ type UserRankingEntry struct {
 	SolvedCount   int     `bun:"solved_count" json:"solved_count"`
 	AffiliationID *int64  `bun:"affiliation_id" json:"affiliation_id"`
 	Affiliation   *string `bun:"affiliation_name" json:"affiliation_name"`
+	Bio           *string `bun:"bio" json:"bio"`
 }
 
 type AffiliationRankingEntry struct {

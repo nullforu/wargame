@@ -81,7 +81,7 @@ func (s *UserService) Search(ctx context.Context, query string, page, pageSize i
 	return users, BuildPagination(params.Page, params.PageSize, totalCount), nil
 }
 
-func (s *UserService) UpdateProfile(ctx context.Context, userID int64, username *string, affiliationID *int64, affiliationSet bool) (*models.User, error) {
+func (s *UserService) UpdateProfile(ctx context.Context, userID int64, username *string, affiliationID *int64, affiliationSet bool, bio *string, bioSet bool) (*models.User, error) {
 	user, err := s.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -110,6 +110,10 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID int64, username 
 
 			user.AffiliationID = affiliationID
 		}
+	}
+
+	if bioSet {
+		user.Bio = bio
 	}
 
 	if err := s.userRepo.Update(ctx, user); err != nil {

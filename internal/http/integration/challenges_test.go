@@ -1,6 +1,7 @@
 package http_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -52,9 +53,11 @@ func TestListChallengesPaginationAndSearch(t *testing.T) {
 
 	var pagedResp struct {
 		Challenges []struct {
-			Title             string `json:"title"`
-			CreatedByUserID   int64  `json:"created_by_user_id"`
-			CreatedByUsername string `json:"created_by_username"`
+			Title     string `json:"title"`
+			CreatedBy struct {
+				UserID   int64  `json:"user_id"`
+				Username string `json:"username"`
+			} `json:"created_by"`
 		} `json:"challenges"`
 		Pagination struct {
 			Page       int  `json:"page"`
@@ -68,7 +71,7 @@ func TestListChallengesPaginationAndSearch(t *testing.T) {
 	if len(pagedResp.Challenges) != 1 || pagedResp.Challenges[0].Title != "Web Advanced" {
 		t.Fatalf("unexpected paged challenges: %+v", pagedResp.Challenges)
 	}
-	if pagedResp.Challenges[0].CreatedByUserID <= 0 || pagedResp.Challenges[0].CreatedByUsername == "" {
+	if pagedResp.Challenges[0].CreatedBy.UserID <= 0 || pagedResp.Challenges[0].CreatedBy.Username == "" {
 		t.Fatalf("expected creator info in list response: %+v", pagedResp.Challenges[0])
 	}
 
@@ -133,6 +136,17 @@ func TestChallengeDetailFiltersSolvedAndSolvers(t *testing.T) {
 	env := setupTest(t, testCfg)
 	_ = createUser(t, env, "admin@example.com", models.AdminRole, "adminpass", models.AdminRole)
 	adminAccess, _, _ := loginUser(t, env.router, "admin@example.com", "adminpass")
+	authorAffiliation := createAffiliation(t, env, "Challenge Authors")
+	adminUser, err := env.userRepo.GetByEmail(context.Background(), "admin@example.com")
+	if err != nil {
+		t.Fatalf("get admin user: %v", err)
+	}
+	authorBio := "challenge author bio"
+	adminUser.AffiliationID = &authorAffiliation.ID
+	adminUser.Bio = &authorBio
+	if err := env.userRepo.Update(context.Background(), adminUser); err != nil {
+		t.Fatalf("update admin affiliation: %v", err)
+	}
 	user := createUser(t, env, "player@example.com", "player", "playerpass", models.UserRole)
 	userAccess, _, _ := loginUser(t, env.router, "player@example.com", "playerpass")
 
@@ -223,23 +237,51 @@ func TestChallengeDetailFiltersSolvedAndSolvers(t *testing.T) {
 	}
 
 	var detail struct {
-		ID                int64                   `json:"id"`
-		Level             int                     `json:"level"`
-		LevelVoteCounts   []models.LevelVoteCount `json:"level_vote_counts"`
-		IsSolved          bool                    `json:"is_solved"`
-		CreatedByUserID   int64                   `json:"created_by_user_id"`
-		CreatedByUsername string                  `json:"created_by_username"`
+		ID              int64                   `json:"id"`
+		CreatedAt       string                  `json:"created_at"`
+		Level           int                     `json:"level"`
+		LevelVoteCounts []models.LevelVoteCount `json:"level_vote_counts"`
+		IsSolved        bool                    `json:"is_solved"`
+		CreatedBy       struct {
+			UserID        int64   `json:"user_id"`
+			Username      string  `json:"username"`
+			AffiliationID *int64  `json:"affiliation_id"`
+			Affiliation   *string `json:"affiliation"`
+			Bio           *string `json:"bio"`
+		} `json:"created_by"`
 	}
 	decodeJSON(t, rec, &detail)
 	if detail.ID != created[0].ID || detail.Level != models.UnknownLevel || !detail.IsSolved || len(detail.LevelVoteCounts) != 0 {
 		t.Fatalf("unexpected detail: %+v", detail)
 	}
-	if detail.CreatedByUserID <= 0 || detail.CreatedByUsername == "" {
+	if detail.CreatedBy.UserID <= 0 || detail.CreatedBy.Username == "" {
 		t.Fatalf("expected creator info in detail response: %+v", detail)
+	}
+	if detail.CreatedAt == "" {
+		t.Fatalf("expected created_at in detail response: %+v", detail)
+	}
+	if detail.CreatedBy.AffiliationID == nil || *detail.CreatedBy.AffiliationID != authorAffiliation.ID {
+		t.Fatalf("expected creator affiliation id in detail response: %+v", detail)
+	}
+	if detail.CreatedBy.Affiliation == nil || *detail.CreatedBy.Affiliation != authorAffiliation.Name {
+		t.Fatalf("expected creator affiliation in detail response: %+v", detail)
+	}
+	if detail.CreatedBy.Bio == nil || *detail.CreatedBy.Bio != authorBio {
+		t.Fatalf("expected creator bio in detail response: %+v", detail)
 	}
 
 	other1 := createUser(t, env, "solver1@example.com", "solver1", "pass", models.UserRole)
 	other2 := createUser(t, env, "solver2@example.com", "solver2", "pass", models.UserRole)
+	solver1Bio := "solver1 bio"
+	solver2Bio := "solver2 bio"
+	other1.Bio = &solver1Bio
+	other2.Bio = &solver2Bio
+	if err := env.userRepo.Update(context.Background(), other1); err != nil {
+		t.Fatalf("update solver1 bio: %v", err)
+	}
+	if err := env.userRepo.Update(context.Background(), other2); err != nil {
+		t.Fatalf("update solver2 bio: %v", err)
+	}
 	createSubmission(t, env, other1.ID, created[0].ID, true, time.Now().UTC().Add(1*time.Minute))
 	createSubmission(t, env, other2.ID, created[0].ID, true, time.Now().UTC().Add(2*time.Minute))
 	createSubmission(t, env, user.ID, created[0].ID, true, time.Now().UTC().Add(3*time.Minute))
@@ -251,7 +293,8 @@ func TestChallengeDetailFiltersSolvedAndSolvers(t *testing.T) {
 
 	var solvers struct {
 		Solvers []struct {
-			UserID int64 `json:"user_id"`
+			UserID int64   `json:"user_id"`
+			Bio    *string `json:"bio"`
 		} `json:"solvers"`
 		Pagination struct {
 			TotalCount int  `json:"total_count"`
@@ -261,6 +304,16 @@ func TestChallengeDetailFiltersSolvedAndSolvers(t *testing.T) {
 	decodeJSON(t, rec, &solvers)
 	if len(solvers.Solvers) != 2 || solvers.Pagination.TotalCount < 3 || !solvers.Pagination.HasNext {
 		t.Fatalf("unexpected solvers response: %+v", solvers)
+	}
+	foundExpectedBio := false
+	for _, solver := range solvers.Solvers {
+		if solver.Bio != nil && (*solver.Bio == solver1Bio || *solver.Bio == solver2Bio) {
+			foundExpectedBio = true
+			break
+		}
+	}
+	if !foundExpectedBio {
+		t.Fatalf("expected solver bio in response page: %+v", solvers.Solvers)
 	}
 }
 

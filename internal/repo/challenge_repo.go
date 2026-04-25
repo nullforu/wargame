@@ -39,8 +39,12 @@ func (r *ChallengeRepo) ListActiveFiltered(ctx context.Context, filter Challenge
 	countQuery := r.db.NewSelect().Model((*models.Challenge)(nil))
 	listQuery := r.db.NewSelect().Model(&challenges).
 		Join("LEFT JOIN users AS author ON author.id = challenge.created_by_user_id").
+		Join("LEFT JOIN affiliations AS author_aff ON author_aff.id = author.affiliation_id").
 		ColumnExpr("challenge.*").
-		ColumnExpr("author.username AS created_by_username")
+		ColumnExpr("author.username AS created_by_username").
+		ColumnExpr("author.affiliation_id AS created_by_affiliation_id").
+		ColumnExpr("author_aff.name AS created_by_affiliation").
+		ColumnExpr("author.bio AS created_by_bio")
 
 	query := strings.TrimSpace(filter.Query)
 	if query != "" {
@@ -117,8 +121,12 @@ func (r *ChallengeRepo) GetByID(ctx context.Context, id int64) (*models.Challeng
 	if err := r.db.NewSelect().
 		Model(challenge).
 		Join("LEFT JOIN users AS author ON author.id = challenge.created_by_user_id").
+		Join("LEFT JOIN affiliations AS author_aff ON author_aff.id = author.affiliation_id").
 		ColumnExpr("challenge.*").
 		ColumnExpr("author.username AS created_by_username").
+		ColumnExpr("author.affiliation_id AS created_by_affiliation_id").
+		ColumnExpr("author_aff.name AS created_by_affiliation").
+		ColumnExpr("author.bio AS created_by_bio").
 		Where("challenge.id = ?", id).
 		Scan(ctx); err != nil {
 		return nil, wrapNotFound("challengeRepo.GetByID", err)

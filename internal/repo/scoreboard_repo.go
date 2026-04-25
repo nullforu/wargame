@@ -148,13 +148,14 @@ func (r *ScoreboardRepo) UserRanking(ctx context.Context, page, pageSize int) ([
 		ColumnExpr("u.username AS username").
 		ColumnExpr("u.affiliation_id AS affiliation_id").
 		ColumnExpr("a.name AS affiliation_name").
+		ColumnExpr("u.bio AS bio").
 		ColumnExpr("COALESCE(SUM(c.points), 0) AS score").
 		ColumnExpr("COALESCE(COUNT(s.challenge_id), 0) AS solved_count").
 		Join("LEFT JOIN affiliations AS a ON a.id = u.affiliation_id").
 		Join("LEFT JOIN solved AS s ON s.user_id = u.id").
 		Join("LEFT JOIN challenges AS c ON c.id = s.challenge_id").
 		Where("u.role != ?", models.BlockedRole).
-		GroupExpr("u.id, u.username, u.affiliation_id, a.name").
+		GroupExpr("u.id, u.username, u.affiliation_id, a.name, u.bio").
 		OrderExpr("score DESC, solved_count DESC, u.id ASC").
 		Limit(pageSize).
 		Offset(offset).
@@ -228,6 +229,7 @@ func (r *ScoreboardRepo) AffiliationUserRanking(ctx context.Context, affiliation
 		ColumnExpr("u.username AS username").
 		ColumnExpr("u.affiliation_id AS affiliation_id").
 		ColumnExpr("a.name AS affiliation_name").
+		ColumnExpr("u.bio AS bio").
 		ColumnExpr("COALESCE(SUM(c.points), 0) AS score").
 		ColumnExpr("COALESCE(COUNT(s.challenge_id), 0) AS solved_count").
 		Join("LEFT JOIN affiliations AS a ON a.id = u.affiliation_id").
@@ -235,7 +237,7 @@ func (r *ScoreboardRepo) AffiliationUserRanking(ctx context.Context, affiliation
 		Join("LEFT JOIN challenges AS c ON c.id = s.challenge_id").
 		Where("u.role != ?", models.BlockedRole).
 		Where("u.affiliation_id = ?", affiliationID).
-		GroupExpr("u.id, u.username, u.affiliation_id, a.name").
+		GroupExpr("u.id, u.username, u.affiliation_id, a.name, u.bio").
 		OrderExpr("score DESC, solved_count DESC, u.id ASC").
 		Limit(pageSize).
 		Offset(offset).

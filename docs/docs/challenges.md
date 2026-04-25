@@ -26,11 +26,17 @@ Response 200
             "title": "Warmup",
             "description": "...",
             "category": "Web",
+            "created_at": "2026-01-24T12:00:00Z",
             "level": 0,
             "points": 100,
             "solve_count": 12,
-            "created_by_user_id": 1,
-            "created_by_username": "admin",
+            "created_by": {
+                "user_id": 1,
+                "username": "admin",
+                "affiliation_id": 3,
+                "affiliation": "Blue Team High",
+                "bio": "Challenge author"
+            },
             "is_active": true,
             "is_locked": false,
             "is_solved": true,
@@ -85,11 +91,17 @@ Response 200
             "title": "Warmup",
             "description": "...",
             "category": "Web",
+            "created_at": "2026-01-24T12:00:00Z",
             "level": 0,
             "points": 100,
             "solve_count": 12,
-            "created_by_user_id": 1,
-            "created_by_username": "admin",
+            "created_by": {
+                "user_id": 1,
+                "username": "admin",
+                "affiliation_id": 3,
+                "affiliation": "Blue Team High",
+                "bio": "Challenge author"
+            },
             "is_active": true,
             "is_locked": false,
             "is_solved": true,
@@ -128,6 +140,7 @@ Response 200
     "title": "Warmup",
     "description": "...",
     "category": "Web",
+    "created_at": "2026-01-24T12:00:00Z",
     "level": 0,
     "level_vote_counts": [
         { "level": 6, "count": 2 },
@@ -135,8 +148,13 @@ Response 200
     ],
     "points": 100,
     "solve_count": 12,
-    "created_by_user_id": 1,
-    "created_by_username": "admin",
+    "created_by": {
+        "user_id": 1,
+        "username": "admin",
+        "affiliation_id": 3,
+        "affiliation": "Blue Team High",
+        "bio": "Challenge author"
+    },
     "is_active": true,
     "is_locked": false,
     "is_solved": true,
@@ -171,6 +189,8 @@ Response 200
         {
             "user_id": 7,
             "username": "alice",
+            "affiliation": "Blue Team High",
+            "bio": "Web solver",
             "solved_at": "2026-01-24T12:00:00Z",
             "is_first_blood": true
         }

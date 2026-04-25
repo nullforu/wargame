@@ -33,7 +33,7 @@ func TestUserServiceGetByIDListUpdateProfile(t *testing.T) {
 	}
 
 	newName := "newname"
-	updated, err := env.userSvc.UpdateProfile(context.Background(), user.ID, &newName, nil, false)
+	updated, err := env.userSvc.UpdateProfile(context.Background(), user.ID, &newName, nil, false, nil, false)
 	if err != nil {
 		t.Fatalf("UpdateProfile: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestUserServiceUpdateProfileAffiliationAndListByAffiliation(t *testing.T) {
 		t.Fatalf("create affiliation: %v", err)
 	}
 
-	updated, err := env.userSvc.UpdateProfile(context.Background(), user.ID, nil, &affiliation.ID, true)
+	updated, err := env.userSvc.UpdateProfile(context.Background(), user.ID, nil, &affiliation.ID, true, nil, false)
 	if err != nil {
 		t.Fatalf("update profile affiliation: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestUserServiceUpdateProfileAffiliationAndListByAffiliation(t *testing.T) {
 		t.Fatalf("unexpected pagination: %+v", pagination)
 	}
 
-	cleared, err := env.userSvc.UpdateProfile(context.Background(), user.ID, nil, nil, true)
+	cleared, err := env.userSvc.UpdateProfile(context.Background(), user.ID, nil, nil, true, nil, false)
 	if err != nil {
 		t.Fatalf("clear affiliation: %v", err)
 	}
@@ -157,7 +157,31 @@ func TestUserServiceUpdateProfileAffiliationAndListByAffiliation(t *testing.T) {
 	}
 
 	badID := int64(99999)
-	if _, err := env.userSvc.UpdateProfile(context.Background(), user.ID, nil, &badID, true); err == nil {
+	if _, err := env.userSvc.UpdateProfile(context.Background(), user.ID, nil, &badID, true, nil, false); err == nil {
 		t.Fatalf("expected invalid affiliation id error")
+	}
+}
+
+func TestUserServiceUpdateProfileBio(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "bio@example.com", "bio-user", "pass", models.UserRole)
+	bio := "hello wargame"
+
+	updated, err := env.userSvc.UpdateProfile(context.Background(), user.ID, nil, nil, false, &bio, true)
+	if err != nil {
+		t.Fatalf("set bio: %v", err)
+	}
+
+	if updated.Bio == nil || *updated.Bio != bio {
+		t.Fatalf("unexpected bio after set: %+v", updated.Bio)
+	}
+
+	cleared, err := env.userSvc.UpdateProfile(context.Background(), user.ID, nil, nil, false, nil, true)
+	if err != nil {
+		t.Fatalf("clear bio: %v", err)
+	}
+
+	if cleared.Bio != nil {
+		t.Fatalf("expected nil bio after clear, got %+v", cleared.Bio)
 	}
 }

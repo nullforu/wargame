@@ -322,7 +322,7 @@ func (h *Handler) UpdateMe(ctx *gin.Context) {
 		return
 	}
 
-	user, err := h.users.UpdateProfile(ctx.Request.Context(), middleware.UserID(ctx), req.Username, req.AffiliationID.Value, req.AffiliationID.Set)
+	user, err := h.users.UpdateProfile(ctx.Request.Context(), middleware.UserID(ctx), req.Username, req.AffiliationID.Value, req.AffiliationID.Set, req.Bio.Value, req.Bio.Set)
 	if err != nil {
 		writeError(ctx, err)
 		return
@@ -500,6 +500,8 @@ func (h *Handler) ChallengeSolvers(ctx *gin.Context) {
 		solvers = append(solvers, challengeSolverResponse{
 			UserID:       row.UserID,
 			Username:     row.Username,
+			Affiliation:  row.Affiliation,
+			Bio:          row.Bio,
 			SolvedAt:     row.SolvedAt.UTC(),
 			IsFirstBlood: row.IsFirstBlood,
 		})
@@ -709,6 +711,8 @@ func (h *Handler) CreateChallenge(ctx *gin.Context) {
 	creator, err := h.users.GetByID(ctx.Request.Context(), creatorID)
 	if err == nil {
 		challenge.CreatedByUsername = creator.Username
+		challenge.CreatedByAffiliationID = creator.AffiliationID
+		challenge.CreatedByAffiliation = creator.Affiliation
 	}
 
 	h.notifyScoreboardChanged(ctx.Request.Context(), "challenge_created")

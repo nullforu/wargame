@@ -47,8 +47,9 @@ func (o *optionalInt64) UnmarshalJSON(data []byte) error {
 }
 
 type meUpdateRequest struct {
-	Username      *string       `json:"username"`
-	AffiliationID optionalInt64 `json:"affiliation_id"`
+	Username      *string        `json:"username"`
+	AffiliationID optionalInt64  `json:"affiliation_id"`
+	Bio           optionalString `json:"bio"`
 }
 
 type adminAffiliationCreateRequest struct {
@@ -138,6 +139,7 @@ type userMeResponse struct {
 	Role          string     `json:"role"`
 	AffiliationID *int64     `json:"affiliation_id"`
 	Affiliation   *string    `json:"affiliation"`
+	Bio           *string    `json:"bio"`
 	StackCount    int        `json:"stack_count"`
 	StackLimit    int        `json:"stack_limit"`
 	BlockedReason *string    `json:"blocked_reason"`
@@ -150,6 +152,7 @@ type userDetailResponse struct {
 	Role          string     `json:"role"`
 	AffiliationID *int64     `json:"affiliation_id"`
 	Affiliation   *string    `json:"affiliation"`
+	Bio           *string    `json:"bio"`
 	BlockedReason *string    `json:"blocked_reason"`
 	BlockedAt     *time.Time `json:"blocked_at"`
 }
@@ -161,6 +164,7 @@ type adminUserResponse struct {
 	Role          string     `json:"role"`
 	AffiliationID *int64     `json:"affiliation_id"`
 	Affiliation   *string    `json:"affiliation"`
+	Bio           *string    `json:"bio"`
 	BlockedReason *string    `json:"blocked_reason"`
 	BlockedAt     *time.Time `json:"blocked_at"`
 }
@@ -170,12 +174,12 @@ type challengeResponse struct {
 	Title               string                    `json:"title"`
 	Description         string                    `json:"description"`
 	Category            string                    `json:"category"`
+	CreatedAt           time.Time                 `json:"created_at"`
 	Level               int                       `json:"level"`
 	Points              int                       `json:"points"`
 	SolveCount          int                       `json:"solve_count"`
 	LevelVoteCounts     []models.LevelVoteCount   `json:"level_vote_counts,omitempty"`
-	CreatedByUserID     *int64                    `json:"created_by_user_id,omitempty"`
-	CreatedByUsername   string                    `json:"created_by_username,omitempty"`
+	CreatedBy           *challengeCreatorResponse `json:"created_by,omitempty"`
 	PreviousChallengeID *int64                    `json:"previous_challenge_id,omitempty"`
 	IsActive            bool                      `json:"is_active"`
 	IsLocked            bool                      `json:"is_locked"`
@@ -187,20 +191,28 @@ type challengeResponse struct {
 }
 
 type lockedChallengeResponse struct {
-	ID                        int64   `json:"id"`
-	Title                     string  `json:"title"`
-	Category                  string  `json:"category"`
-	Level                     int     `json:"level"`
-	Points                    int     `json:"points"`
-	SolveCount                int     `json:"solve_count"`
-	CreatedByUserID           *int64  `json:"created_by_user_id,omitempty"`
-	CreatedByUsername         string  `json:"created_by_username,omitempty"`
-	PreviousChallengeID       *int64  `json:"previous_challenge_id,omitempty"`
-	PreviousChallengeTitle    *string `json:"previous_challenge_title,omitempty"`
-	PreviousChallengeCategory *string `json:"previous_challenge_category,omitempty"`
-	IsActive                  bool    `json:"is_active"`
-	IsLocked                  bool    `json:"is_locked"`
-	IsSolved                  bool    `json:"is_solved"`
+	ID                        int64                     `json:"id"`
+	Title                     string                    `json:"title"`
+	Category                  string                    `json:"category"`
+	CreatedAt                 time.Time                 `json:"created_at"`
+	Level                     int                       `json:"level"`
+	Points                    int                       `json:"points"`
+	SolveCount                int                       `json:"solve_count"`
+	CreatedBy                 *challengeCreatorResponse `json:"created_by,omitempty"`
+	PreviousChallengeID       *int64                    `json:"previous_challenge_id,omitempty"`
+	PreviousChallengeTitle    *string                   `json:"previous_challenge_title,omitempty"`
+	PreviousChallengeCategory *string                   `json:"previous_challenge_category,omitempty"`
+	IsActive                  bool                      `json:"is_active"`
+	IsLocked                  bool                      `json:"is_locked"`
+	IsSolved                  bool                      `json:"is_solved"`
+}
+
+type challengeCreatorResponse struct {
+	UserID        *int64  `json:"user_id,omitempty"`
+	Username      string  `json:"username,omitempty"`
+	AffiliationID *int64  `json:"affiliation_id,omitempty"`
+	Affiliation   *string `json:"affiliation,omitempty"`
+	Bio           *string `json:"bio,omitempty"`
 }
 
 type challengeVotesResponse struct {
@@ -230,6 +242,8 @@ type userSolvedListResponse struct {
 type challengeSolverResponse struct {
 	UserID       int64     `json:"user_id"`
 	Username     string    `json:"username"`
+	Affiliation  *string   `json:"affiliation,omitempty"`
+	Bio          *string   `json:"bio,omitempty"`
 	SolvedAt     time.Time `json:"solved_at"`
 	IsFirstBlood bool      `json:"is_first_blood"`
 }
@@ -349,6 +363,7 @@ func newUserMeResponse(user *models.User, stackCount, stackLimit int) userMeResp
 		Role:          user.Role,
 		AffiliationID: user.AffiliationID,
 		Affiliation:   user.Affiliation,
+		Bio:           user.Bio,
 		StackCount:    stackCount,
 		StackLimit:    stackLimit,
 		BlockedReason: user.BlockedReason,
@@ -363,6 +378,7 @@ func newUserDetailResponse(user *models.User) userDetailResponse {
 		Role:          user.Role,
 		AffiliationID: user.AffiliationID,
 		Affiliation:   user.Affiliation,
+		Bio:           user.Bio,
 		BlockedReason: user.BlockedReason,
 		BlockedAt:     user.BlockedAt,
 	}
@@ -376,6 +392,7 @@ func newAdminUserResponse(user *models.User) adminUserResponse {
 		Role:          user.Role,
 		AffiliationID: user.AffiliationID,
 		Affiliation:   user.Affiliation,
+		Bio:           user.Bio,
 		BlockedReason: user.BlockedReason,
 		BlockedAt:     user.BlockedAt,
 	}
@@ -388,12 +405,12 @@ func newChallengeResponse(challenge *models.Challenge, isSolved bool) challengeR
 		Title:               challenge.Title,
 		Description:         challenge.Description,
 		Category:            challenge.Category,
+		CreatedAt:           challenge.CreatedAt.UTC(),
 		Level:               challenge.Level,
 		Points:              challenge.Points,
 		SolveCount:          challenge.SolveCount,
 		LevelVoteCounts:     challenge.LevelVotes,
-		CreatedByUserID:     challenge.CreatedByUserID,
-		CreatedByUsername:   challenge.CreatedByUsername,
+		CreatedBy:           newChallengeCreatorResponse(challenge),
 		PreviousChallengeID: challenge.PreviousChallengeID,
 		IsActive:            challenge.IsActive,
 		IsLocked:            false,
@@ -416,16 +433,30 @@ func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Ch
 		ID:                        challenge.ID,
 		Title:                     challenge.Title,
 		Category:                  challenge.Category,
+		CreatedAt:                 challenge.CreatedAt.UTC(),
 		Level:                     challenge.Level,
 		Points:                    challenge.Points,
 		SolveCount:                challenge.SolveCount,
-		CreatedByUserID:           challenge.CreatedByUserID,
-		CreatedByUsername:         challenge.CreatedByUsername,
+		CreatedBy:                 newChallengeCreatorResponse(challenge),
 		PreviousChallengeID:       challenge.PreviousChallengeID,
 		PreviousChallengeTitle:    prevTitle,
 		PreviousChallengeCategory: prevCategory,
 		IsActive:                  challenge.IsActive,
 		IsLocked:                  true,
 		IsSolved:                  isSolved,
+	}
+}
+
+func newChallengeCreatorResponse(challenge *models.Challenge) *challengeCreatorResponse {
+	if challenge.CreatedByUserID == nil && challenge.CreatedByUsername == "" && challenge.CreatedByAffiliationID == nil && challenge.CreatedByAffiliation == nil && challenge.CreatedByBio == nil {
+		return nil
+	}
+
+	return &challengeCreatorResponse{
+		UserID:        challenge.CreatedByUserID,
+		Username:      challenge.CreatedByUsername,
+		AffiliationID: challenge.CreatedByAffiliationID,
+		Affiliation:   challenge.CreatedByAffiliation,
+		Bio:           challenge.CreatedByBio,
 	}
 }

@@ -28,6 +28,8 @@ type SolvedChallenge struct {
 type ChallengeSolver struct {
 	UserID       int64     `bun:"user_id" json:"user_id"`
 	Username     string    `bun:"username" json:"username"`
+	Affiliation  *string   `bun:"affiliation" json:"affiliation"`
+	Bio          *string   `bun:"bio" json:"bio"`
 	SolvedAt     time.Time `bun:"solved_at" json:"solved_at"`
 	IsFirstBlood bool      `bun:"is_first_blood" json:"is_first_blood"`
 }

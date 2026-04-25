@@ -1,9 +1,8 @@
-version: "3.9"
+name: wargame-local-db
 
 services:
   postgres:
     image: postgres:16
-    container_name: local-postgres
     restart: unless-stopped
     ports:
       - "5432:5432"
@@ -18,7 +17,6 @@ services:
 
   redis:
     image: redis:7
-    container_name: local-redis
     restart: unless-stopped
     ports:
       - "6379:6379"

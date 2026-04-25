@@ -1,7 +1,8 @@
+name: wargame-test-deploy
+
 services:
   postgres:
     image: postgres:16
-    container_name: wargame-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: app_db
@@ -19,7 +20,6 @@ services:
 
   redis:
     image: redis:7
-    container_name: wargame-redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
@@ -36,7 +36,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: wargame-app
     restart: unless-stopped
     env_file:
       - .env

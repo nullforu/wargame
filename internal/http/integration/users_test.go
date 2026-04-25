@@ -15,7 +15,9 @@ func TestListUsers(t *testing.T) {
 	_ = createUser(t, env, "admin@example.com", models.AdminRole, "pass3", models.AdminRole)
 
 	reason := "policy"
+	bio := "security enthusiast"
 	user1.BlockedReason = &reason
+	user1.Bio = &bio
 	now := time.Now().UTC()
 	user1.BlockedAt = &now
 	if err := env.userRepo.Update(context.Background(), user1); err != nil {
@@ -32,6 +34,8 @@ func TestListUsers(t *testing.T) {
 			ID            int64   `json:"id"`
 			Username      string  `json:"username"`
 			Role          string  `json:"role"`
+			Affiliation   *string `json:"affiliation"`
+			Bio           *string `json:"bio"`
 			BlockedReason *string `json:"blocked_reason"`
 		} `json:"users"`
 		Pagination struct {
@@ -54,6 +58,9 @@ func TestListUsers(t *testing.T) {
 	if resp.Users[0].BlockedReason == nil {
 		t.Fatalf("expected blocked reason for user1")
 	}
+	if resp.Users[0].Bio == nil || *resp.Users[0].Bio != bio {
+		t.Fatalf("expected bio for user1, got %+v", resp.Users[0].Bio)
+	}
 
 	if resp.Pagination.Page != 1 || resp.Pagination.PageSize != 20 || resp.Pagination.TotalCount != 3 || resp.Pagination.HasNext {
 		t.Fatalf("unexpected pagination: %+v", resp.Pagination)
@@ -65,7 +72,9 @@ func TestGetUser(t *testing.T) {
 		env := setupTest(t, testCfg)
 		user := createUser(t, env, "user1@example.com", "user1", "pass1", models.UserRole)
 		reason := "policy"
+		bio := "security enthusiast"
 		user.BlockedReason = &reason
+		user.Bio = &bio
 		now := time.Now().UTC()
 		user.BlockedAt = &now
 		if err := env.userRepo.Update(context.Background(), user); err != nil {
@@ -81,12 +90,16 @@ func TestGetUser(t *testing.T) {
 			ID            int64   `json:"id"`
 			Username      string  `json:"username"`
 			Role          string  `json:"role"`
+			Bio           *string `json:"bio"`
 			BlockedReason *string `json:"blocked_reason"`
 		}
 		decodeJSON(t, rec, &resp)
 
 		if resp.ID != user.ID || resp.Username != "user1" || resp.Role != models.UserRole || resp.BlockedReason == nil {
 			t.Fatalf("unexpected response: %+v", resp)
+		}
+		if resp.Bio == nil || *resp.Bio != bio {
+			t.Fatalf("unexpected bio: %+v", resp.Bio)
 		}
 	})
 
