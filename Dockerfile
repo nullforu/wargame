@@ -23,7 +23,8 @@ WORKDIR /app
 COPY --from=build /out/server /app/server
 COPY --from=build --chown=nonroot:nonroot /out/logs /app/logs
 
-ENV HTTP_ADDR=:8080 \
+ENV GIN_MODE=release \
+    HTTP_ADDR=:8080 \
     LOG_DIR=/app/logs
 
 EXPOSE 8080
