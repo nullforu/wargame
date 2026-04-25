@@ -1,6 +1,6 @@
 import { Editor, useMonaco } from '@monaco-editor/react'
 import { useTheme } from '../lib/theme'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 const valueTemplates = {
     markdown: `Markdown is supported. You can make text **bold**, *italic* or \`inline code block\` and create lists as shown below.
@@ -57,6 +57,7 @@ interface MonacoEditorProps {
 const MonacoEditor = ({ value, onChange, template, readonly = false, language, height = '200px' }: MonacoEditorProps) => {
     const { theme } = useTheme()
     const monaco = useMonaco()
+    const templateBootstrappedRef = useRef(false)
 
     useEffect(() => {
         if (!monaco) return
@@ -106,12 +107,26 @@ const MonacoEditor = ({ value, onChange, template, readonly = false, language, h
         monaco.editor.setTheme(theme === 'dark' ? 'wargame-dark' : 'wargame-light')
     }, [monaco, theme])
 
+    useEffect(() => {
+        if (templateBootstrappedRef.current) return
+        if (!template || !onChange) return
+        if (value !== '') return
+        onChange(valueTemplates[template])
+        templateBootstrappedRef.current = true
+    }, [onChange, template, value])
+
+    useEffect(() => {
+        if (value !== '') {
+            templateBootstrappedRef.current = true
+        }
+    }, [value])
+
     return (
         <Editor
             height={height}
             width='100%'
             defaultLanguage={language ?? 'markdown'}
-            value={value || (template ? valueTemplates[template] : '')}
+            value={value}
             onChange={(v) => onChange?.(v ?? '')}
             theme={theme === 'dark' ? 'wargame-dark' : 'wargame-light'}
             options={{

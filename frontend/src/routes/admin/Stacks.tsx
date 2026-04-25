@@ -127,113 +127,193 @@ const AdminStacks = () => {
             ) : stacks.length === 0 ? (
                 <p className='text-sm text-text-muted'>{t('admin.stacks.noStacks')}</p>
             ) : (
-                <div className='-mx-4 md:mx-0 overflow-hidden rounded-none md:rounded-xl bg-transparent md:bg-surface md:shadow-sm'>
-                    <div className='overflow-x-auto'>
-                        <div className='min-w-[1120px]'>
-                            <div className='grid min-w-[1120px] grid-cols-[150px_minmax(170px,1fr)_170px_160px_160px_160px_120px] bg-surface-muted px-6 py-3 text-[12px] text-text-muted'>
-                                <p className='font-medium whitespace-nowrap'>{t('common.id')}</p>
-                                <p className='font-medium whitespace-nowrap'>{t('admin.stacks.challengeLabel')}</p>
-                                <p className='font-medium whitespace-nowrap'>{t('admin.stacks.userLabel')}</p>
-                                <p className='font-medium whitespace-nowrap'>{t('admin.stacks.ttlLabel')}</p>
-                                <p className='font-medium whitespace-nowrap'>{t('common.createdAt')}</p>
-                                <p className='font-medium whitespace-nowrap'>{t('common.updatedAt')}</p>
-                                <p className='font-medium whitespace-nowrap'>{t('common.action')}</p>
-                            </div>
-                            {stacks.map((stack) => {
-                                const detail = detailById[stack.stack_id]
-                                const detailError = detailErrorById[stack.stack_id]
-                                const detailsOpen = !!detail
-                                const detailLoading = detailLoadingId === stack.stack_id
-                                const deleteLoading = deleteLoadingId === stack.stack_id
+                <div className='-mx-4 space-y-2 px-4 md:mx-0 md:space-y-0 md:px-0'>
+                    <div className='space-y-2 md:hidden'>
+                        {stacks.map((stack) => {
+                            const detail = detailById[stack.stack_id]
+                            const detailError = detailErrorById[stack.stack_id]
+                            const detailsOpen = !!detail
+                            const detailLoading = detailLoadingId === stack.stack_id
+                            const deleteLoading = deleteLoadingId === stack.stack_id
 
-                                return (
-                                    <Fragment key={stack.stack_id}>
-                                        <div className='grid min-w-[1120px] grid-cols-[150px_minmax(170px,1fr)_170px_160px_160px_160px_120px] items-start px-6 py-4 transition hover:bg-surface-muted/40'>
-                                            <p className='whitespace-nowrap font-mono text-xs text-text'>{stack.stack_id}</p>
-                                            <div className='min-w-0 pr-3'>
-                                                <p className='truncate text-sm font-medium text-text'>{stack.challenge_title}</p>
-                                                <p className='truncate text-xs text-text-subtle'>
-                                                    {stack.challenge_category} · #{stack.challenge_id}
-                                                </p>
-                                            </div>
-                                            <div className='min-w-0 pr-3'>
-                                                <p className='truncate text-sm font-medium text-text'>{stack.username}</p>
-                                                <p className='truncate text-xs text-text-subtle'>{stack.email}</p>
-                                            </div>
-                                            <p className='truncate text-xs text-text-subtle' title={formatOptionalDate(stack.ttl_expires_at)}>
-                                                {stack.ttl_expires_at ? formatCompactDateTime(stack.ttl_expires_at) : t('common.na')}
-                                            </p>
-                                            <p className='truncate text-xs text-text-subtle' title={formatDateTime(stack.created_at, localeTag)}>
-                                                {formatCompactDateTime(stack.created_at)}
-                                            </p>
-                                            <p className='truncate text-xs text-text-subtle' title={formatDateTime(stack.updated_at, localeTag)}>
-                                                {formatCompactDateTime(stack.updated_at)}
-                                            </p>
-                                            <div className='flex items-center gap-2 whitespace-nowrap'>
-                                                <button
-                                                    className='rounded-md bg-surface-muted px-3 py-1 text-xs text-text transition hover:bg-surface-subtle disabled:opacity-60'
-                                                    type='button'
-                                                    onClick={() => toggleDetails(stack.stack_id)}
-                                                    disabled={detailLoading}
-                                                >
-                                                    {detailLoading ? t('admin.stacks.detailsLoading') : detailsOpen ? t('common.close') : t('common.view')}
-                                                </button>
-                                                <button
-                                                    className='rounded-md border border-danger/30 px-3 py-1 text-xs text-danger transition hover:border-danger/50 hover:text-danger-strong disabled:opacity-60'
-                                                    type='button'
-                                                    onClick={() => deleteStack(stack.stack_id)}
-                                                    disabled={deleteLoading}
-                                                >
-                                                    {deleteLoading ? t('admin.stacks.deleting') : t('common.delete')}
-                                                </button>
-                                            </div>
-                                        </div>
-                                        {detailError ? <p className='bg-surface/40 px-6 py-4 text-xs text-danger'>{detailError}</p> : null}
-                                        {detailLoading || detail ? (
-                                            <div className='bg-surface/40 px-6 py-4'>
-                                                {detailLoading ? (
-                                                    <p className='text-xs text-text-subtle'>{t('admin.stacks.detailsLoading')}</p>
-                                                ) : detail ? (
-                                                    <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
-                                                        <div>
-                                                            <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.statusLabel')}</p>
-                                                            <p className='mt-1 text-sm text-text'>{detail.status}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.runtimeLabel')}</p>
-                                                            <p className='mt-1 text-sm text-text'>{formatEndpoints(detail)}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.targetPortLabel')}</p>
-                                                            <p className='mt-1 text-sm text-text'>{formatTargetPorts(detail.ports)}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.ttlLabel')}</p>
-                                                            <p className='mt-1 text-sm text-text'>{formatOptionalDate(detail.ttl_expires_at)}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className='text-xs uppercase tracking-wide text-text-muted'>{t('common.createdAt')}</p>
-                                                            <p className='mt-1 text-sm text-text'>{formatDateTime(detail.created_at, localeTag)}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className='text-xs uppercase tracking-wide text-text-muted'>{t('common.updatedAt')}</p>
-                                                            <p className='mt-1 text-sm text-text'>{formatDateTime(detail.updated_at, localeTag)}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.nodeLabel')}</p>
-                                                            <p className='mt-1 text-sm text-text'>{detail.node_public_ip ?? t('common.pending')}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.portLabel')}</p>
-                                                            <p className='mt-1 text-sm text-text'>{formatNodePorts(detail.ports)}</p>
-                                                        </div>
+                            return (
+                                <div key={stack.stack_id} className='rounded-xl border border-border/70 bg-surface p-3'>
+                                    <p className='break-all font-mono text-xs text-text'>#{stack.stack_id}</p>
+                                    <p className='mt-1 truncate text-sm font-medium text-text'>{stack.challenge_title}</p>
+                                    <p className='text-xs text-text-subtle'>
+                                        {stack.challenge_category} · #{stack.challenge_id}
+                                    </p>
+                                    <p className='mt-2 text-sm text-text'>{stack.username}</p>
+                                    <p className='text-xs text-text-subtle truncate'>{stack.email}</p>
+                                    <div className='mt-2 space-y-1 text-xs text-text-subtle'>
+                                        <p>
+                                            {t('admin.stacks.ttlLabel')}: {stack.ttl_expires_at ? formatCompactDateTime(stack.ttl_expires_at) : t('common.na')}
+                                        </p>
+                                        <p>
+                                            {t('common.createdAt')}: {formatCompactDateTime(stack.created_at)}
+                                        </p>
+                                        <p>
+                                            {t('common.updatedAt')}: {formatCompactDateTime(stack.updated_at)}
+                                        </p>
+                                    </div>
+                                    <div className='mt-3 flex gap-2'>
+                                        <button
+                                            className='flex-1 rounded-md bg-surface-muted px-3 py-1.5 text-xs text-text transition hover:bg-surface-subtle disabled:opacity-60'
+                                            type='button'
+                                            onClick={() => toggleDetails(stack.stack_id)}
+                                            disabled={detailLoading}
+                                        >
+                                            {detailLoading ? t('admin.stacks.detailsLoading') : detailsOpen ? t('common.close') : t('common.view')}
+                                        </button>
+                                        <button
+                                            className='flex-1 rounded-md border border-danger/30 px-3 py-1.5 text-xs text-danger transition hover:border-danger/50 hover:text-danger-strong disabled:opacity-60'
+                                            type='button'
+                                            onClick={() => deleteStack(stack.stack_id)}
+                                            disabled={deleteLoading}
+                                        >
+                                            {deleteLoading ? t('admin.stacks.deleting') : t('common.delete')}
+                                        </button>
+                                    </div>
+                                    {detailError ? <p className='mt-2 text-xs text-danger'>{detailError}</p> : null}
+                                    {detailLoading || detail ? (
+                                        <div className='mt-3 rounded-lg bg-surface-muted/60 p-3'>
+                                            {detailLoading ? (
+                                                <p className='text-xs text-text-subtle'>{t('admin.stacks.detailsLoading')}</p>
+                                            ) : detail ? (
+                                                <div className='grid gap-3 sm:grid-cols-2'>
+                                                    <div>
+                                                        <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.statusLabel')}</p>
+                                                        <p className='mt-1 text-sm text-text'>{detail.status}</p>
                                                     </div>
-                                                ) : null}
+                                                    <div>
+                                                        <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.runtimeLabel')}</p>
+                                                        <p className='mt-1 break-all text-sm text-text'>{formatEndpoints(detail)}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.targetPortLabel')}</p>
+                                                        <p className='mt-1 text-sm text-text'>{formatTargetPorts(detail.ports)}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.portLabel')}</p>
+                                                        <p className='mt-1 text-sm text-text'>{formatNodePorts(detail.ports)}</p>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    <div className='hidden overflow-visible rounded-none bg-transparent md:block md:overflow-hidden md:rounded-xl md:bg-surface md:shadow-sm'>
+                        <div className='overflow-x-auto'>
+                            <div className='min-w-[1120px]'>
+                                <div className='grid min-w-[1120px] grid-cols-[150px_minmax(170px,1fr)_170px_160px_160px_160px_120px] bg-surface-muted px-6 py-3 text-[12px] text-text-muted'>
+                                    <p className='font-medium whitespace-nowrap'>{t('common.id')}</p>
+                                    <p className='font-medium whitespace-nowrap'>{t('admin.stacks.challengeLabel')}</p>
+                                    <p className='font-medium whitespace-nowrap'>{t('admin.stacks.userLabel')}</p>
+                                    <p className='font-medium whitespace-nowrap'>{t('admin.stacks.ttlLabel')}</p>
+                                    <p className='font-medium whitespace-nowrap'>{t('common.createdAt')}</p>
+                                    <p className='font-medium whitespace-nowrap'>{t('common.updatedAt')}</p>
+                                    <p className='font-medium whitespace-nowrap'>{t('common.action')}</p>
+                                </div>
+                                {stacks.map((stack) => {
+                                    const detail = detailById[stack.stack_id]
+                                    const detailError = detailErrorById[stack.stack_id]
+                                    const detailsOpen = !!detail
+                                    const detailLoading = detailLoadingId === stack.stack_id
+                                    const deleteLoading = deleteLoadingId === stack.stack_id
+
+                                    return (
+                                        <Fragment key={stack.stack_id}>
+                                            <div className='grid min-w-[1120px] grid-cols-[150px_minmax(170px,1fr)_170px_160px_160px_160px_120px] items-start px-6 py-4 transition hover:bg-surface-muted/40'>
+                                                <p className='whitespace-nowrap font-mono text-xs text-text'>{stack.stack_id}</p>
+                                                <div className='min-w-0 pr-3'>
+                                                    <p className='truncate text-sm font-medium text-text'>{stack.challenge_title}</p>
+                                                    <p className='truncate text-xs text-text-subtle'>
+                                                        {stack.challenge_category} · #{stack.challenge_id}
+                                                    </p>
+                                                </div>
+                                                <div className='min-w-0 pr-3'>
+                                                    <p className='truncate text-sm font-medium text-text'>{stack.username}</p>
+                                                    <p className='truncate text-xs text-text-subtle'>{stack.email}</p>
+                                                </div>
+                                                <p className='truncate text-xs text-text-subtle' title={formatOptionalDate(stack.ttl_expires_at)}>
+                                                    {stack.ttl_expires_at ? formatCompactDateTime(stack.ttl_expires_at) : t('common.na')}
+                                                </p>
+                                                <p className='truncate text-xs text-text-subtle' title={formatDateTime(stack.created_at, localeTag)}>
+                                                    {formatCompactDateTime(stack.created_at)}
+                                                </p>
+                                                <p className='truncate text-xs text-text-subtle' title={formatDateTime(stack.updated_at, localeTag)}>
+                                                    {formatCompactDateTime(stack.updated_at)}
+                                                </p>
+                                                <div className='flex items-center gap-2 whitespace-nowrap'>
+                                                    <button
+                                                        className='rounded-md bg-surface-muted px-3 py-1 text-xs text-text transition hover:bg-surface-subtle disabled:opacity-60'
+                                                        type='button'
+                                                        onClick={() => toggleDetails(stack.stack_id)}
+                                                        disabled={detailLoading}
+                                                    >
+                                                        {detailLoading ? t('admin.stacks.detailsLoading') : detailsOpen ? t('common.close') : t('common.view')}
+                                                    </button>
+                                                    <button
+                                                        className='rounded-md border border-danger/30 px-3 py-1 text-xs text-danger transition hover:border-danger/50 hover:text-danger-strong disabled:opacity-60'
+                                                        type='button'
+                                                        onClick={() => deleteStack(stack.stack_id)}
+                                                        disabled={deleteLoading}
+                                                    >
+                                                        {deleteLoading ? t('admin.stacks.deleting') : t('common.delete')}
+                                                    </button>
+                                                </div>
                                             </div>
-                                        ) : null}
-                                    </Fragment>
-                                )
-                            })}
+                                            {detailError ? <p className='bg-surface/40 px-6 py-4 text-xs text-danger'>{detailError}</p> : null}
+                                            {detailLoading || detail ? (
+                                                <div className='bg-surface/40 px-6 py-4'>
+                                                    {detailLoading ? (
+                                                        <p className='text-xs text-text-subtle'>{t('admin.stacks.detailsLoading')}</p>
+                                                    ) : detail ? (
+                                                        <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
+                                                            <div>
+                                                                <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.statusLabel')}</p>
+                                                                <p className='mt-1 text-sm text-text'>{detail.status}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.runtimeLabel')}</p>
+                                                                <p className='mt-1 text-sm text-text'>{formatEndpoints(detail)}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.targetPortLabel')}</p>
+                                                                <p className='mt-1 text-sm text-text'>{formatTargetPorts(detail.ports)}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.ttlLabel')}</p>
+                                                                <p className='mt-1 text-sm text-text'>{formatOptionalDate(detail.ttl_expires_at)}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className='text-xs uppercase tracking-wide text-text-muted'>{t('common.createdAt')}</p>
+                                                                <p className='mt-1 text-sm text-text'>{formatDateTime(detail.created_at, localeTag)}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className='text-xs uppercase tracking-wide text-text-muted'>{t('common.updatedAt')}</p>
+                                                                <p className='mt-1 text-sm text-text'>{formatDateTime(detail.updated_at, localeTag)}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.nodeLabel')}</p>
+                                                                <p className='mt-1 text-sm text-text'>{detail.node_public_ip ?? t('common.pending')}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.stacks.portLabel')}</p>
+                                                                <p className='mt-1 text-sm text-text'>{formatNodePorts(detail.ports)}</p>
+                                                            </div>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            ) : null}
+                                        </Fragment>
+                                    )
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>

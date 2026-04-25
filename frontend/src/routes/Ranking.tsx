@@ -233,7 +233,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                     return (
                                                         <button
                                                             key={`ranking-user-${row.user_id}`}
-                                                            className='flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-surface-muted cursor-pointer'
+                                                            className='flex w-full flex-wrap items-center gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-surface-muted cursor-pointer sm:flex-nowrap'
                                                             onClick={() => navigate(`/users/${row.user_id}`)}
                                                         >
                                                             <span className={`inline-flex h-7 min-w-9 items-center justify-center rounded-full px-2 text-xs font-semibold ${rankToneClass(rank)}`}>#{rank}</span>
@@ -242,7 +242,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                                 <p className='truncate text-sm text-text'>{row.username}</p>
                                                                 <p className='truncate text-xs text-text-subtle'>{row.affiliation_name ?? t('profile.noAffiliation')}</p>
                                                             </div>
-                                                            <div className='text-right'>
+                                                            <div className='w-full text-left sm:w-auto sm:text-right'>
                                                                 <p className='text-sm font-semibold text-text'>{t('common.pointsShort', { points: row.score })}</p>
                                                                 <p className='text-xs text-text-subtle'>{t('ranking.solvedCount', { count: row.solved_count })}</p>
                                                             </div>
@@ -252,9 +252,9 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                             )}
                                         </div>
                                         {userRows.length === 0 ? <p className='py-3 text-sm text-text-muted'>{t('leaderboard.noScores')}</p> : null}
-                                        <div className='mt-2 flex items-center justify-between gap-2 text-xs text-text-subtle'>
+                                        <div className='mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-text-subtle'>
                                             <span>{t('common.totalCount', { count: userPagination.total_count })}</span>
-                                            <div className='flex items-center gap-2'>
+                                            <div className='flex flex-wrap items-center gap-2'>
                                                 <button
                                                     className='rounded-md border border-border/70 px-2.5 py-1 text-text disabled:opacity-50'
                                                     disabled={!userPagination.has_prev}
@@ -291,7 +291,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                     return (
                                                         <button
                                                             key={`ranking-affiliation-${row.affiliation_id}`}
-                                                            className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-surface-muted cursor-pointer ${
+                                                            className={`flex w-full flex-wrap items-center gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-surface-muted cursor-pointer sm:flex-nowrap ${
                                                                 selectedAffiliation?.affiliation_id === row.affiliation_id ? 'bg-accent/10 ring-1 ring-accent/30' : ''
                                                             }`}
                                                             onClick={() => {
@@ -304,7 +304,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                                 <p className='truncate text-sm text-text'>{row.name}</p>
                                                                 <p className='text-xs text-text-subtle'>{t('ranking.members', { count: row.user_count })}</p>
                                                             </div>
-                                                            <div className='text-right'>
+                                                            <div className='w-full text-left sm:w-auto sm:text-right'>
                                                                 <p className='text-sm font-semibold text-text'>{t('common.pointsShort', { points: row.score })}</p>
                                                                 <p className='text-xs text-text-subtle'>{t('ranking.solvedCount', { count: row.solved_count })}</p>
                                                             </div>
@@ -314,9 +314,9 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                             )}
                                         </div>
                                         {affiliationRows.length === 0 ? <p className='py-3 text-sm text-text-muted'>{t('leaderboard.noScores')}</p> : null}
-                                        <div className='mt-2 flex items-center justify-between gap-2 text-xs text-text-subtle'>
+                                        <div className='mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-text-subtle'>
                                             <span>{t('common.totalCount', { count: affiliationPagination.total_count })}</span>
-                                            <div className='flex items-center gap-2'>
+                                            <div className='flex flex-wrap items-center gap-2'>
                                                 <button
                                                     className='rounded-md border border-border/70 px-2.5 py-1 text-text disabled:opacity-50'
                                                     disabled={!affiliationPagination.has_prev}
@@ -356,7 +356,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                         return (
                                                             <button
                                                                 key={`ranking-affiliation-user-${row.user_id}`}
-                                                                className='flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-surface-muted cursor-pointer'
+                                                                className='flex w-full flex-wrap items-center gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-surface-muted cursor-pointer sm:flex-nowrap'
                                                                 onClick={() => navigate(`/users/${row.user_id}`)}
                                                             >
                                                                 <span className={`inline-flex h-7 min-w-9 items-center justify-center rounded-full px-2 text-xs font-semibold ${rankToneClass(rank)}`}>#{rank}</span>
@@ -365,7 +365,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                                     <p className='truncate text-sm text-text'>{row.username}</p>
                                                                     <p className='truncate text-xs text-text-subtle'>{selectedTitle}</p>
                                                                 </div>
-                                                                <div className='text-right'>
+                                                                <div className='w-full text-left sm:w-auto sm:text-right'>
                                                                     <p className='text-sm font-semibold text-text'>{t('common.pointsShort', { points: row.score })}</p>
                                                                     <p className='text-xs text-text-subtle'>{t('ranking.solvedCount', { count: row.solved_count })}</p>
                                                                 </div>
@@ -375,9 +375,9 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                 )}
                                             </div>
                                             {affiliationUserRows.length === 0 ? <p className='py-3 text-sm text-text-muted'>{t('leaderboard.noScores')}</p> : null}
-                                            <div className='mt-2 flex items-center justify-between gap-2 text-xs text-text-subtle'>
+                                            <div className='mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-text-subtle'>
                                                 <span>{t('common.totalCount', { count: affiliationUserPagination.total_count })}</span>
-                                                <div className='flex items-center gap-2'>
+                                                <div className='flex flex-wrap items-center gap-2'>
                                                     <button
                                                         className='rounded-md border border-border/70 px-2.5 py-1 text-text disabled:opacity-50'
                                                         disabled={!affiliationUserPagination.has_prev}

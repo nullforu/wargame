@@ -346,9 +346,9 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const isSubmissionDisabled = !isChallengeActive || challenge.is_solved || submission.status === 'loading'
 
     return (
-        <section className='animate space-y-4 px-3 sm:px-4 md:px-2 lg:px-0'>
+        <section className='animate space-y-4 px-0 sm:px-1 md:px-2 lg:px-0'>
             <div className='grid items-start gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(320px,0.92fr)]'>
-                <div className='space-y-4'>
+                <div className='min-w-0 space-y-4'>
                     <div className='rounded-2xl border border-border/20 bg-surface p-5 shadow-sm lg:hidden'>
                         <div className='flex items-center gap-3 min-w-0'>
                             <LevelBadge level={challenge.level} />
@@ -368,7 +368,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                         </div>
                     </div>
 
-                    <div className='rounded-2xl p-4 sm:p-5'>
+                    <div className='min-w-0 rounded-2xl p-4 sm:p-5'>
                         <h2 className='text-base font-semibold text-text'>{t('common.description')}</h2>
 
                         {challenge.is_locked ? (
@@ -388,8 +388,8 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                 </button>
                             </div>
                         ) : (
-                            <div className='mt-3'>
-                                <Markdown className='wrap-break-word text-sm text-text' content={detail?.description ?? ''} />
+                            <div className='mt-3 min-w-0'>
+                                <Markdown className='text-sm text-text' content={detail?.description ?? ''} />
                             </div>
                         )}
 
@@ -602,45 +602,49 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                 </h3>
                                 <div className='mt-3 rounded-lg border border-accent/25 bg-accent/7 px-3 py-2 text-sm text-text-muted'>{challenge.is_solved ? t('challenge.voteEnabledHint') : t('challenge.voteDisabledHint')}</div>
 
-                                <div className='mt-4 grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]'>
+                                <div className='mt-4 grid items-stretch gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]'>
                                     <div className='flex min-h-105 flex-col'>
                                         <p className='text-sm font-semibold text-text'>{t('challenge.voteResults')}</p>
                                         <div className='mt-3 flex-1 rounded-xl bg-surface-muted/60 px-3 py-4 dark:bg-surface-muted/80'>
-                                            <div className='flex h-full min-h-75 items-end justify-between gap-2'>
-                                                {LEVEL_VOTE_OPTIONS.map((level) => {
-                                                    const count = voteCountsByLevel.get(level) ?? 0
-                                                    const height = maxVoteCount > 0 ? Math.max(8, Math.round((count / maxVoteCount) * 180)) : 8
-                                                    const isSelected = selectedLevel === level
-                                                    return (
-                                                        <button
-                                                            key={level}
-                                                            type='button'
-                                                            className='flex w-full min-w-0 flex-col items-center justify-end gap-2'
-                                                            onClick={() => void submitLevelVote(level)}
-                                                            disabled={!challenge.is_solved || voteSubmitting}
-                                                        >
-                                                            <div className='flex w-full items-end justify-center'>
-                                                                <div className={`w-3 rounded-full transition-all ${levelBarClass(level)} ${count > 0 ? 'opacity-100' : 'opacity-35'}`} style={{ height: `${height}px` }} />
-                                                            </div>
-                                                            <span
-                                                                className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-[11px] font-semibold transition ${
-                                                                    isSelected ? 'border-accent bg-accent text-white shadow-sm' : 'border-border/70 bg-surface text-text dark:border-border dark:bg-surface-subtle dark:text-text'
-                                                                }`}
-                                                            >
-                                                                {level}
-                                                            </span>
-                                                        </button>
-                                                    )
-                                                })}
+                                            <div className='overflow-x-auto'>
+                                                <div className='min-w-[320px]'>
+                                                    <div className='flex h-full min-h-75 items-end justify-between gap-2'>
+                                                        {LEVEL_VOTE_OPTIONS.map((level) => {
+                                                            const count = voteCountsByLevel.get(level) ?? 0
+                                                            const height = maxVoteCount > 0 ? Math.max(8, Math.round((count / maxVoteCount) * 180)) : 8
+                                                            const isSelected = selectedLevel === level
+                                                            return (
+                                                                <button
+                                                                    key={level}
+                                                                    type='button'
+                                                                    className='flex w-full min-w-0 flex-col items-center justify-end gap-2'
+                                                                    onClick={() => void submitLevelVote(level)}
+                                                                    disabled={!challenge.is_solved || voteSubmitting}
+                                                                >
+                                                                    <div className='flex w-full items-end justify-center'>
+                                                                        <div className={`w-3 rounded-full transition-all ${levelBarClass(level)} ${count > 0 ? 'opacity-100' : 'opacity-35'}`} style={{ height: `${height}px` }} />
+                                                                    </div>
+                                                                    <span
+                                                                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-[11px] font-semibold transition ${
+                                                                            isSelected ? 'border-accent bg-accent text-white shadow-sm' : 'border-border/70 bg-surface text-text dark:border-border dark:bg-surface-subtle dark:text-text'
+                                                                        }`}
+                                                                    >
+                                                                        {level}
+                                                                    </span>
+                                                                </button>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                         {voteMessage ? <p className={`mt-2 text-xs ${voteMessage === t('challenge.voteSubmitted') ? 'text-success' : 'text-danger'}`}>{voteMessage}</p> : null}
                                     </div>
 
                                     <div className='flex min-h-105 flex-col'>
-                                        <div className='flex items-center justify-between gap-2'>
+                                        <div className='flex flex-wrap items-center justify-between gap-2'>
                                             <p className='text-sm font-semibold text-text'>{t('challenge.voteLogTitle')}</p>
-                                            <div className='flex items-center gap-2 text-xs text-text-muted'>
+                                            <div className='flex flex-wrap items-center gap-2 text-xs text-text-muted'>
                                                 <button
                                                     type='button'
                                                     className='rounded-md border border-border/70 px-2 py-1 disabled:opacity-40'
@@ -662,7 +666,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                 <p className='flex h-full min-h-75 items-center text-sm text-text-muted'>{t('challenge.voteLogEmpty')}</p>
                                             ) : (
                                                 votes.map((vote) => (
-                                                    <div key={`${vote.user_id}-${vote.updated_at}`} className='flex min-h-24 items-start gap-3 rounded-xl bg-surface-muted/60 p-2.5'>
+                                                    <div key={`${vote.user_id}-${vote.updated_at}`} className='flex min-h-24 flex-wrap items-start gap-3 rounded-xl bg-surface-muted/60 p-2.5 sm:flex-nowrap'>
                                                         <UserAvatar username={vote.username} size='sm' />
                                                         <div className='min-w-0 flex-1'>
                                                             <button className='block max-w-full truncate text-left text-sm font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${vote.user_id}`)}>
@@ -674,7 +678,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                                 })}
                                                             </p>
                                                         </div>
-                                                        <span className='shrink-0 text-xs text-text-subtle'>{formatTimestamp(vote.updated_at)}</span>
+                                                        <span className='w-full text-right text-xs text-text-subtle sm:w-auto'>{formatTimestamp(vote.updated_at)}</span>
                                                     </div>
                                                 ))
                                             )}

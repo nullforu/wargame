@@ -412,7 +412,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                         </div>
                     </div>
 
-                    <div className='-mx-4 md:mx-0 overflow-hidden rounded-none md:rounded-xl bg-transparent'>
+                    <div className='-mx-4 md:mx-0 overflow-visible md:overflow-hidden rounded-none md:rounded-xl bg-transparent'>
                         {loading ? (
                             <div className='px-4 py-8 text-sm text-text-muted'>{t('common.loading')}</div>
                         ) : errorMessage ? (
@@ -420,60 +420,113 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                         ) : challenges.length === 0 ? (
                             <div className='px-4 py-8 text-sm text-text-muted'>{t('users.noResults')}</div>
                         ) : (
-                            <div className='overflow-x-auto'>
-                                <div className='min-w-150'>
-                                    <div className='grid grid-cols-[minmax(160px,2fr)_1fr_70px_100px] sm:grid-cols-[minmax(200px,2fr)_1fr_80px_110px] lg:grid-cols-[minmax(220px,2fr)_1fr_90px_120px] bg-surface px-4 py-2 text-[12px] text-text-muted'>
-                                        <span>{t('challenges.tableProblem')}</span>
-                                        <span>{t('common.category')}</span>
-                                        <span>{t('challenges.tableSolveCount')}</span>
-                                        <span>{t('challenges.tableAuthor')}</span>
-                                    </div>
+                            <>
+                                <div className='space-y-2 px-4 md:hidden'>
+                                    {challenges.map((challenge) => {
+                                        const category = 'category' in challenge ? challenge.category : t('common.na')
+                                        const solveCount = 'solve_count' in challenge ? challenge.solve_count : 0
+                                        const inactive = challenge.is_active === false
+                                        const author = challenge.created_by_username && challenge.created_by_username.trim() !== '' ? challenge.created_by_username : t('common.na')
 
-                                    <div>
-                                        {challenges.map((challenge) => {
-                                            const category = 'category' in challenge ? challenge.category : t('common.na')
-                                            const solveCount = 'solve_count' in challenge ? challenge.solve_count : 0
-                                            const inactive = challenge.is_active === false
-                                            const author = challenge.created_by_username && challenge.created_by_username.trim() !== '' ? challenge.created_by_username : t('common.na')
-
-                                            return (
-                                                <button
-                                                    key={challenge.id}
-                                                    type='button'
-                                                    className='grid w-full grid-cols-[minmax(160px,2fr)_1fr_70px_100px] sm:grid-cols-[minmax(200px,2fr)_1fr_80px_110px] lg:grid-cols-[minmax(220px,2fr)_1fr_90px_120px] items-center px-4 py-3 text-left transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-70'
-                                                    disabled={inactive}
-                                                    onClick={() => {
-                                                        if (!inactive) {
-                                                            navigate(`/challenges/${challenge.id}${window.location.search}`)
-                                                        }
-                                                    }}
-                                                >
-                                                    <div className='flex items-center gap-3 min-w-0'>
-                                                        <LevelBadge level={challenge.level} />
-                                                        <div className='flex items-center min-w-0 flex-1'>
-                                                            <span className='truncate text-[14px] sm:text-[16px] font-semibold pr-4'>{challenge.title}</span>
+                                        return (
+                                            <button
+                                                key={challenge.id}
+                                                type='button'
+                                                className='w-full rounded-xl border border-border/60 bg-surface p-3 text-left transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-70'
+                                                disabled={inactive}
+                                                onClick={() => {
+                                                    if (!inactive) {
+                                                        navigate(`/challenges/${challenge.id}${window.location.search}`)
+                                                    }
+                                                }}
+                                            >
+                                                <div className='flex items-start gap-3'>
+                                                    <LevelBadge level={challenge.level} />
+                                                    <div className='min-w-0 flex-1'>
+                                                        <div className='flex items-center gap-1.5'>
+                                                            <p className='truncate text-sm font-semibold text-text'>{challenge.title}</p>
                                                             {challenge.is_locked ? (
-                                                                <span className='shrink-0 w-4 h-4 text-warning -ml-1.5' title={t('challenge.lockedLabel')}>
-                                                                    <svg viewBox='0 0 24 24' className='w-full h-full' fill='none' stroke='currentColor' strokeWidth='2'>
+                                                                <span className='shrink-0 h-4 w-4 text-warning' title={t('challenge.lockedLabel')}>
+                                                                    <svg viewBox='0 0 24 24' className='h-full w-full' fill='none' stroke='currentColor' strokeWidth='2'>
                                                                         <rect x='5' y='11' width='14' height='9' rx='2' />
                                                                         <path d='M8 11V8a4 4 0 1 1 8 0v3' />
                                                                     </svg>
                                                                 </span>
                                                             ) : challenge.is_solved ? (
-                                                                <FlagIcon className='shrink-0 w-4 h-4 text-accent -ml-1.5' />
+                                                                <FlagIcon className='shrink-0 h-4 w-4 text-accent' />
                                                             ) : null}
                                                         </div>
+                                                        <p className='mt-1 text-xs text-text-muted'>{t(getCategoryKey(category))}</p>
+                                                        <div className='mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-subtle'>
+                                                            <span>
+                                                                {t('challenges.tableSolveCount')}: {solveCount}
+                                                            </span>
+                                                            <span className='truncate'>
+                                                                {t('challenges.tableAuthor')}: {author}
+                                                            </span>
+                                                        </div>
                                                     </div>
+                                                </div>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
 
-                                                    <span className='text-xs text-text-muted wrap-break-words'>{t(getCategoryKey(category))}</span>
-                                                    <span className='text-sm text-text-muted'>{solveCount}</span>
-                                                    <span className='text-xs text-text-muted truncate'>{author}</span>
-                                                </button>
-                                            )
-                                        })}
+                                <div className='hidden overflow-x-auto md:block'>
+                                    <div className='min-w-150'>
+                                        <div className='grid grid-cols-[minmax(160px,2fr)_1fr_70px_100px] sm:grid-cols-[minmax(200px,2fr)_1fr_80px_110px] lg:grid-cols-[minmax(220px,2fr)_1fr_90px_120px] bg-surface px-4 py-2 text-[12px] text-text-muted'>
+                                            <span>{t('challenges.tableProblem')}</span>
+                                            <span>{t('common.category')}</span>
+                                            <span>{t('challenges.tableSolveCount')}</span>
+                                            <span>{t('challenges.tableAuthor')}</span>
+                                        </div>
+
+                                        <div>
+                                            {challenges.map((challenge) => {
+                                                const category = 'category' in challenge ? challenge.category : t('common.na')
+                                                const solveCount = 'solve_count' in challenge ? challenge.solve_count : 0
+                                                const inactive = challenge.is_active === false
+                                                const author = challenge.created_by_username && challenge.created_by_username.trim() !== '' ? challenge.created_by_username : t('common.na')
+
+                                                return (
+                                                    <button
+                                                        key={challenge.id}
+                                                        type='button'
+                                                        className='grid w-full grid-cols-[minmax(160px,2fr)_1fr_70px_100px] sm:grid-cols-[minmax(200px,2fr)_1fr_80px_110px] lg:grid-cols-[minmax(220px,2fr)_1fr_90px_120px] items-center px-4 py-3 text-left transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-70'
+                                                        disabled={inactive}
+                                                        onClick={() => {
+                                                            if (!inactive) {
+                                                                navigate(`/challenges/${challenge.id}${window.location.search}`)
+                                                            }
+                                                        }}
+                                                    >
+                                                        <div className='min-w-0 flex items-center gap-3'>
+                                                            <LevelBadge level={challenge.level} />
+                                                            <div className='min-w-0 flex flex-1 items-center'>
+                                                                <span className='truncate pr-4 text-[14px] font-semibold sm:text-[16px]'>{challenge.title}</span>
+                                                                {challenge.is_locked ? (
+                                                                    <span className='-ml-1.5 h-4 w-4 shrink-0 text-warning' title={t('challenge.lockedLabel')}>
+                                                                        <svg viewBox='0 0 24 24' className='h-full w-full' fill='none' stroke='currentColor' strokeWidth='2'>
+                                                                            <rect x='5' y='11' width='14' height='9' rx='2' />
+                                                                            <path d='M8 11V8a4 4 0 1 1 8 0v3' />
+                                                                        </svg>
+                                                                    </span>
+                                                                ) : challenge.is_solved ? (
+                                                                    <FlagIcon className='-ml-1.5 h-4 w-4 shrink-0 text-accent' />
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+
+                                                        <span className='wrap-break-words text-xs text-text-muted'>{t(getCategoryKey(category))}</span>
+                                                        <span className='text-sm text-text-muted'>{solveCount}</span>
+                                                        <span className='truncate text-xs text-text-muted'>{author}</span>
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            </>
                         )}
                     </div>
 

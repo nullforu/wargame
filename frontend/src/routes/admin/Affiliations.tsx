@@ -19,21 +19,24 @@ const AdminAffiliations = () => {
     const [errorMessage, setErrorMessage] = useState('')
     const [successMessage, setSuccessMessage] = useState('')
 
-    const loadRows = useCallback(async (targetPage: number) => {
-        setLoading(true)
-        setErrorMessage('')
-        try {
-            const data = await api.affiliations(targetPage, 20)
-            setRows(data.affiliations)
-            setPagination(data.pagination)
-        } catch (error) {
-            setErrorMessage(formatApiError(error, t).message)
-            setRows([])
-            setPagination(EMPTY_PAGINATION)
-        } finally {
-            setLoading(false)
-        }
-    }, [api, t])
+    const loadRows = useCallback(
+        async (targetPage: number) => {
+            setLoading(true)
+            setErrorMessage('')
+            try {
+                const data = await api.affiliations(targetPage, 20)
+                setRows(data.affiliations)
+                setPagination(data.pagination)
+            } catch (error) {
+                setErrorMessage(formatApiError(error, t).message)
+                setRows([])
+                setPagination(EMPTY_PAGINATION)
+            } finally {
+                setLoading(false)
+            }
+        },
+        [api, t],
+    )
 
     useEffect(() => {
         void loadRows(page)

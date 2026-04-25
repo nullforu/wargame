@@ -573,10 +573,10 @@ const ChallengeManagement = () => {
             {loading ? (
                 <p className='text-sm text-text-subtle'>{t('admin.manage.loadingChallenges')}</p>
             ) : (
-                <div className='-mx-4 md:mx-0 overflow-hidden rounded-none md:rounded-xl bg-transparent md:bg-surface md:shadow-sm'>
+                <div className='-mx-4 md:mx-0 overflow-visible md:overflow-hidden rounded-none md:rounded-xl bg-transparent md:bg-surface md:shadow-sm'>
                     <div className='overflow-x-auto'>
-                        <div className='min-w-245'>
-                            <div className='grid grid-cols-[72px_minmax(0,1fr)_140px_90px_100px_100px_110px_130px] bg-surface-muted px-4 py-3 text-[12px] text-text-muted'>
+                        <div className='min-w-[980px]'>
+                            <div className='grid min-w-[980px] grid-cols-[72px_minmax(0,1fr)_140px_90px_100px_100px_110px_130px] bg-surface-muted px-4 py-3 text-[12px] text-text-muted'>
                                 <p className='font-medium'>{t('common.id')}</p>
                                 <p className='font-medium'>{t('common.title')}</p>
                                 <p className='font-medium'>{t('common.category')}</p>
@@ -595,7 +595,7 @@ const ChallengeManagement = () => {
 
                                 return (
                                     <Fragment key={challenge.id}>
-                                        <div className='grid grid-cols-[72px_minmax(0,1fr)_140px_90px_100px_100px_110px_130px] items-center px-4 py-4 transition hover:bg-surface-muted/40'>
+                                        <div className='grid min-w-[980px] grid-cols-[72px_minmax(0,1fr)_140px_90px_100px_100px_110px_130px] items-center px-4 py-4 transition hover:bg-surface-muted/40'>
                                             <p className='whitespace-nowrap text-sm text-text'>{challenge.id}</p>
                                             <p className='truncate pr-3 text-sm text-text'>{challenge.title}</p>
                                             <p className='text-sm text-text'>{categoryLabel}</p>

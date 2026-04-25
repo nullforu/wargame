@@ -218,92 +218,177 @@ const AdminUsers = () => {
             {loading ? (
                 <p className='text-sm text-text-muted'>{t('admin.users.loading')}</p>
             ) : (
-                <div className='-mx-4 md:mx-0 overflow-hidden rounded-none md:rounded-xl bg-transparent md:bg-surface md:shadow-sm'>
-                    <div className='grid grid-cols-[80px_minmax(0,1fr)_140px_minmax(220px,1fr)_320px] bg-surface-muted px-6 py-3 text-[12px] text-text-muted'>
-                        <p className='font-medium'>{t('common.id')}</p>
-                        <p className='font-medium'>{t('common.user')}</p>
-                        <p className='font-medium'>{t('common.role')}</p>
-                        <p className='font-medium'>{t('admin.users.blockedLabel')}</p>
-                        <p className='font-medium'>{t('common.action')}</p>
-                    </div>
-                    {filteredUsers.map((user) => {
-                        const isBlocked = user.role === 'blocked'
-                        const rowError = rowErrors[user.id]
-                        const pendingBlock = blockingUserId === user.id
-                        const pendingUnblock = unblockingUserId === user.id
+                <div className='-mx-4 space-y-2 px-4 md:mx-0 md:space-y-0 md:px-0'>
+                    <div className='space-y-2 md:hidden'>
+                        {filteredUsers.map((user) => {
+                            const isBlocked = user.role === 'blocked'
+                            const rowError = rowErrors[user.id]
+                            const pendingBlock = blockingUserId === user.id
+                            const pendingUnblock = unblockingUserId === user.id
 
-                        return (
-                            <div key={user.id} className='grid grid-cols-[80px_minmax(0,1fr)_140px_minmax(220px,1fr)_320px] items-start px-6 py-5 transition hover:bg-surface-muted/40'>
-                                <p className='whitespace-nowrap text-sm text-text'>{user.id}</p>
-                                <div className='min-w-0 pr-4 text-sm text-text'>
-                                    <p className='truncate font-medium'>{user.username}</p>
-                                </div>
-                                <div className='text-sm'>
-                                    <span
-                                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium uppercase ${
-                                            user.role === 'admin' ? 'bg-secondary/20 text-secondary' : user.role === 'blocked' ? 'bg-danger/20 text-danger' : 'bg-accent/20 text-accent-strong'
-                                        }`}
-                                    >
-                                        {t(getRoleKey(user.role))}
-                                    </span>
-                                </div>
-                                <div className='pr-4 text-sm text-text'>
-                                    {isBlocked ? (
-                                        <div className='space-y-1'>
-                                            <p className='text-sm font-medium text-danger'>{t('admin.users.blockedStatus')}</p>
-                                            <p className='text-xs text-text-subtle'>
-                                                {t('admin.users.blockedReasonLabel')}: {user.blocked_reason ?? t('common.na')}
-                                            </p>
-                                            <p className='text-xs text-text-subtle'>
-                                                {t('admin.users.blockedAtLabel')}: {formatOptionalDate(user.blocked_at)}
-                                            </p>
+                            return (
+                                <div key={user.id} className='rounded-xl border border-border/70 bg-surface p-3'>
+                                    <div className='flex items-start justify-between gap-3'>
+                                        <div className='min-w-0'>
+                                            <p className='text-xs text-text-subtle'>#{user.id}</p>
+                                            <p className='truncate text-sm font-semibold text-text'>{user.username}</p>
                                         </div>
-                                    ) : (
-                                        <p className='text-xs text-text-subtle'>{t('admin.users.activeStatus')}</p>
-                                    )}
-                                </div>
-                                <div className='text-sm text-text'>
-                                    {user.role === 'admin' ? (
-                                        <p className='text-xs text-text-subtle'>{t('admin.users.adminLocked')}</p>
-                                    ) : isBlocked ? (
-                                        <button
-                                            className='rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text transition hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60'
-                                            onClick={() => handleUnblockUser(user)}
-                                            disabled={pendingUnblock}
-                                            type='button'
+                                        <span
+                                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium uppercase ${
+                                                user.role === 'admin' ? 'bg-secondary/20 text-secondary' : user.role === 'blocked' ? 'bg-danger/20 text-danger' : 'bg-accent/20 text-accent-strong'
+                                            }`}
                                         >
-                                            {pendingUnblock ? t('admin.users.unblocking') : t('admin.users.unblockUser')}
-                                        </button>
-                                    ) : (
-                                        <div className='space-y-2'>
-                                            <input
-                                                type='text'
-                                                placeholder={t('admin.users.reasonPlaceholder')}
-                                                value={blockReasons[user.id] ?? ''}
-                                                onChange={(event) =>
-                                                    setBlockReasons((prev) => ({
-                                                        ...prev,
-                                                        [user.id]: event.target.value,
-                                                    }))
-                                                }
-                                                className='w-full min-w-50 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text placeholder-text-subtle focus:border-accent focus:outline-none'
-                                            />
+                                            {t(getRoleKey(user.role))}
+                                        </span>
+                                    </div>
+
+                                    <div className='mt-2 text-sm text-text'>
+                                        {isBlocked ? (
+                                            <div className='space-y-1'>
+                                                <p className='text-sm font-medium text-danger'>{t('admin.users.blockedStatus')}</p>
+                                                <p className='text-xs text-text-subtle'>
+                                                    {t('admin.users.blockedReasonLabel')}: {user.blocked_reason ?? t('common.na')}
+                                                </p>
+                                                <p className='text-xs text-text-subtle'>
+                                                    {t('admin.users.blockedAtLabel')}: {formatOptionalDate(user.blocked_at)}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <p className='text-xs text-text-subtle'>{t('admin.users.activeStatus')}</p>
+                                        )}
+                                    </div>
+
+                                    <div className='mt-3 text-sm text-text'>
+                                        {user.role === 'admin' ? (
+                                            <p className='text-xs text-text-subtle'>{t('admin.users.adminLocked')}</p>
+                                        ) : isBlocked ? (
                                             <button
-                                                className='rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text transition hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60'
-                                                onClick={() => handleBlockUser(user)}
-                                                disabled={pendingBlock}
+                                                className='w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text transition hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60'
+                                                onClick={() => handleUnblockUser(user)}
+                                                disabled={pendingUnblock}
                                                 type='button'
                                             >
-                                                {pendingBlock ? t('admin.users.blocking') : t('admin.users.blockUser')}
+                                                {pendingUnblock ? t('admin.users.unblocking') : t('admin.users.unblockUser')}
                                             </button>
-                                        </div>
-                                    )}
-                                    {rowError ? <p className='mt-2 text-xs text-danger'>{rowError}</p> : null}
+                                        ) : (
+                                            <div className='space-y-2'>
+                                                <input
+                                                    type='text'
+                                                    placeholder={t('admin.users.reasonPlaceholder')}
+                                                    value={blockReasons[user.id] ?? ''}
+                                                    onChange={(event) =>
+                                                        setBlockReasons((prev) => ({
+                                                            ...prev,
+                                                            [user.id]: event.target.value,
+                                                        }))
+                                                    }
+                                                    className='w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text placeholder-text-subtle focus:border-accent focus:outline-none'
+                                                />
+                                                <button
+                                                    className='w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text transition hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60'
+                                                    onClick={() => handleBlockUser(user)}
+                                                    disabled={pendingBlock}
+                                                    type='button'
+                                                >
+                                                    {pendingBlock ? t('admin.users.blocking') : t('admin.users.blockUser')}
+                                                </button>
+                                            </div>
+                                        )}
+                                        {rowError ? <p className='mt-2 text-xs text-danger'>{rowError}</p> : null}
+                                    </div>
                                 </div>
-                            </div>
-                        )
-                    })}
-                    {filteredUsers.length === 0 ? <p className='px-6 py-8 text-center text-sm text-text-muted'>{t('admin.users.noUsers')}</p> : null}
+                            )
+                        })}
+                        {filteredUsers.length === 0 ? <p className='px-2 py-6 text-center text-sm text-text-muted'>{t('admin.users.noUsers')}</p> : null}
+                    </div>
+
+                    <div className='hidden overflow-visible rounded-none bg-transparent md:block md:overflow-hidden md:rounded-xl md:bg-surface md:shadow-sm'>
+                        <div className='grid grid-cols-[80px_minmax(0,1fr)_140px_minmax(220px,1fr)_320px] bg-surface-muted px-6 py-3 text-[12px] text-text-muted'>
+                            <p className='font-medium'>{t('common.id')}</p>
+                            <p className='font-medium'>{t('common.user')}</p>
+                            <p className='font-medium'>{t('common.role')}</p>
+                            <p className='font-medium'>{t('admin.users.blockedLabel')}</p>
+                            <p className='font-medium'>{t('common.action')}</p>
+                        </div>
+                        {filteredUsers.map((user) => {
+                            const isBlocked = user.role === 'blocked'
+                            const rowError = rowErrors[user.id]
+                            const pendingBlock = blockingUserId === user.id
+                            const pendingUnblock = unblockingUserId === user.id
+
+                            return (
+                                <div key={user.id} className='grid grid-cols-[80px_minmax(0,1fr)_140px_minmax(220px,1fr)_320px] items-start px-6 py-5 transition hover:bg-surface-muted/40'>
+                                    <p className='whitespace-nowrap text-sm text-text'>{user.id}</p>
+                                    <div className='min-w-0 pr-4 text-sm text-text'>
+                                        <p className='truncate font-medium'>{user.username}</p>
+                                    </div>
+                                    <div className='text-sm'>
+                                        <span
+                                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium uppercase ${
+                                                user.role === 'admin' ? 'bg-secondary/20 text-secondary' : user.role === 'blocked' ? 'bg-danger/20 text-danger' : 'bg-accent/20 text-accent-strong'
+                                            }`}
+                                        >
+                                            {t(getRoleKey(user.role))}
+                                        </span>
+                                    </div>
+                                    <div className='pr-4 text-sm text-text'>
+                                        {isBlocked ? (
+                                            <div className='space-y-1'>
+                                                <p className='text-sm font-medium text-danger'>{t('admin.users.blockedStatus')}</p>
+                                                <p className='text-xs text-text-subtle'>
+                                                    {t('admin.users.blockedReasonLabel')}: {user.blocked_reason ?? t('common.na')}
+                                                </p>
+                                                <p className='text-xs text-text-subtle'>
+                                                    {t('admin.users.blockedAtLabel')}: {formatOptionalDate(user.blocked_at)}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <p className='text-xs text-text-subtle'>{t('admin.users.activeStatus')}</p>
+                                        )}
+                                    </div>
+                                    <div className='text-sm text-text'>
+                                        {user.role === 'admin' ? (
+                                            <p className='text-xs text-text-subtle'>{t('admin.users.adminLocked')}</p>
+                                        ) : isBlocked ? (
+                                            <button
+                                                className='rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text transition hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60'
+                                                onClick={() => handleUnblockUser(user)}
+                                                disabled={pendingUnblock}
+                                                type='button'
+                                            >
+                                                {pendingUnblock ? t('admin.users.unblocking') : t('admin.users.unblockUser')}
+                                            </button>
+                                        ) : (
+                                            <div className='space-y-2'>
+                                                <input
+                                                    type='text'
+                                                    placeholder={t('admin.users.reasonPlaceholder')}
+                                                    value={blockReasons[user.id] ?? ''}
+                                                    onChange={(event) =>
+                                                        setBlockReasons((prev) => ({
+                                                            ...prev,
+                                                            [user.id]: event.target.value,
+                                                        }))
+                                                    }
+                                                    className='w-full min-w-50 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text placeholder-text-subtle focus:border-accent focus:outline-none'
+                                                />
+                                                <button
+                                                    className='rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text transition hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60'
+                                                    onClick={() => handleBlockUser(user)}
+                                                    disabled={pendingBlock}
+                                                    type='button'
+                                                >
+                                                    {pendingBlock ? t('admin.users.blocking') : t('admin.users.blockUser')}
+                                                </button>
+                                            </div>
+                                        )}
+                                        {rowError ? <p className='mt-2 text-xs text-danger'>{rowError}</p> : null}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                        {filteredUsers.length === 0 ? <p className='px-6 py-8 text-center text-sm text-text-muted'>{t('admin.users.noUsers')}</p> : null}
+                    </div>
                 </div>
             )}
             <div className='mt-3 flex items-center justify-end gap-2 px-1 text-xs text-text-muted'>

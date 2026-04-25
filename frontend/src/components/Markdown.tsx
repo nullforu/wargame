@@ -2,7 +2,7 @@ import ReactMarkdown from 'react-markdown'
 
 export default function Markdown({ content, className }: { content: string; className?: string }) {
     return (
-        <div className={className}>
+        <div className={`markdown-content min-w-0 ${className ?? ''}`}>
             <ReactMarkdown
                 components={{
                     h1: ({ children }) => <h1 className='text-3xl font-bold mb-5 mt-8'>{children}</h1>,
@@ -17,8 +17,16 @@ export default function Markdown({ content, className }: { content: string; clas
                     li: ({ children }) => <li className='mb-2'>{children}</li>,
                     strong: ({ children }) => <strong className='font-bold'>{children}</strong>,
                     em: ({ children }) => <em className='italic'>{children}</em>,
-                    code: ({ children }) => <code className='bg-gray-100 dark:bg-gray-800 p-1 rounded'>{children}</code>,
-                    pre: ({ children }) => <pre className='bg-gray-100 dark:bg-gray-800 p-4 rounded mb-4'>{children}</pre>,
+                    code: ({ children, className }) => {
+                        const text = String(children)
+                        const isBlock = Boolean(className?.includes('language-') || text.includes('\n'))
+                        return isBlock ? (
+                            <code className={`inline-block min-w-max whitespace-pre font-mono text-sm leading-6 ${className ?? ''}`}>{children}</code>
+                        ) : (
+                            <code className={`rounded bg-gray-100 p-1 text-[0.92em] dark:bg-gray-800 ${className ?? ''}`}>{children}</code>
+                        )
+                    },
+                    pre: ({ children }) => <pre className='mb-4 block w-full max-w-full overflow-x-auto overflow-y-hidden rounded bg-gray-100 p-4 dark:bg-gray-800'>{children}</pre>,
                     hr: () => <hr className='border-gray-200 dark:border-gray-700 my-7' />,
                     img: ({ src, alt }) => (
                         <a href={String(src)} target='_blank' rel='noopener noreferrer' className='block mb-4'>
