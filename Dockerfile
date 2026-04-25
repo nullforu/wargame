@@ -23,9 +23,9 @@ WORKDIR /app
 COPY --from=build /out/server /app/server
 COPY --from=build --chown=nonroot:nonroot /out/logs /app/logs
 
-ENV HTTP_ADDR=:8081 \
+ENV HTTP_ADDR=:8080 \
     LOG_DIR=/app/logs
 
-EXPOSE 8081
+EXPOSE 8080
 USER nonroot:nonroot
 ENTRYPOINT ["/app/server"]
