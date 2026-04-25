@@ -272,6 +272,7 @@
     "challenge.voteTitle": "Level Vote",
     "challenge.voteEnabledHint": "You can submit feedback after solving this challenge.",
     "challenge.voteDisabledHint": "Solve this challenge first to submit a level vote.",
+    "challenge.voteLoginRequired": "Login required to submit a level vote.",
     "challenge.voteResults": "Vote Results",
     "challenge.voteLogTitle": "All Vote Logs",
     "challenge.voteLogEmpty": "No level votes yet.",

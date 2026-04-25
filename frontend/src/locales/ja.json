@@ -272,6 +272,7 @@
     "challenge.voteTitle": "レベル投票",
     "challenge.voteEnabledHint": "問題を解いた後にフィードバックを送信できます。",
     "challenge.voteDisabledHint": "この問題を解くとレベル投票できます。",
+    "challenge.voteLoginRequired": "レベル投票を送信するにはログインが必要です。",
     "challenge.voteResults": "投票結果",
     "challenge.voteLogTitle": "全投票ログ",
     "challenge.voteLogEmpty": "まだレベル投票がありません。",

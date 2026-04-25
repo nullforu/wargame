@@ -6,7 +6,6 @@ import { getCategoryKey, getLocaleTag, useLocale, useT } from '../lib/i18n'
 import { navigate } from '../lib/router'
 import { useAuth } from '../lib/auth'
 import { useApi } from '../lib/useApi'
-import LoginRequired from '../components/LoginRequired'
 import Markdown from '../components/Markdown'
 import UserAvatar from '../components/UserAvatar'
 import { LevelBadge } from './Challenges'
@@ -131,9 +130,9 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }
 
     useEffect(() => {
-        if (!auth.user || !challengeId) return
+        if (!challengeId) return
         void loadChallenge()
-    }, [auth.user?.id, challengeId])
+    }, [challengeId])
 
     const loadStack = async () => {
         if (!challengeId || !challenge || challenge.is_locked || challenge.is_solved || !('stack_enabled' in challenge) || challenge.stack_enabled !== true) return
@@ -154,20 +153,20 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }
 
     useEffect(() => {
-        if (!auth.user || !challengeId) return
+        if (!challengeId) return
         void loadSolvers(solverPage)
-    }, [auth.user?.id, challengeId, solverPage])
+    }, [challengeId, solverPage])
 
     useEffect(() => {
-        if (!auth.user || !challengeId) return
+        if (!challengeId) return
         void loadVotes(votePage)
-    }, [auth.user?.id, challengeId, votePage])
+    }, [challengeId, votePage])
 
     useEffect(() => {
-        if (!auth.user || !challengeId) return
+        if (!challengeId) return
         setMyVoteLoaded(false)
         void loadMyVote()
-    }, [auth.user?.id, challengeId])
+    }, [challengeId])
 
     useEffect(() => {
         setVotePage(1)
@@ -202,6 +201,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
 
     const submitFlag = async () => {
         if (!challengeId || !challenge || challenge.is_locked || challenge.is_active === false) return
+        if (!auth.user) return
         if (challenge.is_solved) {
             setSubmission({ status: 'success', message: t('challenge.correct') })
             return
@@ -233,7 +233,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }
 
     const submitLevelVote = async (level: number) => {
-        if (!challengeId || voteSubmitting) return
+        if (!challengeId || voteSubmitting || !auth.user) return
         setVoteSubmitting(true)
         setVoteMessage('')
         try {
@@ -252,7 +252,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }
 
     const downloadFile = async () => {
-        if (!challengeId || !challenge || !('has_file' in challenge) || !challenge.has_file || downloadLoading) return
+        if (!challengeId || !challenge || !('has_file' in challenge) || !challenge.has_file || downloadLoading || !auth.user) return
         setDownloadLoading(true)
         setDownloadMessage('')
         try {
@@ -266,7 +266,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }
 
     const createStack = async () => {
-        if (!challengeId || !challenge || challenge.is_locked || !('stack_enabled' in challenge) || challenge.stack_enabled !== true || stackLoading) return
+        if (!challengeId || !challenge || challenge.is_locked || !('stack_enabled' in challenge) || challenge.stack_enabled !== true || stackLoading || !auth.user) return
         setStackLoading(true)
         setStackMessage('')
         try {
@@ -280,7 +280,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }
 
     const deleteStack = async () => {
-        if (!challengeId || !challenge || challenge.is_locked || !('stack_enabled' in challenge) || challenge.stack_enabled !== true || stackLoading) return
+        if (!challengeId || !challenge || challenge.is_locked || !('stack_enabled' in challenge) || challenge.stack_enabled !== true || stackLoading || !auth.user) return
         setStackLoading(true)
         setStackMessage('')
         try {
@@ -322,10 +322,6 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         })
         return max
     }, [voteCountsByLevel])
-    if (!auth.user) {
-        return <LoginRequired title={t('challenges.title')} />
-    }
-
     if (!challengeId) {
         return (
             <section className='animate'>
@@ -352,7 +348,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
 
     const detail = challenge.is_locked ? null : challenge
     const isChallengeActive = challenge.is_locked ? false : challenge.is_active !== false
-    const isSubmissionDisabled = !isChallengeActive || challenge.is_solved || submission.status === 'loading'
+    const isSubmissionDisabled = !auth.user || !isChallengeActive || challenge.is_solved || submission.status === 'loading'
     const creatorName = challenge.created_by?.username?.trim()
     const creatorAffiliation = challenge.created_by?.affiliation?.trim()
     const creatorBio = challenge.created_by?.bio?.trim()
@@ -374,7 +370,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                 ) : (
                                     <div className='block max-w-full truncate text-left text-lg font-semibold text-text'>{creatorName}</div>
                                 )}
-                                <p className='mt-1 text-sm text-text-subtle'>{creatorAffiliation ? creatorAffiliation : t('common.na')}</p>
+                                <p className='mt-1 text-sm text-text-subtle'>{creatorAffiliation ? creatorAffiliation : ''}</p>
                                 <p className='mt-1 max-w-full truncate text-sm text-text-subtle'>{creatorBio && creatorBio.length > 0 ? creatorBio : t('profile.noBio')}</p>
                             </div>
                         </div>
@@ -383,7 +379,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                     <div className='flex items-start justify-between gap-4 py-2'>
                         <div className='min-w-0 flex-1'>
                             <p className='text-lg font-semibold text-text'>{t('common.na')}</p>
-                            <p className='mt-1 text-sm text-text-subtle'>{t('common.na')}</p>
+                            <p className='mt-1 text-sm text-text-subtle'></p>
                         </div>
                     </div>
                 )}
@@ -417,7 +413,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                         </div>
                     </div>
 
-                    <div className='min-w-0 rounded-2xl p-4 sm:p-5'>
+                    <div className='min-w-0 rounded-2xl sm:p-5'>
                         <h2 className='text-base font-semibold text-text'>{t('common.description')}</h2>
 
                         {challenge.is_locked ? (
@@ -549,7 +545,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                             <div className='mt-12'>
                                 <button
                                     onClick={downloadFile}
-                                    disabled={downloadLoading}
+                                    disabled={downloadLoading || !auth.user}
                                     className='w-full h-10 flex items-center justify-center gap-2 rounded-sm border border-border bg-surface-muted px-4 py-4 text-sm font-medium text-accent hover:bg-surface-subtle transition disabled:opacity-60'
                                 >
                                     <svg xmlns='http://www.w3.org/2000/svg' className='h-4 w-4' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
@@ -558,6 +554,14 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
 
                                     {downloadLoading ? t('challenge.downloadPreparing') : t('challenge.download')}
                                 </button>
+                                {!auth.user ? (
+                                    <p className='mt-2 text-xs text-warning'>
+                                        {t('challenge.fileLoginRequired')}{' '}
+                                        <a className='underline cursor-pointer' href='/login' onClick={(e) => navigate('/login', e)}>
+                                            {t('auth.loginLink')}
+                                        </a>
+                                    </p>
+                                ) : null}
 
                                 {downloadMessage && <p className='mt-2 text-xs text-danger'>{downloadMessage}</p>}
                             </div>
@@ -567,45 +571,58 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                             <div className='rounded-md border border-border/30 bg-surface p-4 sm:p-5 shadow-sm mt-8'>
                                 <div className='flex items-center justify-between gap-2'>
                                     <h2 className='text-base font-semibold text-text'>{t('challenge.stackInstance')}</h2>
-                                    <button className='rounded-lg bg-surface-muted px-3 py-1.5 text-xs text-text hover:bg-surface-subtle disabled:opacity-60' onClick={() => void loadStack()} disabled={stackLoading}>
-                                        {t('common.refresh')}
-                                    </button>
+                                    {auth.user ? (
+                                        <button className='rounded-lg bg-surface-muted px-3 py-1.5 text-xs text-text hover:bg-surface-subtle disabled:opacity-60' onClick={() => void loadStack()} disabled={stackLoading}>
+                                            {t('common.refresh')}
+                                        </button>
+                                    ) : null}
                                 </div>
 
-                                {stackInfo ? (
-                                    <div className='mt-3 space-y-1.5 text-sm text-text-muted'>
-                                        <p>
-                                            {t('challenge.stackStatus')} <span className='text-text'>{stackInfo.status}</span>
-                                        </p>
-                                        <p>
-                                            {t('challenge.stackEndpoint')}{' '}
-                                            <span className='break-all text-text'>
-                                                {stackInfo.node_public_ip && stackInfo.ports.length > 0 ? stackInfo.ports.map((port) => `${port.protocol} ${stackInfo.node_public_ip}:${port.node_port}`).join(', ') : t('common.pending')}
-                                            </span>
-                                        </p>
-                                        <p>
-                                            {t('challenge.stackPorts')}{' '}
-                                            <span className='text-text'>{stackInfo.ports.length > 0 ? stackInfo.ports.map((port) => `${port.container_port}/${port.protocol}`).join(', ') : t('common.pending')}</span>
-                                        </p>
-                                        <p>
-                                            {t('challenge.stackTtl')} <span className='text-text'>{stackInfo.ttl_expires_at ? formatTimestamp(stackInfo.ttl_expires_at) : t('common.pending')}</span>
-                                        </p>
-                                    </div>
+                                {auth.user ? (
+                                    stackInfo ? (
+                                        <div className='mt-3 space-y-1.5 text-sm text-text-muted'>
+                                            <p>
+                                                {t('challenge.stackStatus')} <span className='text-text'>{stackInfo.status}</span>
+                                            </p>
+                                            <p>
+                                                {t('challenge.stackEndpoint')}{' '}
+                                                <span className='break-all text-text'>
+                                                    {stackInfo.node_public_ip && stackInfo.ports.length > 0 ? stackInfo.ports.map((port) => `${port.protocol} ${stackInfo.node_public_ip}:${port.node_port}`).join(', ') : t('common.pending')}
+                                                </span>
+                                            </p>
+                                            <p>
+                                                {t('challenge.stackPorts')}{' '}
+                                                <span className='text-text'>{stackInfo.ports.length > 0 ? stackInfo.ports.map((port) => `${port.container_port}/${port.protocol}`).join(', ') : t('common.pending')}</span>
+                                            </p>
+                                            <p>
+                                                {t('challenge.stackTtl')} <span className='text-text'>{stackInfo.ttl_expires_at ? formatTimestamp(stackInfo.ttl_expires_at) : t('common.pending')}</span>
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <p className='mt-3 text-sm text-text-muted'>{t('challenge.stackNoActive')}</p>
+                                    )
                                 ) : (
-                                    <p className='mt-3 text-sm text-text-muted'>{t('challenge.stackNoActive')}</p>
+                                    <p className='mt-3 text-sm text-warning'>
+                                        {t('challenge.stackLoginRequired')}{' '}
+                                        <a className='underline cursor-pointer' href='/login' onClick={(e) => navigate('/login', e)}>
+                                            {t('auth.loginLink')}
+                                        </a>
+                                    </p>
                                 )}
 
-                                <div className='mt-4 flex flex-wrap gap-2'>
-                                    {stackInfo ? (
-                                        <button className='rounded-lg border border-danger/20 px-3 py-2 text-sm text-danger hover:border-danger/40 disabled:opacity-60' onClick={deleteStack} disabled={stackLoading}>
-                                            {stackLoading ? t('challenge.stackWorking') : t('challenge.deleteStack')}
-                                        </button>
-                                    ) : (
-                                        <button className='rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent-strong disabled:opacity-60' onClick={createStack} disabled={stackLoading || challenge.is_solved}>
-                                            {stackLoading ? t('challenge.stackWorking') : t('challenge.createStack')}
-                                        </button>
-                                    )}
-                                </div>
+                                {auth.user ? (
+                                    <div className='mt-4 flex flex-wrap gap-2'>
+                                        {stackInfo ? (
+                                            <button className='rounded-lg border border-danger/20 px-3 py-2 text-sm text-danger hover:border-danger/40 disabled:opacity-60' onClick={deleteStack} disabled={stackLoading}>
+                                                {stackLoading ? t('challenge.stackWorking') : t('challenge.deleteStack')}
+                                            </button>
+                                        ) : (
+                                            <button className='rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent-strong disabled:opacity-60' onClick={createStack} disabled={stackLoading || challenge.is_solved}>
+                                                {stackLoading ? t('challenge.stackWorking') : t('challenge.createStack')}
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : null}
 
                                 {stackMessage ? <p className='mt-2 text-xs text-danger'>{stackMessage}</p> : null}
                             </div>
@@ -635,6 +652,16 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                     </button>
                                 </div>
 
+                                {!auth.user ? (
+                                    <p className='mt-2 text-xs text-warning'>
+                                        {t('challenge.loginToSubmitPrefix')}{' '}
+                                        <a className='underline cursor-pointer' href='/login' onClick={(e) => navigate('/login', e)}>
+                                            {t('auth.loginLink')}
+                                        </a>{' '}
+                                        {t('challenge.loginToSubmitSuffix')}
+                                    </p>
+                                ) : null}
+
                                 {submission.message && <p className={`mt-2 text-sm ${submission.status === 'success' ? 'text-success' : 'text-danger'}`}>{submission.message}</p>}
                             </form>
                         )}
@@ -663,7 +690,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                                     type='button'
                                                                     className='flex w-full min-w-0 flex-col items-center justify-end gap-2'
                                                                     onClick={() => void submitLevelVote(level)}
-                                                                    disabled={!challenge.is_solved || voteSubmitting}
+                                                                    disabled={!auth.user || !challenge.is_solved || voteSubmitting}
                                                                 >
                                                                     <div className='flex w-full items-end justify-center'>
                                                                         <div className={`w-3 rounded-full transition-all ${levelBarClass(level)} ${count > 0 ? 'opacity-100' : 'opacity-35'}`} style={{ height: `${height}px` }} />
@@ -682,6 +709,14 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                 </div>
                                             </div>
                                         </div>
+                                        {!auth.user ? (
+                                            <p className='mt-2 text-xs text-warning'>
+                                                {t('challenge.voteLoginRequired')}{' '}
+                                                <a className='underline cursor-pointer' href='/login' onClick={(e) => navigate('/login', e)}>
+                                                    {t('auth.loginLink')}
+                                                </a>
+                                            </p>
+                                        ) : null}
                                         {voteMessage ? <p className={`mt-2 text-xs ${voteMessage === t('challenge.voteSubmitted') ? 'text-success' : 'text-danger'}`}>{voteMessage}</p> : null}
                                     </div>
 

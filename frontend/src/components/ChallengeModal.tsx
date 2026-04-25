@@ -279,6 +279,11 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
                                 ) : null}
                             </div>
                             {!auth.user ? <p className='mt-2 text-xs text-warning'>{t('challenge.fileLoginRequired')}</p> : null}
+                            {!auth.user ? (
+                                <a className='mt-2 inline-block text-xs text-warning underline' href='/login' onClick={(e) => navigate('/login', e)}>
+                                    {t('auth.loginLink')}
+                                </a>
+                            ) : null}
                             {downloadMessage ? <p className='mt-2 text-xs text-danger'>{downloadMessage}</p> : null}
                         </div>
                     </div>
@@ -328,7 +333,12 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
                             </div>
 
                             {!auth.user ? (
-                                <p className='mt-2 text-xs text-warning'>{t('challenge.stackLoginRequired')}</p>
+                                <div className='mt-2 text-xs text-warning'>
+                                    <p>{t('challenge.stackLoginRequired')}</p>
+                                    <a className='mt-1 inline-block underline' href='/login' onClick={(e) => navigate('/login', e)}>
+                                        {t('auth.loginLink')}
+                                    </a>
+                                </div>
                             ) : isSolved ? (
                                 <p className='mt-2 text-xs text-text-subtle'>{t('challenge.stackSolvedNoNew')}</p>
                             ) : stackInfo ? (

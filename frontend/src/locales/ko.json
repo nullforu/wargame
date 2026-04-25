@@ -272,6 +272,7 @@
     "challenge.voteTitle": "레벨 투표",
     "challenge.voteEnabledHint": "문제 풀이를 완료한 후 피드백을 제출할 수 있습니다.",
     "challenge.voteDisabledHint": "문제를 해결해야 레벨 투표를 제출할 수 있습니다.",
+    "challenge.voteLoginRequired": "레벨 투표를 제출하려면 로그인이 필요합니다.",
     "challenge.voteResults": "투표 결과",
     "challenge.voteLogTitle": "전체 투표 로그",
     "challenge.voteLogEmpty": "아직 등록된 레벨 투표가 없습니다.",

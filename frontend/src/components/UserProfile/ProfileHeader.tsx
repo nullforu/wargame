@@ -17,7 +17,7 @@ const ProfileHeader = ({ user }: ProfileHeaderProps) => {
                 <UserAvatar username={user.username} size='lg' />
                 <div>
                     <h2 className='text-2xl text-text sm:text-3xl'>{user.username}</h2>
-                    <p className='mt-1 text-sm text-text-muted'>{user.affiliation ?? t('profile.noAffiliation')}</p>
+                    <p className='mt-1 text-sm text-text-muted'>{user.affiliation?.trim() ? user.affiliation : ''}</p>
                     {user.bio ? (
                         <p className='mt-1 max-w-xl text-sm text-text-subtle' style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                             {user.bio}

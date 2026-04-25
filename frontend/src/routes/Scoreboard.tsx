@@ -1,8 +1,6 @@
 import ScoreboardTimeline from '../components/ScoreboardTimeline'
 import LegacyLeaderboard from '../components/LegacyLeaderboard'
-import LoginRequired from '../components/LoginRequired'
 import { useT } from '../lib/i18n'
-import { useAuth } from '../lib/auth'
 
 interface RouteProps {
     routeParams?: Record<string, string>
@@ -11,11 +9,6 @@ interface RouteProps {
 const Scoreboard = ({ routeParams = {} }: RouteProps) => {
     void routeParams
     const t = useT()
-    const { state: auth } = useAuth()
-
-    if (!auth.user) {
-        return <LoginRequired title={t('scoreboard.title')} />
-    }
 
     return (
         <section className='animate space-y-4'>

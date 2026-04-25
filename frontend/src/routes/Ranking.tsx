@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import LoginRequired from '../components/LoginRequired'
 import ScoreboardTimeline from '../components/ScoreboardTimeline'
 import UserAvatar from '../components/UserAvatar'
-import { useAuth } from '../lib/auth'
 import { useApi } from '../lib/useApi'
 import { useT } from '../lib/i18n'
 import { formatApiError } from '../lib/utils'
@@ -36,7 +34,6 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
     void routeParams
     const t = useT()
     const api = useApi()
-    const { state: auth } = useAuth()
     const [userRows, setUserRows] = useState<UserRankingEntry[]>([])
     const [affiliationRows, setAffiliationRows] = useState<AffiliationRankingEntry[]>([])
     const [affiliationUserRows, setAffiliationUserRows] = useState<UserRankingEntry[]>([])
@@ -179,10 +176,6 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
         return affiliationUserErrorMessage || affiliationErrorMessage
     }, [activeTab, userErrorMessage, affiliationErrorMessage, affiliationUserErrorMessage])
 
-    if (!auth.user) {
-        return <LoginRequired title={t('ranking.title')} />
-    }
-
     return (
         <section className='animate space-y-4'>
             <h2 className='text-2xl font-semibold text-text'>{t('ranking.title')}</h2>
@@ -240,7 +233,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                             <UserAvatar username={row.username} size='sm' />
                                                             <div className='min-w-0 flex-1'>
                                                                 <p className='truncate text-sm text-text'>{row.username}</p>
-                                                                <p className='truncate text-xs text-text-subtle'>{row.affiliation_name ?? t('profile.noAffiliation')}</p>
+                                                                <p className='truncate text-xs text-text-subtle'>{row.affiliation_name?.trim() ? row.affiliation_name : ''}</p>
                                                                 <p className='truncate text-xs text-text-subtle'>{row.bio ?? t('profile.noBio')}</p>
                                                             </div>
                                                             <div className='w-full text-left sm:w-auto sm:text-right'>

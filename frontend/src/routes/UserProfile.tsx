@@ -60,6 +60,7 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     const activeStacks = useMemo(() => stacks.filter((stack) => !['stopped', 'failed', 'node_deleted'].includes(stack.status)), [stacks])
     const targetUserId = routeUserId ?? auth.user?.id ?? null
     const totalSolvedPoints = useMemo(() => solved.reduce((sum, item) => sum + item.points, 0), [solved])
+    const canViewProfile = routeUserId !== null || auth.user !== null
 
     const formatOptionalDateTime = useCallback((value?: string | null) => (value ? formatDateTime(value, localeTag) : t('common.na')), [localeTag, t])
 
@@ -269,7 +270,7 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
                 </div>
             ) : null}
 
-            {!auth.user ? (
+            {!canViewProfile ? (
                 <LoginRequired title={t('profile.title')} />
             ) : loading ? (
                 <div className='rounded-none border-0 bg-transparent p-3 shadow-none md:rounded-2xl md:border md:border-border md:bg-surface md:p-8'>

@@ -168,7 +168,7 @@ const AccountCard = ({
                                     onClick={() => onSelectedAffiliationIDChange(null)}
                                     disabled={savingAffiliation || loadingAffiliations}
                                 >
-                                    <span>{t('profile.noAffiliation')}</span>
+                                    <span />
                                 </button>
                                 {affiliations.map((item) => (
                                     <button
@@ -216,7 +216,7 @@ const AccountCard = ({
                         </div>
                     ) : (
                         <div className='flex items-center gap-2 self-start sm:self-auto'>
-                            <span>{user.affiliation ?? t('profile.noAffiliation')}</span>
+                            <span>{user.affiliation?.trim() ? user.affiliation : ''}</span>
                             <button className='text-xs text-accent hover:underline cursor-pointer' onClick={() => onEditingAffiliationChange(true)}>
                                 {t('profile.edit')}
                             </button>

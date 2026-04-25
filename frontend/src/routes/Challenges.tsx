@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatApiError } from '../lib/utils'
 import type { Challenge, PaginationMeta, ScoreEntry } from '../lib/types'
-import LoginRequired from '../components/LoginRequired'
 import { getCategoryKey, useT } from '../lib/i18n'
 import { useApi } from '../lib/useApi'
 import { CHALLENGE_CATEGORIES } from '../lib/constants'
-import { useAuth } from '../lib/auth'
 import { navigate } from '../lib/router'
 import UserAvatar from '../components/UserAvatar'
 import { levelBadgeClass, normalizeLevel } from '../lib/level'
@@ -71,7 +69,6 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
     void routeParams
     const t = useT()
     const api = useApi()
-    const { state: auth } = useAuth()
     const [challenges, setChallenges] = useState<Challenge[]>([])
     const [loading, setLoading] = useState(true)
     const [errorMessage, setErrorMessage] = useState('')
@@ -158,9 +155,8 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
     }
 
     useEffect(() => {
-        if (!auth.user) return
         void Promise.all([loadChallenges(page), loadTopUsers()])
-    }, [auth.user?.id, page, appliedSearch, categoryFilter, levelFilter, solveFilter, sortFilter])
+    }, [page, appliedSearch, categoryFilter, levelFilter, solveFilter, sortFilter])
 
     useEffect(() => {
         const onPopState = () => {
@@ -218,10 +214,6 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
             window.removeEventListener('keydown', onKeyDown)
         }
     }, [isSortMenuOpen])
-
-    if (!auth.user) {
-        return <LoginRequired title={t('challenges.title')} />
-    }
 
     return (
         <section className='animate space-y-4'>

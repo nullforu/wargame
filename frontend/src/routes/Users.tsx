@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import LoginRequired from '../components/LoginRequired'
 import type { PaginationMeta, UserListItem } from '../lib/types'
 import { formatApiError } from '../lib/utils'
 import { navigate } from '../lib/router'
 import { getRoleKey, useT } from '../lib/i18n'
 import { useApi } from '../lib/useApi'
-import { useAuth } from '../lib/auth'
 import UserAvatar from '../components/UserAvatar'
 
 interface RouteProps {
@@ -23,7 +21,6 @@ const Users = ({ routeParams = {} }: RouteProps) => {
     void routeParams
     const t = useT()
     const api = useApi()
-    const { state: auth } = useAuth()
     const [users, setUsers] = useState<UserListItem[]>([])
     const [loading, setLoading] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
@@ -55,7 +52,6 @@ const Users = ({ routeParams = {} }: RouteProps) => {
     }
 
     const loadUsers = async () => {
-        if (!auth.user) return
         setLoading(true)
         setErrorMessage('')
 
@@ -75,9 +71,8 @@ const Users = ({ routeParams = {} }: RouteProps) => {
     const sortedUsers = useMemo(() => [...users].sort((a, b) => a.id - b.id), [users])
 
     useEffect(() => {
-        if (!auth.user) return
         void loadUsers()
-    }, [auth.user, page, appliedSearch])
+    }, [page, appliedSearch])
 
     useEffect(() => {
         const onPopState = () => {
@@ -89,10 +84,6 @@ const Users = ({ routeParams = {} }: RouteProps) => {
         window.addEventListener('popstate', onPopState)
         return () => window.removeEventListener('popstate', onPopState)
     }, [])
-
-    if (!auth.user) {
-        return <LoginRequired title={t('users.title')} />
-    }
 
     return (
         <section className='animate space-y-4'>
@@ -152,7 +143,7 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                                                 <p className='mt-1 text-xs text-text-muted'>
                                                     #{user.id} · {t(getRoleKey(user.role))}
                                                 </p>
-                                                <p className='mt-1 truncate text-xs text-text-subtle'>{user.affiliation ?? t('profile.noAffiliation')}</p>
+                                                <p className='mt-1 truncate text-xs text-text-subtle'>{user.affiliation?.trim() ? user.affiliation : ''}</p>
                                                 <p className='truncate text-xs text-text-subtle'>{user.bio ?? t('profile.noBio')}</p>
                                             </div>
                                         </div>
@@ -187,7 +178,7 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                                         <UserAvatar username={user.username} size='sm' />
                                         <div className='min-w-0 pr-3'>
                                             <p className='truncate text-sm text-text dark:text-text'>{user.username}</p>
-                                            <p className='truncate text-xs text-text-subtle'>{user.affiliation ?? t('profile.noAffiliation')}</p>
+                                            <p className='truncate text-xs text-text-subtle'>{user.affiliation?.trim() ? user.affiliation : ''}</p>
                                             <p className='truncate text-xs text-text-subtle'>{user.bio ?? t('profile.noBio')}</p>
                                         </div>
                                     </div>
