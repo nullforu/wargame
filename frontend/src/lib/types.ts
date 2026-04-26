@@ -242,6 +242,43 @@ export interface ChallengeSolversResponse {
     pagination: PaginationMeta
 }
 
+export interface WriteupAuthor {
+    user_id: number
+    username: string
+    affiliation_id?: number | null
+    affiliation?: string | null
+    bio?: string | null
+}
+
+export interface WriteupChallenge {
+    id: number
+    title: string
+    category: string
+    points: number
+    level: number
+}
+
+export interface Writeup {
+    id: number
+    content?: string | null
+    created_at: string
+    updated_at: string
+    author: WriteupAuthor
+    challenge: WriteupChallenge
+    is_mine: boolean
+}
+
+export interface ChallengeWriteupsResponse {
+    writeups: Writeup[]
+    can_view_content: boolean
+    pagination: PaginationMeta
+}
+
+export interface WriteupDetailResponse {
+    writeup: Writeup
+    can_view_content: boolean
+}
+
 export interface LeaderboardChallenge {
     id: number
     title: string

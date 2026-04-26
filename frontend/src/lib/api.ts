@@ -10,6 +10,7 @@ import type {
     ChallengeFileUploadResponse,
     ChallengeMyVoteResponse,
     ChallengeVotesResponse,
+    ChallengeWriteupsResponse,
     AdminChallengeDetail,
     AdminStackDeleteResponse,
     AdminStackListItem,
@@ -32,6 +33,8 @@ import type {
     UserDetail,
     UserRankingResponse,
     UsersResponse,
+    Writeup,
+    WriteupDetailResponse,
 } from './types'
 import type { AuthState } from './auth'
 
@@ -346,6 +349,46 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
                 pagination: normalizePagination(data?.pagination),
             } as ChallengeVotesResponse
         },
+        challengeWriteups: async (id: number, page?: number, pageSize?: number) => {
+            const data = await request<Partial<ChallengeWriteupsResponse>>(withPagination(`/api/challenges/${id}/writeups`, page, pageSize), { auth: true })
+            return {
+                writeups: Array.isArray(data?.writeups) ? data.writeups : [],
+                can_view_content: Boolean(data?.can_view_content),
+                pagination: normalizePagination(data?.pagination),
+            } as ChallengeWriteupsResponse
+        },
+        writeup: async (id: number) => {
+            const data = await request<Partial<WriteupDetailResponse>>(`/api/writeups/${id}`, { auth: true })
+            return {
+                writeup: data?.writeup as Writeup,
+                can_view_content: Boolean(data?.can_view_content),
+            } as WriteupDetailResponse
+        },
+        createWriteup: (challengeID: number, content: string) =>
+            request<Writeup>(`/api/challenges/${challengeID}/writeups`, {
+                method: 'POST',
+                body: { content },
+                auth: true,
+            }),
+        updateWriteup: (writeupID: number, payload: { content?: string }) =>
+            request<Writeup>(`/api/writeups/${writeupID}`, {
+                method: 'PATCH',
+                body: payload,
+                auth: true,
+            }),
+        deleteWriteup: (writeupID: number) =>
+            request<{ status?: string }>(`/api/writeups/${writeupID}`, {
+                method: 'DELETE',
+                auth: true,
+            }),
+        myWriteups: async (page?: number, pageSize?: number) => {
+            const data = await request<Partial<ChallengeWriteupsResponse>>(withPagination(`/api/me/writeups`, page, pageSize), { auth: true })
+            return {
+                writeups: Array.isArray(data?.writeups) ? data.writeups : [],
+                can_view_content: true,
+                pagination: normalizePagination(data?.pagination),
+            } as ChallengeWriteupsResponse
+        },
         challengeMyVote: async (id: number) => {
             const data = await request<Partial<ChallengeMyVoteResponse>>(`/api/challenges/${id}/my-vote`, { auth: true })
             return {
@@ -485,6 +528,14 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
                 solved: Array.isArray(data?.solved) ? data.solved : [],
                 pagination: normalizePagination(data?.pagination),
             } as UserSolvedResponse
+        },
+        userWriteups: async (id: number, page?: number, pageSize?: number) => {
+            const data = await request<Partial<ChallengeWriteupsResponse>>(withPagination(`/api/users/${id}/writeups`, page, pageSize), { auth: true })
+            return {
+                writeups: Array.isArray(data?.writeups) ? data.writeups : [],
+                can_view_content: Boolean(data?.can_view_content),
+                pagination: normalizePagination(data?.pagination),
+            } as ChallengeWriteupsResponse
         },
     }
 }

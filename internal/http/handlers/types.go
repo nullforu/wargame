@@ -109,6 +109,14 @@ type levelVoteRequest struct {
 	Level int `json:"level" binding:"required"`
 }
 
+type createWriteupRequest struct {
+	Content string `json:"content" binding:"required"`
+}
+
+type updateWriteupRequest struct {
+	Content optionalString `json:"content"`
+}
+
 type adminBlockUserRequest struct {
 	Reason string `json:"reason" binding:"required"`
 }
@@ -251,6 +259,43 @@ type challengeSolverResponse struct {
 type challengeSolversResponse struct {
 	Solvers    []challengeSolverResponse `json:"solvers,omitempty"`
 	Pagination models.Pagination         `json:"pagination"`
+}
+
+type writeupAuthorResponse struct {
+	UserID        int64   `json:"user_id"`
+	Username      string  `json:"username"`
+	AffiliationID *int64  `json:"affiliation_id,omitempty"`
+	Affiliation   *string `json:"affiliation,omitempty"`
+	Bio           *string `json:"bio,omitempty"`
+}
+
+type writeupChallengeResponse struct {
+	ID       int64  `json:"id"`
+	Title    string `json:"title"`
+	Category string `json:"category"`
+	Points   int    `json:"points"`
+	Level    int    `json:"level"`
+}
+
+type writeupResponse struct {
+	ID        int64                    `json:"id"`
+	Content   *string                  `json:"content,omitempty"`
+	CreatedAt time.Time                `json:"created_at"`
+	UpdatedAt time.Time                `json:"updated_at"`
+	Author    writeupAuthorResponse    `json:"author"`
+	Challenge writeupChallengeResponse `json:"challenge"`
+	IsMine    bool                     `json:"is_mine"`
+}
+
+type writeupsListResponse struct {
+	Writeups       []writeupResponse `json:"writeups,omitempty"`
+	CanViewContent bool              `json:"can_view_content"`
+	Pagination     models.Pagination `json:"pagination"`
+}
+
+type writeupDetailResponse struct {
+	Writeup        writeupResponse `json:"writeup"`
+	CanViewContent bool            `json:"can_view_content"`
 }
 
 type adminChallengeResponse struct {
@@ -458,5 +503,35 @@ func newChallengeCreatorResponse(challenge *models.Challenge) *challengeCreatorR
 		AffiliationID: challenge.CreatedByAffiliationID,
 		Affiliation:   challenge.CreatedByAffiliation,
 		Bio:           challenge.CreatedByBio,
+	}
+}
+
+func newWriteupResponse(row models.WriteupDetail, includeContent bool, isMine bool) writeupResponse {
+	content := (*string)(nil)
+	if includeContent {
+		value := row.Content
+		content = &value
+	}
+
+	return writeupResponse{
+		ID:        row.ID,
+		Content:   content,
+		CreatedAt: row.CreatedAt.UTC(),
+		UpdatedAt: row.UpdatedAt.UTC(),
+		Author: writeupAuthorResponse{
+			UserID:        row.UserID,
+			Username:      row.Username,
+			AffiliationID: row.AffiliationID,
+			Affiliation:   row.Affiliation,
+			Bio:           row.Bio,
+		},
+		Challenge: writeupChallengeResponse{
+			ID:       row.ChallengeID,
+			Title:    row.ChallengeTitle,
+			Category: row.ChallengeCategory,
+			Points:   row.ChallengePoints,
+			Level:    row.ChallengeLevel,
+		},
+		IsMine: isMine,
 	}
 }

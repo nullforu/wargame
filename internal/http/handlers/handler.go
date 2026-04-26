@@ -315,6 +315,26 @@ func (h *Handler) Me(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
 }
 
+func (h *Handler) MyWriteups(ctx *gin.Context) {
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	rows, pagination, err := h.wargame.MyWriteupsPage(ctx.Request.Context(), middleware.UserID(ctx), page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]writeupResponse, 0, len(rows))
+	for _, row := range rows {
+		resp = append(resp, newWriteupResponse(row, true, true))
+	}
+
+	ctx.JSON(http.StatusOK, writeupsListResponse{Writeups: resp, CanViewContent: true, Pagination: pagination})
+}
+
 func (h *Handler) UpdateMe(ctx *gin.Context) {
 	var req meUpdateRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -508,6 +528,112 @@ func (h *Handler) ChallengeSolvers(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, challengeSolversResponse{Solvers: solvers, Pagination: pagination})
+}
+
+func (h *Handler) ChallengeWriteups(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	viewerID := h.optionalUserID(ctx)
+	rows, pagination, canViewContent, err := h.wargame.ChallengeWriteupsPage(ctx.Request.Context(), challengeID, viewerID, page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]writeupResponse, 0, len(rows))
+	for _, row := range rows {
+		isMine := viewerID > 0 && row.UserID == viewerID
+		resp = append(resp, newWriteupResponse(row, canViewContent, isMine))
+	}
+
+	ctx.JSON(http.StatusOK, writeupsListResponse{Writeups: resp, CanViewContent: canViewContent, Pagination: pagination})
+}
+
+func (h *Handler) GetWriteup(ctx *gin.Context) {
+	writeupID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	viewerID := h.optionalUserID(ctx)
+	row, canViewContent, err := h.wargame.GetWriteupByID(ctx.Request.Context(), writeupID, viewerID)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	isMine := viewerID > 0 && row.UserID == viewerID
+	ctx.JSON(http.StatusOK, writeupDetailResponse{Writeup: newWriteupResponse(*row, canViewContent, isMine), CanViewContent: canViewContent})
+}
+
+func (h *Handler) CreateWriteup(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req createWriteupRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	row, err := h.wargame.CreateWriteup(ctx.Request.Context(), middleware.UserID(ctx), challengeID, req.Content)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, newWriteupResponse(*row, true, true))
+}
+
+func (h *Handler) UpdateWriteup(ctx *gin.Context) {
+	writeupID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req updateWriteupRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	content, err := requireNonNullOptionalString("content", req.Content)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	row, err := h.wargame.UpdateWriteup(ctx.Request.Context(), middleware.UserID(ctx), writeupID, content)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newWriteupResponse(*row, true, true))
+}
+
+func (h *Handler) DeleteWriteup(ctx *gin.Context) {
+	writeupID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.wargame.DeleteWriteup(ctx.Request.Context(), middleware.UserID(ctx), writeupID); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 func (h *Handler) SubmitFlag(ctx *gin.Context) {
@@ -1198,6 +1324,43 @@ func (h *Handler) GetUserSolved(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, userSolvedListResponse{Solved: rows, Pagination: pagination})
+}
+
+func (h *Handler) GetUserWriteups(ctx *gin.Context) {
+	userID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	if _, err := h.users.GetByID(ctx.Request.Context(), userID); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	viewerID := h.optionalUserID(ctx)
+	rows, pagination, err := h.wargame.UserWriteupsPage(ctx.Request.Context(), userID, viewerID, page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]writeupResponse, 0, len(rows))
+	canViewAnyContent := false
+	for _, row := range rows {
+		isMine := viewerID > 0 && row.UserID == viewerID
+		includeContent := row.Content != ""
+		if includeContent {
+			canViewAnyContent = true
+		}
+		resp = append(resp, newWriteupResponse(row, includeContent, isMine))
+	}
+
+	ctx.JSON(http.StatusOK, writeupsListResponse{Writeups: resp, CanViewContent: canViewAnyContent, Pagination: pagination})
 }
 
 func (h *Handler) AdminBlockUser(ctx *gin.Context) {

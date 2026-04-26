@@ -11,6 +11,8 @@ import Users from './routes/Users'
 import UserProfile from './routes/UserProfile'
 import Admin from './routes/Admin'
 import NotFound from './routes/NotFound'
+import WriteupDetail from './routes/WriteupDetail'
+import WriteupEditor from './routes/WriteupEditor'
 import { useAuth } from './lib/auth'
 import { useApi } from './lib/useApi'
 import { useLocale, useT } from './lib/i18n'
@@ -41,10 +43,26 @@ const dynamicRoutes: Array<{
     extractParams: (path: string) => Record<string, string>
 }> = [
     {
+        pattern: /^\/challenges\/(\d+)\/writeup$/,
+        component: WriteupEditor,
+        extractParams: (path) => {
+            const match = path.match(/^\/challenges\/(\d+)\/writeup$/)
+            return match ? { id: match[1] } : { id: '' }
+        },
+    },
+    {
         pattern: /^\/challenges\/(\d+)$/,
         component: ChallengeDetail,
         extractParams: (path) => {
             const match = path.match(/^\/challenges\/(\d+)$/)
+            return match ? { id: match[1] } : { id: '' }
+        },
+    },
+    {
+        pattern: /^\/writeups\/(\d+)$/,
+        component: WriteupDetail,
+        extractParams: (path) => {
+            const match = path.match(/^\/writeups\/(\d+)$/)
             return match ? { id: match[1] } : { id: '' }
         },
     },

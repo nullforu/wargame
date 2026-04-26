@@ -6,7 +6,7 @@
 
 BEGIN;
 
-TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE;
+TRUNCATE TABLE challenge_votes, writeups, submissions, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE;
 
 INSERT INTO affiliations (id, name, created_at, updated_at)
 VALUES

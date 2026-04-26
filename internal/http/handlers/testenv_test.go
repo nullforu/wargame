@@ -200,6 +200,7 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 	challengeRepo := repo.NewChallengeRepo(handlerDB)
 	submissionRepo := repo.NewSubmissionRepo(handlerDB)
 	voteRepo := repo.NewChallengeVoteRepo(handlerDB)
+	writeupRepo := repo.NewWriteupRepo(handlerDB)
 	scoreRepo := repo.NewScoreboardRepo(handlerDB)
 	stackRepo := repo.NewStackRepo(handlerDB)
 
@@ -209,7 +210,7 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	authSvc := service.NewAuthService(handlerCfg, userRepo, handlerRedis)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
-	wargameSvc := service.NewWargameService(handlerCfg, challengeRepo, submissionRepo, voteRepo, handlerRedis, fileStore)
+	wargameSvc := service.NewWargameService(handlerCfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, handlerRedis, fileStore)
 	stackSvc := service.NewStackService(handlerCfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, handlerRedis)
 
 	handler := New(handlerCfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, handlerRedis)
@@ -237,7 +238,7 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 func resetHandlerState(t *testing.T) {
 	t.Helper()
 
-	if _, err := handlerDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_votes, submissions, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := handlerDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_votes, writeups, submissions, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
