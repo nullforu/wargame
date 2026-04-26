@@ -13,6 +13,7 @@ interface RouteProps {
 
 const PAGE_SIZE = 20
 const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: PAGE_SIZE, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
+const RANKING_SKELETON_ROWS = 5
 type RankingTabId = 'overall' | 'affiliations'
 const TAB_PARAM = 'tab'
 const RANKING_TAB_IDS: RankingTabId[] = ['overall', 'affiliations']
@@ -216,7 +217,22 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                     <h3 className='text-lg text-text'>{t('ranking.usersTitle')}</h3>
                                 </div>
                                 {loadingUsers ? (
-                                    <p className='text-sm text-text-muted'>{t('common.loading')}</p>
+                                    <div className='space-y-2'>
+                                        {Array.from({ length: RANKING_SKELETON_ROWS }, (_, idx) => (
+                                            <div key={`ranking-user-skeleton-${idx}`} className='flex w-full flex-wrap items-center gap-3 rounded-md px-3 py-2.5 sm:flex-nowrap'>
+                                                <div className='h-7 min-w-9 rounded-full bg-surface-muted animate-pulse' />
+                                                <div className='h-8 w-8 rounded-full bg-surface-muted animate-pulse' />
+                                                <div className='min-w-0 flex-1 space-y-2'>
+                                                    <div className='h-4 w-28 rounded bg-surface-muted animate-pulse' />
+                                                    <div className='h-3 w-36 rounded bg-surface-muted animate-pulse' />
+                                                </div>
+                                                <div className='w-full space-y-2 sm:w-24'>
+                                                    <div className='h-4 w-20 rounded bg-surface-muted animate-pulse' />
+                                                    <div className='h-3 w-16 rounded bg-surface-muted animate-pulse' />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 ) : (
                                     <>
                                         <div className='space-y-2'>
@@ -275,7 +291,21 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                     <h3 className='text-lg text-text'>{t('ranking.affiliationsTitle')}</h3>
                                 </div>
                                 {loadingAffiliations ? (
-                                    <p className='text-sm text-text-muted'>{t('common.loading')}</p>
+                                    <div className='space-y-2'>
+                                        {Array.from({ length: RANKING_SKELETON_ROWS }, (_, idx) => (
+                                            <div key={`ranking-affiliation-skeleton-${idx}`} className='flex w-full flex-wrap items-center gap-3 rounded-md px-3 py-2.5 sm:flex-nowrap'>
+                                                <div className='h-7 min-w-9 rounded-full bg-surface-muted animate-pulse' />
+                                                <div className='min-w-0 flex-1 space-y-2'>
+                                                    <div className='h-4 w-40 rounded bg-surface-muted animate-pulse' />
+                                                    <div className='h-3 w-24 rounded bg-surface-muted animate-pulse' />
+                                                </div>
+                                                <div className='w-full space-y-2 sm:w-24'>
+                                                    <div className='h-4 w-20 rounded bg-surface-muted animate-pulse' />
+                                                    <div className='h-3 w-16 rounded bg-surface-muted animate-pulse' />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 ) : (
                                     <>
                                         <div className='space-y-2'>
@@ -340,7 +370,22 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                         <h3 className='text-lg text-text'>{t('ranking.affiliationUsersTitle', { name: selectedTitle })}</h3>
                                     </div>
                                     {loadingAffiliationUsers ? (
-                                        <p className='text-sm text-text-muted'>{t('common.loading')}</p>
+                                        <div className='space-y-2'>
+                                            {Array.from({ length: RANKING_SKELETON_ROWS }, (_, idx) => (
+                                                <div key={`ranking-affiliation-user-skeleton-${idx}`} className='flex w-full flex-wrap items-center gap-3 rounded-md px-3 py-2.5 sm:flex-nowrap'>
+                                                    <div className='h-7 min-w-9 rounded-full bg-surface-muted animate-pulse' />
+                                                    <div className='h-8 w-8 rounded-full bg-surface-muted animate-pulse' />
+                                                    <div className='min-w-0 flex-1 space-y-2'>
+                                                        <div className='h-4 w-32 rounded bg-surface-muted animate-pulse' />
+                                                        <div className='h-3 w-24 rounded bg-surface-muted animate-pulse' />
+                                                    </div>
+                                                    <div className='w-full space-y-2 sm:w-24'>
+                                                        <div className='h-4 w-20 rounded bg-surface-muted animate-pulse' />
+                                                        <div className='h-3 w-16 rounded bg-surface-muted animate-pulse' />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     ) : (
                                         <>
                                             <div className='space-y-2'>

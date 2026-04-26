@@ -400,8 +400,31 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
 
     if (loading) {
         return (
-            <section className='animate'>
-                <div className='border border-border bg-surface p-8 text-sm text-text-muted'>{t('common.loading')}</div>
+            <section className='animate space-y-4 px-0 sm:px-1 md:px-2 lg:px-0'>
+                <div className='grid items-start gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(320px,0.92fr)]'>
+                    <div className='min-w-0 space-y-4'>
+                        <div className='rounded-2xl sm:p-5'>
+                            <div className='animate-pulse space-y-4'>
+                                <div className='h-5 w-40 rounded bg-surface-muted' />
+                                <div className='space-y-2'>
+                                    <div className='h-4 w-full rounded bg-surface-muted' />
+                                    <div className='h-4 w-11/12 rounded bg-surface-muted' />
+                                    <div className='h-4 w-4/5 rounded bg-surface-muted' />
+                                </div>
+                                <div className='mt-8 h-10 w-full rounded bg-surface-muted' />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className='hidden lg:block'>
+                        <div className='rounded-2xl border border-border bg-surface p-5 animate-pulse space-y-3'>
+                            <div className='h-4 w-28 rounded bg-surface-muted' />
+                            <div className='h-8 w-full rounded bg-surface-muted' />
+                            <div className='h-8 w-full rounded bg-surface-muted' />
+                            <div className='h-20 w-full rounded bg-surface-muted' />
+                        </div>
+                    </div>
+                </div>
             </section>
         )
     }

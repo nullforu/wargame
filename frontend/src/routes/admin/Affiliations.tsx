@@ -6,6 +6,7 @@ import type { Affiliation, PaginationMeta } from '../../lib/types'
 import FormMessage from '../../components/FormMessage'
 
 const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: 20, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
+const AFFILIATION_SKELETON_ROWS = 5
 
 const AdminAffiliations = () => {
     const t = useT()
@@ -91,7 +92,20 @@ const AdminAffiliations = () => {
             {successMessage ? <FormMessage variant='success' message={successMessage} /> : null}
 
             {loading ? (
-                <p className='text-sm text-text-muted'>{t('common.loading')}</p>
+                <div className='rounded-lg border border-border bg-surface'>
+                    <div className='grid grid-cols-[80px_minmax(0,1fr)] gap-3 border-b border-border bg-surface-muted px-4 py-2 text-xs text-text-muted'>
+                        <span>{t('common.id')}</span>
+                        <span>{t('common.affiliation')}</span>
+                    </div>
+                    <div className='divide-y divide-border/70'>
+                        {Array.from({ length: AFFILIATION_SKELETON_ROWS }, (_, idx) => (
+                            <div key={`admin-affiliation-skeleton-${idx}`} className='grid grid-cols-[80px_minmax(0,1fr)] gap-3 px-4 py-3'>
+                                <div className='h-3 w-8 rounded bg-surface-muted animate-pulse' />
+                                <div className='h-4 w-2/3 rounded bg-surface-muted animate-pulse' />
+                            </div>
+                        ))}
+                    </div>
+                </div>
             ) : (
                 <div className='rounded-lg border border-border bg-surface'>
                     <div className='grid grid-cols-[80px_minmax(0,1fr)] gap-3 border-b border-border bg-surface-muted px-4 py-2 text-xs text-text-muted'>

@@ -12,6 +12,7 @@ interface RouteProps {
 
 const PAGE_SIZE = 20
 const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: PAGE_SIZE, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
+const USER_SKELETON_ROWS = 5
 const parsePositiveInt = (value: string | null, fallback: number) => {
     const parsed = Number(value)
     return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
@@ -128,7 +129,48 @@ const Users = ({ routeParams = {} }: RouteProps) => {
             </div>
 
             <div className='-mx-4 md:mx-0 overflow-hidden rounded-none md:rounded-xl bg-transparent md:bg-surface md:shadow-sm'>
-                {loading ? <p className='px-4 py-8 text-sm text-text-muted dark:text-text-muted'>{t('common.loading')}</p> : null}
+                {loading ? (
+                    <>
+                        <div className='divide-y divide-border/60 md:hidden'>
+                            {Array.from({ length: USER_SKELETON_ROWS }, (_, idx) => (
+                                <div key={`users-mobile-skeleton-${idx}`} className='px-4 py-3'>
+                                    <div className='flex items-center justify-between gap-3 animate-pulse'>
+                                        <div className='min-w-0 flex items-center gap-3.75'>
+                                            <div className='h-10 w-10 shrink-0 rounded-full bg-surface-muted' />
+                                            <div className='min-w-0 space-y-2'>
+                                                <div className='h-4 w-28 rounded bg-surface-muted' />
+                                                <div className='h-4 w-16 rounded bg-surface-muted' />
+                                                <div className='h-3 w-32 rounded bg-surface-muted' />
+                                                <div className='h-3 w-40 rounded bg-surface-muted' />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className='hidden md:block'>
+                            <div className='grid grid-cols-[80px_minmax(0,1fr)_180px] bg-surface-muted px-4 py-3 text-[12px] text-text-muted dark:bg-surface-muted dark:text-text-muted'>
+                                <p className='font-medium'>{t('common.id')}</p>
+                                <p className='font-medium'>{t('common.username')}</p>
+                                <p className='font-medium'>{t('common.role')}</p>
+                            </div>
+                            {Array.from({ length: USER_SKELETON_ROWS }, (_, idx) => (
+                                <div key={`users-desktop-skeleton-${idx}`} className='grid grid-cols-[80px_minmax(0,1fr)_180px] items-center px-4 py-4'>
+                                    <div className='h-3 w-10 rounded bg-surface-muted animate-pulse' />
+                                    <div className='flex items-center gap-3.75'>
+                                        <div className='h-8 w-8 shrink-0 rounded-full bg-surface-muted animate-pulse' />
+                                        <div className='min-w-0 flex-1 space-y-2'>
+                                            <div className='h-3 w-24 rounded bg-surface-muted animate-pulse' />
+                                            <div className='h-3 w-36 rounded bg-surface-muted animate-pulse' />
+                                        </div>
+                                    </div>
+                                    <div className='h-4 w-14 rounded bg-surface-muted animate-pulse' />
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                ) : null}
                 {!loading && errorMessage ? <p className='px-4 py-8 text-sm text-danger'>{errorMessage}</p> : null}
                 {!loading && !errorMessage ? (
                     <>

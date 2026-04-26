@@ -15,6 +15,7 @@ interface RouteProps {
 
 const PAGE_SIZE = 20
 const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: PAGE_SIZE, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
+const CHALLENGE_SKELETON_ROWS = 5
 
 type SolveFilter = 'all' | 'solved' | 'unsolved'
 type SortFilter = 'latest' | 'oldest' | 'most_solved' | 'least_solved'
@@ -443,7 +444,52 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
 
                     <div className='-mx-4 md:mx-0 overflow-visible md:overflow-hidden rounded-none md:rounded-xl bg-transparent'>
                         {loading ? (
-                            <div className='px-4 py-8 text-sm text-text-muted'>{t('common.loading')}</div>
+                            <>
+                                <div className='space-y-2 px-4 md:hidden'>
+                                    {Array.from({ length: CHALLENGE_SKELETON_ROWS }, (_, idx) => (
+                                        <div key={`challenge-mobile-skeleton-${idx}`} className='w-full rounded-xl border border-border/60 bg-surface p-3'>
+                                            <div className='flex items-start gap-3 animate-pulse'>
+                                                <div className='h-8 w-8 shrink-0 rounded-full bg-surface-muted' />
+                                                <div className='min-w-0 flex-1 space-y-2'>
+                                                    <div className='h-4 w-3/5 rounded bg-surface-muted' />
+                                                    <div className='h-3 w-1/3 rounded bg-surface-muted' />
+                                                    <div className='mt-1 flex flex-wrap gap-x-4 gap-y-1'>
+                                                        <div className='h-3 w-20 rounded bg-surface-muted' />
+                                                        <div className='h-3 w-28 rounded bg-surface-muted' />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className='hidden overflow-x-auto md:block'>
+                                    <div className='min-w-150'>
+                                        <div className='grid grid-cols-[minmax(160px,2fr)_1fr_70px_100px] sm:grid-cols-[minmax(200px,2fr)_1fr_80px_110px] lg:grid-cols-[minmax(220px,2fr)_1fr_90px_120px] bg-surface px-4 py-2 text-[12px] text-text-muted'>
+                                            <span>{t('challenges.tableProblem')}</span>
+                                            <span>{t('common.category')}</span>
+                                            <span>{t('challenges.tableSolveCount')}</span>
+                                            <span>{t('challenges.tableAuthor')}</span>
+                                        </div>
+                                        <div>
+                                            {Array.from({ length: CHALLENGE_SKELETON_ROWS }, (_, idx) => (
+                                                <div
+                                                    key={`challenge-desktop-skeleton-${idx}`}
+                                                    className='grid w-full grid-cols-[minmax(160px,2fr)_1fr_70px_100px] sm:grid-cols-[minmax(200px,2fr)_1fr_80px_110px] lg:grid-cols-[minmax(220px,2fr)_1fr_90px_120px] items-center px-4 py-3'
+                                                >
+                                                    <div className='min-w-0 flex items-center gap-3 animate-pulse'>
+                                                        <div className='h-8 w-8 shrink-0 rounded-full bg-surface-muted' />
+                                                        <div className='h-4 w-2/3 rounded bg-surface-muted' />
+                                                    </div>
+                                                    <div className='h-3 w-2/5 rounded bg-surface-muted animate-pulse' />
+                                                    <div className='h-3 w-10 rounded bg-surface-muted animate-pulse' />
+                                                    <div className='h-3 w-4/5 rounded bg-surface-muted animate-pulse' />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
                         ) : errorMessage ? (
                             <div className='px-4 py-8 text-sm text-danger'>{errorMessage}</div>
                         ) : challenges.length === 0 ? (

@@ -5,6 +5,8 @@ import { formatApiError, formatDateTime } from '../../lib/utils'
 import { getLocaleTag, useLocale, useT } from '../../lib/i18n'
 import FormMessage from '../../components/FormMessage'
 
+const STACK_SKELETON_ROWS = 5
+
 const AdminStacks = () => {
     const t = useT()
     const api = useApi()
@@ -123,7 +125,47 @@ const AdminStacks = () => {
             {successMessage ? <FormMessage variant='success' message={successMessage} /> : null}
 
             {loading ? (
-                <p className='text-sm text-text-muted'>{t('admin.stacks.loading')}</p>
+                <div className='-mx-4 space-y-2 px-4 md:mx-0 md:space-y-0 md:px-0'>
+                    <div className='space-y-2 md:hidden'>
+                        {Array.from({ length: STACK_SKELETON_ROWS }, (_, idx) => (
+                            <div key={`admin-stacks-mobile-skeleton-${idx}`} className='rounded-xl border border-border/70 bg-surface p-3'>
+                                <div className='animate-pulse space-y-2'>
+                                    <div className='h-3 w-32 rounded bg-surface-muted' />
+                                    <div className='h-4 w-2/3 rounded bg-surface-muted' />
+                                    <div className='h-3 w-1/2 rounded bg-surface-muted' />
+                                    <div className='h-8 w-full rounded bg-surface-muted' />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className='hidden overflow-visible rounded-none bg-transparent md:block md:overflow-hidden md:rounded-xl md:bg-surface md:shadow-sm'>
+                        <div className='overflow-x-auto'>
+                            <div className='min-w-280'>
+                                <div className='grid min-w-280 grid-cols-[150px_minmax(170px,1fr)_170px_160px_160px_160px_120px] bg-surface-muted px-6 py-3 text-[12px] text-text-muted'>
+                                    <p className='font-medium whitespace-nowrap'>{t('common.id')}</p>
+                                    <p className='font-medium whitespace-nowrap'>{t('admin.stacks.challengeLabel')}</p>
+                                    <p className='font-medium whitespace-nowrap'>{t('admin.stacks.userLabel')}</p>
+                                    <p className='font-medium whitespace-nowrap'>{t('admin.stacks.ttlLabel')}</p>
+                                    <p className='font-medium whitespace-nowrap'>{t('common.createdAt')}</p>
+                                    <p className='font-medium whitespace-nowrap'>{t('common.updatedAt')}</p>
+                                    <p className='font-medium whitespace-nowrap'>{t('common.action')}</p>
+                                </div>
+                                {Array.from({ length: STACK_SKELETON_ROWS }, (_, idx) => (
+                                    <div key={`admin-stacks-desktop-skeleton-${idx}`} className='grid min-w-280 grid-cols-[150px_minmax(170px,1fr)_170px_160px_160px_160px_120px] items-start px-6 py-4'>
+                                        <div className='h-3 w-24 rounded bg-surface-muted animate-pulse' />
+                                        <div className='h-4 w-2/3 rounded bg-surface-muted animate-pulse' />
+                                        <div className='h-3 w-1/2 rounded bg-surface-muted animate-pulse' />
+                                        <div className='h-3 w-16 rounded bg-surface-muted animate-pulse' />
+                                        <div className='h-3 w-16 rounded bg-surface-muted animate-pulse' />
+                                        <div className='h-3 w-16 rounded bg-surface-muted animate-pulse' />
+                                        <div className='h-7 w-full rounded bg-surface-muted animate-pulse' />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             ) : stacks.length === 0 ? (
                 <p className='text-sm text-text-muted'>{t('admin.stacks.noStacks')}</p>
             ) : (

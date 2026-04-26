@@ -178,7 +178,12 @@ const AccountCard = ({
                                 ))}
                                 {!loadingAffiliations && affiliations.length === 0 ? <p className='px-3 py-2 text-xs text-text-subtle'>{t('profile.affiliationSearchEmpty')}</p> : null}
                             </div>
-                            {loadingAffiliations ? <p className='text-xs text-text-subtle'>{t('common.loading')}</p> : null}
+                            {loadingAffiliations ? (
+                                <div className='space-y-1 animate-pulse'>
+                                    <div className='h-3 w-24 rounded bg-surface-muted' />
+                                    <div className='h-3 w-32 rounded bg-surface-muted' />
+                                </div>
+                            ) : null}
                             <div className='flex items-center justify-between text-xs text-text-subtle'>
                                 <button
                                     type='button'

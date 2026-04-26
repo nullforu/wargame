@@ -11,6 +11,7 @@ const AdminUsers = () => {
     const locale = useLocale()
     const localeTag = useMemo(() => getLocaleTag(locale), [locale])
     type RoleFilter = 'all' | 'admin' | 'user' | 'blocked'
+    const SKELETON_ROWS = 5
     const [users, setUsers] = useState<UserListItem[]>([])
     const [loading, setLoading] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
@@ -216,7 +217,44 @@ const AdminUsers = () => {
             {successMessage ? <FormMessage variant='success' message={successMessage} /> : null}
 
             {loading ? (
-                <p className='text-sm text-text-muted'>{t('admin.users.loading')}</p>
+                <div className='-mx-4 space-y-2 px-4 md:mx-0 md:space-y-0 md:px-0'>
+                    <div className='space-y-2 md:hidden'>
+                        {Array.from({ length: SKELETON_ROWS }, (_, idx) => (
+                            <div key={`admin-users-mobile-skeleton-${idx}`} className='rounded-xl border border-border/70 bg-surface p-3'>
+                                <div className='animate-pulse space-y-3'>
+                                    <div className='flex items-start justify-between gap-3'>
+                                        <div className='space-y-2'>
+                                            <div className='h-3 w-10 rounded bg-surface-muted' />
+                                            <div className='h-4 w-28 rounded bg-surface-muted' />
+                                        </div>
+                                        <div className='h-5 w-14 rounded-full bg-surface-muted' />
+                                    </div>
+                                    <div className='h-3 w-36 rounded bg-surface-muted' />
+                                    <div className='h-8 w-full rounded bg-surface-muted' />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className='hidden overflow-visible rounded-none bg-transparent md:block md:overflow-hidden md:rounded-xl md:bg-surface md:shadow-sm'>
+                        <div className='grid grid-cols-[80px_minmax(0,1fr)_140px_minmax(220px,1fr)_320px] bg-surface-muted px-6 py-3 text-[12px] text-text-muted'>
+                            <p className='font-medium'>{t('common.id')}</p>
+                            <p className='font-medium'>{t('common.user')}</p>
+                            <p className='font-medium'>{t('common.role')}</p>
+                            <p className='font-medium'>{t('admin.users.blockedLabel')}</p>
+                            <p className='font-medium'>{t('common.action')}</p>
+                        </div>
+                        {Array.from({ length: SKELETON_ROWS }, (_, idx) => (
+                            <div key={`admin-users-desktop-skeleton-${idx}`} className='grid grid-cols-[80px_minmax(0,1fr)_140px_minmax(220px,1fr)_320px] items-start px-6 py-5'>
+                                <div className='h-3 w-8 rounded bg-surface-muted animate-pulse' />
+                                <div className='h-4 w-32 rounded bg-surface-muted animate-pulse' />
+                                <div className='h-5 w-14 rounded-full bg-surface-muted animate-pulse' />
+                                <div className='h-3 w-40 rounded bg-surface-muted animate-pulse' />
+                                <div className='h-8 w-full rounded bg-surface-muted animate-pulse' />
+                            </div>
+                        ))}
+                    </div>
+                </div>
             ) : (
                 <div className='-mx-4 space-y-2 px-4 md:mx-0 md:space-y-0 md:px-0'>
                     <div className='space-y-2 md:hidden'>

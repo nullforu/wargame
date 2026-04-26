@@ -13,6 +13,7 @@ interface LegacyLeaderboardProps {
 type UserEntryView = ScoreEntry & { solveMap: Map<number, LeaderboardSolve> }
 const PAGE_SIZE = 20
 const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: PAGE_SIZE, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
+const LEGACY_LEADERBOARD_SKELETON_ROWS = 5
 
 const parsePositiveInt = (value: string | null, fallback: number) => {
     const parsed = Number(value)
@@ -117,7 +118,21 @@ const LegacyLeaderboard = ({ refreshTrigger = 0 }: LegacyLeaderboardProps) => {
                 <span className='text-xs text-text-subtle'>{t('leaderboard.challengesCount', { count: challenges.length })}</span>
             </div>
             {loading ? (
-                <p className='mt-4 text-sm text-text-muted'>{t('common.loading')}</p>
+                <div className='mt-4 space-y-3'>
+                    <div className='h-4 w-36 rounded bg-surface-muted animate-pulse' />
+                    <div className='space-y-2'>
+                        {Array.from({ length: LEGACY_LEADERBOARD_SKELETON_ROWS }, (_, idx) => (
+                            <div key={`legacy-leaderboard-skeleton-${idx}`} className='grid grid-cols-[48px_80px_minmax(160px,1fr)] items-center gap-3 rounded-md px-3 py-3'>
+                                <div className='h-3 w-8 rounded bg-surface-muted animate-pulse' />
+                                <div className='h-3 w-14 rounded bg-surface-muted animate-pulse' />
+                                <div className='flex items-center gap-3'>
+                                    <div className='h-8 w-8 rounded-full bg-surface-muted animate-pulse' />
+                                    <div className='h-4 w-28 rounded bg-surface-muted animate-pulse' />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             ) : errorMessage ? (
                 <p className='mt-4 text-sm text-danger'>{errorMessage}</p>
             ) : (

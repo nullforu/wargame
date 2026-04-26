@@ -46,6 +46,8 @@ const ChallengeRow = ({ challenge, isSolved, onClick }: ChallengeRowProps) => {
     )
 }
 
+const CHALLENGES_VIEW_SKELETON_ROWS = 5
+
 interface ChallengesViewProps {
     title: string
     summaryText?: string
@@ -126,7 +128,22 @@ const ChallengesView = ({
 
     const renderBody = () => {
         if (loading) {
-            return <div className='mt-6 rounded-2xl border border-border bg-surface p-8 text-center text-text-muted'>{loadingText}</div>
+            return (
+                <div className='mt-6 overflow-hidden rounded-2xl border border-border bg-surface'>
+                    <p className='sr-only'>{loadingText}</p>
+                    {Array.from({ length: CHALLENGES_VIEW_SKELETON_ROWS }, (_, idx) => (
+                        <div key={`challenges-view-skeleton-${idx}`} className='border-b border-border px-4 py-4 last:border-b-0'>
+                            <div className='flex items-center justify-between gap-4 animate-pulse'>
+                                <div className='min-w-0 flex-1 space-y-2'>
+                                    <div className='h-4 w-2/3 rounded bg-surface-muted' />
+                                    <div className='h-3 w-1/3 rounded bg-surface-muted' />
+                                </div>
+                                <div className='h-6 w-16 rounded-full bg-surface-muted' />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )
         }
 
         if (errorMessage) {

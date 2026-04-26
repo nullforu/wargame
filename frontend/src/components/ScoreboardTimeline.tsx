@@ -141,7 +141,16 @@ const ScoreboardTimeline = ({ refreshTrigger = 0 }: ScoreboardTimelineProps) => 
     return (
         <div className='min-w-0 rounded-xl border border-border bg-surface p-4'>
             {loading ? (
-                <p className='text-sm text-text-muted'>{t('timeline.calculating')}</p>
+                <div className='animate-pulse space-y-4'>
+                    <div className='h-4 w-48 rounded bg-surface-muted' />
+                    <div className='h-72 w-full rounded-lg bg-surface-muted' />
+                    <div className='flex flex-wrap gap-3'>
+                        {Array.from({ length: 4 }, (_, idx) => (
+                            <div key={`timeline-legend-skeleton-${idx}`} className='h-4 w-24 rounded bg-surface-muted' />
+                        ))}
+                    </div>
+                    <p className='text-xs text-text-subtle'>{t('timeline.calculating')}</p>
+                </div>
             ) : errorMessage ? (
                 <p className='text-sm text-danger'>{errorMessage}</p>
             ) : timeline ? (

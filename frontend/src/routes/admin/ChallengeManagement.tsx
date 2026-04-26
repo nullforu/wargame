@@ -13,6 +13,7 @@ import MonacoEditor from '../../components/MonacoEditor'
 type ActiveFilter = 'all' | 'active' | 'inactive'
 type SortFilter = 'latest' | 'oldest' | 'most_solved' | 'least_solved'
 const ALL_LEVEL_FILTER = -1
+const CHALLENGE_MANAGEMENT_SKELETON_ROWS = 5
 
 const ChallengeManagement = () => {
     const t = useT()
@@ -583,7 +584,34 @@ const ChallengeManagement = () => {
             {successMessage ? <FormMessage variant='success' message={successMessage} /> : null}
 
             {loading ? (
-                <p className='text-sm text-text-subtle'>{t('admin.manage.loadingChallenges')}</p>
+                <div className='-mx-4 md:mx-0 overflow-visible md:overflow-hidden rounded-none md:rounded-xl bg-transparent md:bg-surface md:shadow-sm'>
+                    <div className='overflow-x-auto'>
+                        <div className='min-w-245'>
+                            <div className='grid min-w-245 grid-cols-[72px_minmax(0,1fr)_140px_90px_100px_100px_110px_130px] bg-surface-muted px-4 py-3 text-[12px] text-text-muted'>
+                                <p className='font-medium'>{t('common.id')}</p>
+                                <p className='font-medium'>{t('common.title')}</p>
+                                <p className='font-medium'>{t('common.category')}</p>
+                                <p className='font-medium'>LEVEL</p>
+                                <p className='font-medium'>{t('common.points')}</p>
+                                <p className='font-medium'>{t('challenges.tableSolveCount')}</p>
+                                <p className='font-medium'>{t('common.status')}</p>
+                                <p className='text-right font-medium'>{t('common.action')}</p>
+                            </div>
+                            {Array.from({ length: CHALLENGE_MANAGEMENT_SKELETON_ROWS }, (_, idx) => (
+                                <div key={`admin-challenge-skeleton-${idx}`} className='grid min-w-245 grid-cols-[72px_minmax(0,1fr)_140px_90px_100px_100px_110px_130px] items-center px-4 py-4'>
+                                    <div className='h-3 w-10 rounded bg-surface-muted animate-pulse' />
+                                    <div className='h-4 w-3/4 rounded bg-surface-muted animate-pulse' />
+                                    <div className='h-3 w-20 rounded bg-surface-muted animate-pulse' />
+                                    <div className='h-3 w-8 rounded bg-surface-muted animate-pulse' />
+                                    <div className='h-3 w-12 rounded bg-surface-muted animate-pulse' />
+                                    <div className='h-3 w-12 rounded bg-surface-muted animate-pulse' />
+                                    <div className='h-3 w-16 rounded bg-surface-muted animate-pulse' />
+                                    <div className='ml-auto h-3 w-20 rounded bg-surface-muted animate-pulse' />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             ) : (
                 <div className='-mx-4 md:mx-0 overflow-visible md:overflow-hidden rounded-none md:rounded-xl bg-transparent md:bg-surface md:shadow-sm'>
                     <div className='overflow-x-auto'>

@@ -274,7 +274,30 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
                 <LoginRequired title={t('profile.title')} />
             ) : loading ? (
                 <div className='rounded-none border-0 bg-transparent p-3 shadow-none md:rounded-2xl md:border md:border-border md:bg-surface md:p-8'>
-                    <p className='text-center text-sm text-text-muted'>{t('common.loading')}</p>
+                    <div className='animate-pulse space-y-6'>
+                        <div className='flex items-center gap-4'>
+                            <div className='h-16 w-16 rounded-full bg-surface-muted' />
+                            <div className='space-y-2'>
+                                <div className='h-4 w-32 rounded bg-surface-muted' />
+                                <div className='h-3 w-48 rounded bg-surface-muted' />
+                            </div>
+                        </div>
+
+                        <div className='rounded-xl border border-border/60 bg-surface p-4 space-y-3'>
+                            <div className='h-4 w-24 rounded bg-surface-muted' />
+                            <div className='h-10 w-full rounded bg-surface-muted' />
+                            <div className='h-10 w-full rounded bg-surface-muted' />
+                        </div>
+
+                        <div className='space-y-3'>
+                            {Array.from({ length: 3 }, (_, idx) => (
+                                <div key={`user-profile-solved-skeleton-${idx}`} className='rounded-xl border border-border/60 bg-surface p-4 space-y-2'>
+                                    <div className='h-4 w-2/3 rounded bg-surface-muted' />
+                                    <div className='h-3 w-1/3 rounded bg-surface-muted' />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             ) : errorMessage ? (
                 <div className='rounded-none border-0 bg-danger/10 p-3 shadow-none md:rounded-2xl md:border md:border-danger/30 md:p-8'>
