@@ -186,6 +186,8 @@
     "admin.communityIntro": "Manage challenges and users with community-facing operations in one place.",
     "admin.loginRequired": "Admin functions require login.",
     "admin.accessDenied": "Access denied. Admin account required.",
+    "admin.notice.reloginRequired": "After being promoted to admin, you must log out and log back in for permissions to apply correctly.",
+    "admin.notice.closeAriaLabel": "Close notice message",
     "admin.tab.createChallenge": "Create Challenge",
     "admin.tab.challengeManagement": "Challenge Management",
     "admin.tab.users": "Users",

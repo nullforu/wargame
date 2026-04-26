@@ -186,6 +186,8 @@
     "admin.communityIntro": "コミュニティ運営向けに問題とユーザーを一元管理します。",
     "admin.loginRequired": "管理者機能を利用するにはログインが必要です。",
     "admin.accessDenied": "アクセスが拒否されました。管理者アカウントが必要です。",
+    "admin.notice.reloginRequired": "管理者権限に昇格した後は、権限を正しく反映するために一度ログアウトして再ログインしてください。",
+    "admin.notice.closeAriaLabel": "お知らせメッセージを閉じる",
     "admin.tab.createChallenge": "問題作成",
     "admin.tab.challengeManagement": "問題管理",
     "admin.tab.users": "ユーザー",

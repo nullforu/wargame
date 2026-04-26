@@ -6,6 +6,7 @@ import Stacks from './admin/Stacks'
 import Affiliations from './admin/Affiliations'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/auth'
+import DismissibleNotice from '../components/DismissibleNotice'
 
 interface RouteProps {
     routeParams?: Record<string, string>
@@ -13,6 +14,7 @@ interface RouteProps {
 
 type AdminTabId = 'challenge_create' | 'challenge_management' | 'users' | 'stacks' | 'affiliations'
 const TAB_PARAM = 'tab'
+const ADMIN_NOTICE_DISMISSED_KEY = 'admin_notice_dismissed'
 const ADMIN_TAB_IDS: AdminTabId[] = ['challenge_create', 'challenge_management', 'users', 'stacks', 'affiliations']
 
 const getTabFromUrl = (): AdminTabId | null => {
@@ -60,6 +62,9 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
 
     return (
         <section className='animate space-y-3'>
+            <DismissibleNotice closeAriaLabel={t('admin.notice.closeAriaLabel')} storageKey={ADMIN_NOTICE_DISMISSED_KEY}>
+                {t('admin.notice.reloginRequired')}
+            </DismissibleNotice>
             {!auth.user ? (
                 <div className='border border-warning/40 bg-warning/10 p-4 text-sm text-warning'>{t('admin.loginRequired')}</div>
             ) : auth.user.role !== 'admin' ? (

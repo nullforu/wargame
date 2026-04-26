@@ -186,6 +186,8 @@
     "admin.communityIntro": "커뮤니티 운영 관점에서 문제와 사용자를 한 곳에서 관리합니다.",
     "admin.loginRequired": "관리자 기능은 로그인이 필요합니다.",
     "admin.accessDenied": "접근이 거부되었습니다. 관리자 계정이 필요합니다.",
+    "admin.notice.reloginRequired": "관리자 권한으로 승격 후, 로그아웃 및 재로그인을 해야 권한이 정상적으로 적용됩니다.",
+    "admin.notice.closeAriaLabel": "안내 메시지 닫기",
     "admin.tab.createChallenge": "문제 생성",
     "admin.tab.challengeManagement": "문제 관리",
     "admin.tab.users": "유저",
