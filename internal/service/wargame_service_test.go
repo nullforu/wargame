@@ -882,3 +882,92 @@ func TestWargameServiceWriteupLifecycle(t *testing.T) {
 		t.Fatalf("expected writeup not found after delete, got %v", err)
 	}
 }
+
+func TestWargameServiceWriteupValidationAndLookupErrors(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "writeup-validate@example.com", "writeup_validate", "pass", models.UserRole)
+	challenge := createChallenge(t, env, "Writeup Validate", 200, "flag{wv}", true)
+
+	if _, err := env.wargameSvc.CreateWriteup(context.Background(), 0, challenge.ID, "body"); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for user_id=0, got %v", err)
+	}
+
+	if _, err := env.wargameSvc.CreateWriteup(context.Background(), user.ID, 0, "body"); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for challenge_id=0, got %v", err)
+	}
+
+	if _, err := env.wargameSvc.CreateWriteup(context.Background(), user.ID, challenge.ID, "   "); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for blank content, got %v", err)
+	}
+
+	createSubmission(t, env, user.ID, challenge.ID, true, time.Now().UTC())
+
+	longContent := strings.Repeat("a", maxWriteupContent+1)
+	if _, err := env.wargameSvc.CreateWriteup(context.Background(), user.ID, challenge.ID, longContent); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for too long content, got %v", err)
+	}
+
+	created, err := env.wargameSvc.CreateWriteup(context.Background(), user.ID, challenge.ID, "ok")
+	if err != nil {
+		t.Fatalf("CreateWriteup valid: %v", err)
+	}
+
+	if _, err := env.wargameSvc.UpdateWriteup(context.Background(), user.ID, created.ID, nil); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for nil content patch, got %v", err)
+	}
+
+	blank := "   "
+	if _, err := env.wargameSvc.UpdateWriteup(context.Background(), user.ID, created.ID, &blank); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for blank content patch, got %v", err)
+	}
+
+	tooLong := strings.Repeat("b", maxWriteupContent+1)
+	if _, err := env.wargameSvc.UpdateWriteup(context.Background(), user.ID, created.ID, &tooLong); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for too long content patch, got %v", err)
+	}
+
+	ok := "updated"
+	if _, err := env.wargameSvc.UpdateWriteup(context.Background(), user.ID, 0, &ok); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for writeup_id=0 patch, got %v", err)
+	}
+
+	if _, err := env.wargameSvc.UpdateWriteup(context.Background(), user.ID, 999999, &ok); !errors.Is(err, ErrWriteupNotFound) {
+		t.Fatalf("expected writeup not found on patch, got %v", err)
+	}
+
+	if err := env.wargameSvc.DeleteWriteup(context.Background(), 0, created.ID); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for delete user_id=0, got %v", err)
+	}
+
+	if err := env.wargameSvc.DeleteWriteup(context.Background(), user.ID, 0); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for delete writeup_id=0, got %v", err)
+	}
+
+	if err := env.wargameSvc.DeleteWriteup(context.Background(), user.ID, 999999); !errors.Is(err, ErrWriteupNotFound) {
+		t.Fatalf("expected writeup not found on delete, got %v", err)
+	}
+
+	if _, _, _, err := env.wargameSvc.ChallengeWriteupsPage(context.Background(), 0, user.ID, 1, 10); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for challenge writeups challenge_id=0, got %v", err)
+	}
+
+	if _, _, _, err := env.wargameSvc.ChallengeWriteupsPage(context.Background(), 999999, user.ID, 1, 10); !errors.Is(err, ErrChallengeNotFound) {
+		t.Fatalf("expected challenge not found from challenge writeups, got %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.GetWriteupByID(context.Background(), 0, user.ID); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for get writeup id=0, got %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.GetWriteupByID(context.Background(), 999999, user.ID); !errors.Is(err, ErrWriteupNotFound) {
+		t.Fatalf("expected writeup not found for unknown id, got %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.MyWriteupsPage(context.Background(), 0, 1, 10); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for my writeups user_id=0, got %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.UserWriteupsPage(context.Background(), 0, user.ID, 1, 10); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for target user_id=0, got %v", err)
+	}
+}
