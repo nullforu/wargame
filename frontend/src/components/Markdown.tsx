@@ -1,11 +1,16 @@
+import { Children, isValidElement } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
 
 export default function Markdown({ content, className }: { content: string; className?: string }) {
     return (
         <div className={`markdown-content min-w-0 ${className ?? ''}`}>
             <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
                 components={{
                     h1: ({ children }) => <h1 className='mt-8 mb-5 text-3xl font-bold leading-tight'>{children}</h1>,
                     h2: ({ children }) => <h2 className='mt-7 mb-4 text-2xl font-bold leading-tight'>{children}</h2>,
@@ -13,7 +18,13 @@ export default function Markdown({ content, className }: { content: string; clas
                     h4: ({ children }) => <h4 className='mt-5 mb-3 text-lg font-semibold leading-tight'>{children}</h4>,
                     h5: ({ children }) => <h5 className='mt-4 mb-2 text-base font-semibold leading-tight'>{children}</h5>,
                     h6: ({ children }) => <h6 className='mt-3 mb-1 text-base font-semibold leading-tight'>{children}</h6>,
-                    p: ({ children }) => <p className='mb-4 text-sm leading-7 md:text-base wrap-break-word'>{children}</p>,
+                    p: ({ children }) => {
+                        const nodes = Children.toArray(children)
+                        const firstNode = nodes[0]
+                        const isMathOnlyParagraph = nodes.length === 1 && isValidElement<{ className?: string }>(firstNode) && typeof firstNode.props.className === 'string' && firstNode.props.className.includes('katex')
+
+                        return <p className={`mb-4 text-sm leading-7 md:text-base wrap-break-word ${isMathOnlyParagraph ? 'text-center' : ''}`}>{children}</p>
+                    },
                     ul: ({ children }) => <ul className='mb-4 list-disc pl-6 text-sm leading-7 md:text-base'>{children}</ul>,
                     ol: ({ children }) => <ol className='mb-4 list-decimal pl-6 text-sm leading-7 md:text-base'>{children}</ol>,
                     li: ({ children }) => <li className='mb-2'>{children}</li>,

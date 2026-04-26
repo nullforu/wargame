@@ -52,7 +52,8 @@ const ChallengeManagement = () => {
         if (typeof window === 'undefined') return { q: '', page: 1, category: 'all', level: ALL_LEVEL_FILTER, active: 'all' as ActiveFilter, sort: 'latest' as SortFilter }
         const params = new URLSearchParams(window.location.search)
         const parsedPage = Number(params.get('page'))
-        const parsedLevel = Number(params.get('level'))
+        const levelParam = params.get('level')
+        const parsedLevel = levelParam !== null ? Number(levelParam) : NaN
         const activeParam = params.get('active')
         const sortParam = params.get('sort')
         return {
