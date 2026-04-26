@@ -158,7 +158,7 @@ const AdminUsers = () => {
                 </button>
             </div>
 
-            <div className='space-y-2 bg-transparent shadow-none md:bg-surface md:p-3 dark:bg-surface'>
+            <div className='space-y-2 bg-transparent shadow-none md:bg-surface dark:bg-surface'>
                 <input
                     type='text'
                     placeholder={t('admin.users.searchPlaceholder')}

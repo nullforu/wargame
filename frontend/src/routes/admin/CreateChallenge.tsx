@@ -133,7 +133,7 @@ const CreateChallenge = () => {
 
     return (
         <div className='space-y-4'>
-            <div className='rounded-3xl border border-border bg-surface p-4 md:p-8'>
+            <div className='rounded-lg border border-border bg-surface p-4 md:p-8'>
                 <form
                     className='space-y-5'
                     onSubmit={(event) => {

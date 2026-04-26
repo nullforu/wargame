@@ -4,11 +4,14 @@ import ko from '../locales/ko.json'
 import ja from '../locales/ja.json'
 
 export type Locale = 'en' | 'ko' | 'ja'
+export type TranslationVars = Record<string, string | number>
+export type TranslationTemplate = (vars?: TranslationVars) => string
 
 interface LocaleContextValue {
     locale: Locale
     setLocale: (locale: Locale) => void
-    t: (key: string, vars?: Record<string, string | number>) => string
+    t: (key: string, vars?: TranslationVars) => string
+    template: (key: string) => TranslationTemplate
 }
 
 const STORAGE_KEY = 'wargame.locale'
@@ -45,7 +48,7 @@ const persistLocale = (locale: Locale) => {
     }
 }
 
-const interpolate = (message: string, vars?: Record<string, string | number>) => {
+const interpolate = (message: string, vars?: TranslationVars) => {
     if (!vars) return message
     return message.replace(/\{(\w+)\}/g, (_, key: string) => {
         const value = vars[key]
@@ -64,8 +67,8 @@ export const LocaleProvider = ({ children }: { children: React.ReactNode }) => {
         persistLocale(normalized)
     }, [])
 
-    const t = useCallback(
-        (key: string, vars?: Record<string, string | number>) => {
+    const resolveTranslation = useCallback(
+        (key: string, vars?: TranslationVars) => {
             const dictionary = dictionaries[locale] ?? dictionaries.en
             const fallback = dictionaries.en
             const message = dictionary[key] ?? fallback[key] ?? key
@@ -74,7 +77,16 @@ export const LocaleProvider = ({ children }: { children: React.ReactNode }) => {
         [locale],
     )
 
-    const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t])
+    const t = useCallback((key: string, vars?: TranslationVars) => resolveTranslation(key, vars), [resolveTranslation])
+
+    const template = useCallback(
+        (key: string): TranslationTemplate =>
+            (vars?: TranslationVars) =>
+                resolveTranslation(key, vars),
+        [resolveTranslation],
+    )
+
+    const value = useMemo(() => ({ locale, setLocale, t, template }), [locale, setLocale, t, template])
 
     return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
 }
@@ -101,6 +113,15 @@ export const useT = () => {
         throw new Error('useT must be used within LocaleProvider')
     }
     return context.t
+}
+
+export const useTemplate = (key: string): TranslationTemplate => {
+    const context = useContext(LocaleContext)
+    if (!context) {
+        throw new Error('useTemplate must be used within LocaleProvider')
+    }
+
+    return useMemo(() => context.template(key), [context, key])
 }
 
 export const getLocaleTag = (locale: Locale) => {
@@ -134,7 +155,7 @@ const categoryKeyMap: Record<string, string> = {
 
 export const getCategoryKey = (category: string) => categoryKeyMap[category] ?? category
 
-export const translateCategory = (translate: (key: string, vars?: Record<string, string | number>) => string, category: string) => {
+export const translateCategory = (translate: (key: string, vars?: TranslationVars) => string, category: string) => {
     return translate(getCategoryKey(category))
 }
 
@@ -146,6 +167,6 @@ const roleKeyMap: Record<string, string> = {
 
 export const getRoleKey = (role: string) => roleKeyMap[role] ?? role
 
-export const translateRole = (translate: (key: string, vars?: Record<string, string | number>) => string, role: string) => {
+export const translateRole = (translate: (key: string, vars?: TranslationVars) => string, role: string) => {
     return translate(getRoleKey(role))
 }

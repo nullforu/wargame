@@ -208,8 +208,8 @@ const AdminStacks = () => {
 
                     <div className='hidden overflow-visible rounded-none bg-transparent md:block md:overflow-hidden md:rounded-xl md:bg-surface md:shadow-sm'>
                         <div className='overflow-x-auto'>
-                            <div className='min-w-[1120px]'>
-                                <div className='grid min-w-[1120px] grid-cols-[150px_minmax(170px,1fr)_170px_160px_160px_160px_120px] bg-surface-muted px-6 py-3 text-[12px] text-text-muted'>
+                            <div className='min-w-280'>
+                                <div className='grid min-w-280 grid-cols-[150px_minmax(170px,1fr)_170px_160px_160px_160px_120px] bg-surface-muted px-6 py-3 text-[12px] text-text-muted'>
                                     <p className='font-medium whitespace-nowrap'>{t('common.id')}</p>
                                     <p className='font-medium whitespace-nowrap'>{t('admin.stacks.challengeLabel')}</p>
                                     <p className='font-medium whitespace-nowrap'>{t('admin.stacks.userLabel')}</p>
@@ -227,7 +227,7 @@ const AdminStacks = () => {
 
                                     return (
                                         <Fragment key={stack.stack_id}>
-                                            <div className='grid min-w-[1120px] grid-cols-[150px_minmax(170px,1fr)_170px_160px_160px_160px_120px] items-start px-6 py-4 transition hover:bg-surface-muted/40'>
+                                            <div className='grid min-w-280 grid-cols-[150px_minmax(170px,1fr)_170px_160px_160px_160px_120px] items-start px-6 py-4 transition hover:bg-surface-muted/40'>
                                                 <p className='whitespace-nowrap font-mono text-xs text-text'>{stack.stack_id}</p>
                                                 <div className='min-w-0 pr-3'>
                                                     <p className='truncate text-sm font-medium text-text'>{stack.challenge_title}</p>

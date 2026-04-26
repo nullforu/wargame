@@ -87,7 +87,7 @@ const Users = ({ routeParams = {} }: RouteProps) => {
 
     return (
         <section className='animate space-y-4'>
-            <div className='space-y-2 bg-transparent shadow-none md:bg-surface md:p-3 dark:bg-surface'>
+            <div className='space-y-2 bg-transparent shadow-none md:bg-surface dark:bg-surface'>
                 <h2 className='text-2xl font-semibold text-text dark:text-text'>{t('users.title')}</h2>
 
                 <div className='mt-1'>
@@ -134,26 +134,17 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                     <>
                         <div className='divide-y divide-border/60 md:hidden'>
                             {sortedUsers.map((user) => (
-                                <div key={user.id} className='px-4 py-3'>
+                                <div key={user.id} className='px-4 py-3 cursor-pointer' onClick={() => navigate(`/users/${user.id}${window.location.search}`)}>
                                     <div className='flex items-center justify-between gap-3'>
                                         <div className='min-w-0 flex items-center gap-3.75'>
                                             <UserAvatar username={user.username} size='md' />
                                             <div className='min-w-0'>
                                                 <p className='truncate text-sm font-semibold text-text'>{user.username}</p>
-                                                <p className='mt-1 text-xs text-text-muted'>
-                                                    #{user.id} · {t(getRoleKey(user.role))}
-                                                </p>
+                                                <p className='mt-1 text-xs text-text-muted bg-accent/10 inline-block rounded px-1.5 py-0.5 dark:bg-accent/20 dark:text-accent'>{t(getRoleKey(user.role))}</p>
                                                 <p className='mt-1 truncate text-xs text-text-subtle'>{user.affiliation?.trim() ? user.affiliation : ''}</p>
                                                 <p className='truncate text-xs text-text-subtle'>{user.bio ?? t('profile.noBio')}</p>
                                             </div>
                                         </div>
-                                        <button
-                                            className='rounded-md border border-border bg-surface px-3 py-1 text-xs text-text-muted transition hover:bg-surface-muted dark:border-border dark:bg-surface dark:text-text dark:hover:bg-surface-muted'
-                                            onClick={() => navigate(`/users/${user.id}${window.location.search}`)}
-                                            type='button'
-                                        >
-                                            {t('common.view')}
-                                        </button>
                                     </div>
                                 </div>
                             ))}
@@ -161,16 +152,15 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                         </div>
 
                         <div className='hidden md:block'>
-                            <div className='grid grid-cols-[110px_minmax(0,1fr)_180px_120px] bg-surface-muted px-4 py-3 text-[12px] text-text-muted dark:bg-surface-muted dark:text-text-muted'>
+                            <div className='grid grid-cols-[80px_minmax(0,1fr)_180px] bg-surface-muted px-4 py-3 text-[12px] text-text-muted dark:bg-surface-muted dark:text-text-muted'>
                                 <p className='font-medium'>{t('common.id')}</p>
                                 <p className='font-medium'>{t('common.username')}</p>
                                 <p className='font-medium'>{t('common.role')}</p>
-                                <p className='text-right font-medium'>{t('common.action')}</p>
                             </div>
                             {sortedUsers.map((user) => (
                                 <div
                                     key={user.id}
-                                    className='grid grid-cols-[110px_minmax(0,1fr)_180px_120px] items-center px-4 py-4 transition hover:bg-surface-muted/40 dark:hover:bg-surface-muted cursor-pointer'
+                                    className='grid grid-cols-[80px_minmax(0,1fr)_180px] items-center px-4 py-4 transition hover:bg-surface-muted/40 dark:hover:bg-surface-muted cursor-pointer'
                                     onClick={() => navigate(`/users/${user.id}${window.location.search}`)}
                                 >
                                     <p className='text-sm text-text dark:text-text'>{user.id}</p>
@@ -182,16 +172,7 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                                             <p className='truncate text-xs text-text-subtle'>{user.bio ?? t('profile.noBio')}</p>
                                         </div>
                                     </div>
-                                    <p className='text-xs text-text-muted dark:text-text-muted'>{t(getRoleKey(user.role))}</p>
-                                    <div className='text-right'>
-                                        <button
-                                            className='rounded-md border border-border bg-surface px-3 py-1 text-xs text-text-muted transition hover:bg-surface-muted dark:border-border dark:bg-surface dark:text-text dark:hover:bg-surface-muted'
-                                            onClick={() => navigate(`/users/${user.id}${window.location.search}`)}
-                                            type='button'
-                                        >
-                                            {t('common.view')}
-                                        </button>
-                                    </div>
+                                    <p className='text-xs text-text-muted dark:text-text-muted bg-accent/10 inline-block rounded px-1.5 py-0.5 w-max max-w-full whitespace-nowrap dark:bg-accent/20'>{t(getRoleKey(user.role))}</p>
                                 </div>
                             ))}
                             {sortedUsers.length === 0 ? <p className='px-6 py-8 text-center text-sm text-text-muted dark:text-text-muted'>{appliedSearch ? t('users.noResults') : t('users.noUsers')}</p> : null}

@@ -26,7 +26,7 @@ const ActiveStacksCard = ({ activeStacks, stacksError, stacksLoading, stackDelet
     }
 
     return (
-        <div className='mt-6 rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-2xl md:border md:border-border md:bg-surface md:p-6'>
+        <div className='mt-6 rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-lg md:border md:border-border md:bg-surface md:p-6'>
             <div className='flex flex-wrap items-center justify-between gap-4'>
                 <h3 className='text-lg text-text'>{t('profile.activeStacks')}</h3>
                 <button className='text-xs uppercase tracking-wide text-text-subtle hover:text-text disabled:opacity-60 cursor-pointer' onClick={onRefresh} disabled={stacksLoading}>

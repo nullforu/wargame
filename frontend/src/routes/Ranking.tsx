@@ -229,7 +229,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                             className='flex w-full flex-wrap items-center gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-surface-muted cursor-pointer sm:flex-nowrap'
                                                             onClick={() => navigate(`/users/${row.user_id}`)}
                                                         >
-                                                            <span className={`inline-flex h-7 min-w-9 items-center justify-center rounded-full px-2 text-xs font-semibold ${rankToneClass(rank)}`}>#{rank}</span>
+                                                            <span className={`inline-flex h-7 min-w-9 items-center justify-center rounded-full px-2 text-xs font-semibold md:mr-4 ${rankToneClass(rank)}`}>#{rank}</span>
                                                             <UserAvatar username={row.username} size='sm' />
                                                             <div className='min-w-0 flex-1'>
                                                                 <p className='truncate text-sm text-text'>{row.username}</p>
@@ -293,7 +293,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                                 setAffiliationUserPage(1)
                                                             }}
                                                         >
-                                                            <span className={`inline-flex h-7 min-w-9 items-center justify-center rounded-full px-2 text-xs font-semibold ${rankToneClass(rank)}`}>#{rank}</span>
+                                                            <span className={`inline-flex h-7 min-w-9 items-center justify-center rounded-full px-2 text-xs font-semibold md:mr-4 ${rankToneClass(rank)}`}>#{rank}</span>
                                                             <div className='min-w-0 flex-1'>
                                                                 <p className='truncate text-sm text-text'>{row.name}</p>
                                                                 <p className='text-xs text-text-subtle'>{t('ranking.members', { count: row.user_count })}</p>
@@ -353,7 +353,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                                 className='flex w-full flex-wrap items-center gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-surface-muted cursor-pointer sm:flex-nowrap'
                                                                 onClick={() => navigate(`/users/${row.user_id}`)}
                                                             >
-                                                                <span className={`inline-flex h-7 min-w-9 items-center justify-center rounded-full px-2 text-xs font-semibold ${rankToneClass(rank)}`}>#{rank}</span>
+                                                                <span className={`inline-flex h-7 min-w-9 items-center justify-center rounded-full px-2 text-xs font-semibold md:mr-4 ${rankToneClass(rank)}`}>#{rank}</span>
                                                                 <UserAvatar username={row.username} size='sm' />
                                                                 <div className='min-w-0 flex-1'>
                                                                     <p className='truncate text-sm text-text'>{row.username}</p>

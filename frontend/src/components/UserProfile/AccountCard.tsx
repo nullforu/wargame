@@ -1,5 +1,5 @@
 import type { Affiliation, PaginationMeta, UserDetail } from '../../lib/types'
-import { getRoleKey, useT } from '../../lib/i18n'
+import { useT } from '../../lib/i18n'
 import UserAvatar from '../UserAvatar'
 
 interface AccountCardProps {
@@ -77,7 +77,7 @@ const AccountCard = ({
     }
 
     return (
-        <div className='mt-6 rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-2xl md:border md:border-border md:bg-surface md:p-6'>
+        <div className='mt-6 rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-lg md:border md:border-border md:bg-surface md:p-6'>
             <h3 className='text-lg text-text'>{t('profile.account')}</h3>
 
             <div className='mt-4 space-y-2 text-sm text-text'>
@@ -108,11 +108,6 @@ const AccountCard = ({
                 <div className='flex flex-col gap-1 sm:flex-row sm:justify-between'>
                     <span className='text-text-muted'>{t('common.email')}</span>
                     <span>{authEmail}</span>
-                </div>
-
-                <div className='flex flex-col gap-1 sm:flex-row sm:justify-between'>
-                    <span className='text-text-muted'>{t('common.role')}</span>
-                    <span className='uppercase text-accent'>{t(getRoleKey(user.role))}</span>
                 </div>
 
                 <div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'>

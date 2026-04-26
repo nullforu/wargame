@@ -12,6 +12,7 @@ import MonacoEditor from '../../components/MonacoEditor'
 
 type ActiveFilter = 'all' | 'active' | 'inactive'
 type SortFilter = 'latest' | 'oldest' | 'most_solved' | 'least_solved'
+const ALL_LEVEL_FILTER = -1
 
 const ChallengeManagement = () => {
     const t = useT()
@@ -47,7 +48,7 @@ const ChallengeManagement = () => {
     const [editFileUploading, setEditFileUploading] = useState(false)
     const [editFileSuccess, setEditFileSuccess] = useState('')
     const readQueryState = (): { q: string; page: number; category: string; level: number; active: ActiveFilter; sort: SortFilter } => {
-        if (typeof window === 'undefined') return { q: '', page: 1, category: 'all', level: 0, active: 'all' as ActiveFilter, sort: 'latest' as SortFilter }
+        if (typeof window === 'undefined') return { q: '', page: 1, category: 'all', level: ALL_LEVEL_FILTER, active: 'all' as ActiveFilter, sort: 'latest' as SortFilter }
         const params = new URLSearchParams(window.location.search)
         const parsedPage = Number(params.get('page'))
         const parsedLevel = Number(params.get('level'))
@@ -57,7 +58,7 @@ const ChallengeManagement = () => {
             q: (params.get('q') ?? '').trim(),
             page: Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1,
             category: (params.get('category') ?? 'all').trim() || 'all',
-            level: Number.isInteger(parsedLevel) && parsedLevel >= 1 && parsedLevel <= 10 ? parsedLevel : 0,
+            level: Number.isInteger(parsedLevel) && parsedLevel >= 0 && parsedLevel <= 10 ? parsedLevel : ALL_LEVEL_FILTER,
             active: activeParam === 'active' || activeParam === 'inactive' ? activeParam : 'all',
             sort: sortParam === 'oldest' || sortParam === 'most_solved' || sortParam === 'least_solved' ? sortParam : 'latest',
         }
@@ -87,7 +88,7 @@ const ChallengeManagement = () => {
         if (next.q.trim() !== '') params.set('q', next.q.trim())
         if (next.page > 1) params.set('page', String(next.page))
         if (next.category !== 'all') params.set('category', next.category)
-        if (next.level > 0) params.set('level', String(next.level))
+        if (next.level >= 0) params.set('level', String(next.level))
         if (next.active !== 'all') params.set('active', next.active)
         if (next.sort !== 'latest') params.set('sort', next.sort)
         const query = params.toString()
@@ -120,7 +121,7 @@ const ChallengeManagement = () => {
         try {
             const response = await api.searchChallenges(appliedSearch, page, 20, {
                 category: categoryFilter === 'all' ? undefined : categoryFilter,
-                level: levelFilter > 0 ? levelFilter : undefined,
+                level: levelFilter >= 0 ? levelFilter : undefined,
                 sort: sortFilter,
             })
             const filtered = response.challenges.filter((challenge) => {
@@ -433,7 +434,7 @@ const ChallengeManagement = () => {
                 </button>
             </div>
 
-            <div className='space-y-2 bg-transparent shadow-none md:bg-surface md:p-3 dark:bg-surface'>
+            <div className='space-y-2 bg-transparent shadow-none md:bg-surface dark:bg-surface'>
                 <input
                     type='text'
                     placeholder={t('common.search')}
@@ -461,11 +462,11 @@ const ChallengeManagement = () => {
                             setSearchQuery('')
                             setAppliedSearch('')
                             setCategoryFilter('all')
-                            setLevelFilter(0)
+                            setLevelFilter(ALL_LEVEL_FILTER)
                             setActiveFilter('all')
                             setSortFilter('latest')
                             setPage(1)
-                            pushQueryState({ q: '', page: 1, category: 'all', level: 0, active: 'all', sort: 'latest' })
+                            pushQueryState({ q: '', page: 1, category: 'all', level: ALL_LEVEL_FILTER, active: 'all', sort: 'latest' })
                         }}
                     >
                         {t('common.reset')}
@@ -505,6 +506,17 @@ const ChallengeManagement = () => {
                     <span className='w-14 text-xs text-text-muted'>{t('challenges.filterLevel')}</span>
                     <button
                         type='button'
+                        className={`rounded-md border px-3 py-1 text-xs ${levelFilter === ALL_LEVEL_FILTER ? 'border-accent/60 bg-accent/12 text-accent' : 'border-border/60 bg-surface-muted text-text-muted'}`}
+                        onClick={() => {
+                            setLevelFilter(ALL_LEVEL_FILTER)
+                            setPage(1)
+                            pushQueryState({ q: appliedSearch, page: 1, category: categoryFilter, level: ALL_LEVEL_FILTER, active: activeFilter, sort: sortFilter })
+                        }}
+                    >
+                        {t('common.all')}
+                    </button>
+                    <button
+                        type='button'
                         className={`rounded-md border px-3 py-1 text-xs ${levelFilter === 0 ? 'border-accent/60 bg-accent/12 text-accent' : 'border-border/60 bg-surface-muted text-text-muted'}`}
                         onClick={() => {
                             setLevelFilter(0)
@@ -512,7 +524,7 @@ const ChallengeManagement = () => {
                             pushQueryState({ q: appliedSearch, page: 1, category: categoryFilter, level: 0, active: activeFilter, sort: sortFilter })
                         }}
                     >
-                        {t('common.all')}
+                        {t('level.unknown')}
                     </button>
                     {Array.from({ length: 10 }, (_, idx) => idx + 1).map((level) => (
                         <button
@@ -575,8 +587,8 @@ const ChallengeManagement = () => {
             ) : (
                 <div className='-mx-4 md:mx-0 overflow-visible md:overflow-hidden rounded-none md:rounded-xl bg-transparent md:bg-surface md:shadow-sm'>
                     <div className='overflow-x-auto'>
-                        <div className='min-w-[980px]'>
-                            <div className='grid min-w-[980px] grid-cols-[72px_minmax(0,1fr)_140px_90px_100px_100px_110px_130px] bg-surface-muted px-4 py-3 text-[12px] text-text-muted'>
+                        <div className='min-w-245'>
+                            <div className='grid min-w-245 grid-cols-[72px_minmax(0,1fr)_140px_90px_100px_100px_110px_130px] bg-surface-muted px-4 py-3 text-[12px] text-text-muted'>
                                 <p className='font-medium'>{t('common.id')}</p>
                                 <p className='font-medium'>{t('common.title')}</p>
                                 <p className='font-medium'>{t('common.category')}</p>
@@ -595,7 +607,7 @@ const ChallengeManagement = () => {
 
                                 return (
                                     <Fragment key={challenge.id}>
-                                        <div className='grid min-w-[980px] grid-cols-[72px_minmax(0,1fr)_140px_90px_100px_100px_110px_130px] items-center px-4 py-4 transition hover:bg-surface-muted/40'>
+                                        <div className='grid min-w-245 grid-cols-[72px_minmax(0,1fr)_140px_90px_100px_100px_110px_130px] items-center px-4 py-4 transition hover:bg-surface-muted/40'>
                                             <p className='whitespace-nowrap text-sm text-text'>{challenge.id}</p>
                                             <p className='truncate pr-3 text-sm text-text'>{challenge.title}</p>
                                             <p className='text-sm text-text'>{categoryLabel}</p>

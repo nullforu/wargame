@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatApiError } from '../lib/utils'
-import type { Challenge, PaginationMeta, ScoreEntry } from '../lib/types'
+import type { Challenge, PaginationMeta, UserRankingEntry } from '../lib/types'
 import { getCategoryKey, useT } from '../lib/i18n'
 import { useApi } from '../lib/useApi'
 import { CHALLENGE_CATEGORIES } from '../lib/constants'
@@ -18,10 +18,19 @@ const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: PAGE_SIZE, total_
 
 type SolveFilter = 'all' | 'solved' | 'unsolved'
 type SortFilter = 'latest' | 'oldest' | 'most_solved' | 'least_solved'
+const ALL_LEVEL_FILTER = -1
 
 const parsePositiveInt = (value: string | null, fallback: number) => {
     const parsed = Number(value)
     return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const parseLevelFilter = (value: string | null): number => {
+    if (value == null || value.trim() === '') return ALL_LEVEL_FILTER
+    const parsed = Number(value)
+    if (!Number.isInteger(parsed)) return ALL_LEVEL_FILTER
+    if (parsed < 0 || parsed > 10) return ALL_LEVEL_FILTER
+    return parsed
 }
 
 const parseSolveFilter = (value: string | null): SolveFilter => {
@@ -75,7 +84,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
 
     const readQueryState = () => {
         if (typeof window === 'undefined') {
-            return { q: '', page: 1, category: 'all', level: 0, solved: 'all' as SolveFilter, sort: 'latest' as SortFilter }
+            return { q: '', page: 1, category: 'all', level: ALL_LEVEL_FILTER, solved: 'all' as SolveFilter, sort: 'latest' as SortFilter }
         }
         const params = new URLSearchParams(window.location.search)
         const categoryParam = params.get('category')
@@ -83,7 +92,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
             q: (params.get('q') ?? '').trim(),
             page: parsePositiveInt(params.get('page'), 1),
             category: categoryParam && categoryParam.trim() !== '' ? categoryParam : 'all',
-            level: Math.max(0, Math.min(10, parsePositiveInt(params.get('level'), 0))),
+            level: parseLevelFilter(params.get('level')),
             solved: parseSolveFilter(params.get('solved')),
             sort: parseSortFilter(params.get('sort')),
         }
@@ -100,7 +109,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
     const [solveFilter, setSolveFilter] = useState<SolveFilter>(initialQueryState.solved)
     const [sortFilter, setSortFilter] = useState<SortFilter>(initialQueryState.sort)
 
-    const [topUsers, setTopUsers] = useState<ScoreEntry[]>([])
+    const [topUsers, setTopUsers] = useState<UserRankingEntry[]>([])
     const [isExtraCategoryOpen, setIsExtraCategoryOpen] = useState(false)
     const [isSortMenuOpen, setIsSortMenuOpen] = useState(false)
     const extraCategoryMenuRef = useRef<HTMLDivElement | null>(null)
@@ -113,7 +122,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
         if (next.q.trim() !== '') params.set('q', next.q.trim())
         if (next.page > 1) params.set('page', String(next.page))
         if (next.category !== 'all') params.set('category', next.category)
-        if (next.level > 0) params.set('level', String(next.level))
+        if (next.level >= 0) params.set('level', String(next.level))
         if (next.solved !== 'all') params.set('solved', next.solved)
         if (next.sort !== 'latest') params.set('sort', next.sort)
         const query = params.toString()
@@ -131,7 +140,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
         try {
             const data = await api.searchChallenges(appliedSearch, targetPage, PAGE_SIZE, {
                 category: categoryFilter === 'all' ? undefined : categoryFilter,
-                level: levelFilter > 0 ? levelFilter : undefined,
+                level: levelFilter >= 0 ? levelFilter : undefined,
                 solved: solveFilter === 'all' ? undefined : solveFilter === 'solved',
                 sort: sortFilter,
             })
@@ -147,8 +156,8 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
 
     const loadTopUsers = async () => {
         try {
-            const leaderboard = await api.leaderboard()
-            setTopUsers(leaderboard.entries.slice(0, 10))
+            const ranking = await api.rankingUsers(1, 10)
+            setTopUsers(ranking.entries.slice(0, 10))
         } catch {
             setTopUsers([])
         }
@@ -225,10 +234,19 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                 <span className='pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle dark:text-text-subtle'>⌕</span>
                                 <input
                                     type='text'
+                                    name='search'
                                     placeholder={t('challenges.searchPlaceholder')}
                                     value={searchQuery}
                                     onChange={(event) => setSearchQuery(event.target.value)}
                                     className='w-full rounded-lg border border-border/70 bg-surface py-2.5 pl-9 pr-3 text-sm text-text placeholder:text-text-subtle dark:border-border/70 dark:bg-surface dark:text-text dark:placeholder:text-text-subtle'
+                                    onKeyDown={(event) => {
+                                        if (event.key === 'Enter') {
+                                            const nextQ = searchQuery.trim()
+                                            setAppliedSearch(nextQ)
+                                            setPage(1)
+                                            pushQueryState({ q: nextQ, page: 1, category: categoryFilter, level: levelFilter, solved: solveFilter, sort: sortFilter })
+                                        }
+                                    }}
                                 />
                             </div>
                             <button
@@ -315,14 +333,33 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                             <span className='w-14 text-xs text-text-muted dark:text-text-muted'>{t('challenges.filterLevel')}</span>
                             <button
                                 type='button'
-                                className={`rounded-md border px-3 py-1 text-xs ${levelFilter === 0 ? 'border-accent/60 bg-accent/12 text-accent' : 'border-border/60 bg-surface-muted text-text-muted'}`}
+                                className={`rounded-md border px-3 py-1 text-xs ${levelFilter === ALL_LEVEL_FILTER ? 'border-accent/60 bg-accent/12 text-accent' : 'border-border/60 bg-surface-muted text-text-muted'}`}
                                 onClick={() => {
-                                    setLevelFilter(0)
+                                    setLevelFilter(ALL_LEVEL_FILTER)
                                     setPage(1)
-                                    pushQueryState({ q: appliedSearch, page: 1, category: categoryFilter, level: 0, solved: solveFilter, sort: sortFilter })
+                                    pushQueryState({ q: appliedSearch, page: 1, category: categoryFilter, level: ALL_LEVEL_FILTER, solved: solveFilter, sort: sortFilter })
                                 }}
                             >
                                 {t('common.all')}
+                            </button>
+                            <button
+                                type='button'
+                                onClick={() => {
+                                    setLevelFilter(0)
+                                    setPage(1)
+                                    pushQueryState({
+                                        q: appliedSearch,
+                                        page: 1,
+                                        category: categoryFilter,
+                                        level: 0,
+                                        solved: solveFilter,
+                                        sort: sortFilter,
+                                    })
+                                }}
+                                className='transition hover:scale-105'
+                                aria-label={t('level.unknown')}
+                            >
+                                <LevelBadge level={0} active={levelFilter === 0} />
                             </button>
                             {Array.from({ length: 10 }, (_, idx) => idx + 1).map((level) => (
                                 <button
@@ -570,22 +607,39 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                         <p className='text-xl leading-none text-text dark:text-text'>
                             {t('challenges.sidebarTopUsersLine1Prefix')} <span className='text-accent'>{topUsers.length}</span> {t('challenges.sidebarTopUsersLine1Suffix')} {t('challenges.sidebarTopUsersLine2')}
                         </p>
+
                         <div className='mt-4 space-y-2'>
                             {topUsers.length === 0 ? (
                                 <p className='text-sm text-text-muted dark:text-text-muted'>{t('leaderboard.noScores')}</p>
                             ) : (
-                                topUsers.map((entry, index) => (
-                                    <button
-                                        key={`top-user-${entry.username}-${index}`}
-                                        className='flex w-full items-center gap-2.75 rounded px-3 py-2 text-left hover:bg-surface-muted dark:hover:bg-surface-muted'
-                                        onClick={() => navigate(`/users/${entry.user_id}`)}
-                                    >
-                                        <span className='text-xs text-text-subtle'>#{index + 1}</span>
-                                        <UserAvatar username={entry.username} size='sm' />
-                                        <span className='text-sm font-semibold text-text'>{entry.username}</span>
-                                        <span className='ml-auto text-xs text-text-muted'>{t('common.pointsShort', { points: entry.score })}</span>
-                                    </button>
-                                ))
+                                topUsers.map((entry, index) => {
+                                    const affiliation = entry.affiliation_name?.trim()
+                                    const bio = entry.bio?.trim()
+                                    const profileLine = `${affiliation ? `${affiliation} · ` : ''}${bio && bio.length > 0 ? bio : t('profile.noBio')}`
+
+                                    return (
+                                        <button
+                                            key={`top-user-${entry.user_id}-${index}`}
+                                            type='button'
+                                            className='group flex w-full items-start justify-between gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-surface-muted dark:hover:bg-surface-muted'
+                                            onClick={() => navigate(`/users/${entry.user_id}`)}
+                                        >
+                                            <div className='min-w-0 flex flex-1 items-center gap-3'>
+                                                <UserAvatar username={entry.username} size='sm' />
+                                                <div className='min-w-0 flex-1'>
+                                                    <div className='flex min-w-0 items-center gap-1.5'>
+                                                        <span className='shrink-0 text-xs text-text-subtle'>#{index + 1}</span>
+                                                        <span className='min-w-0 truncate text-sm font-semibold text-text'>{entry.username}</span>
+                                                    </div>
+
+                                                    <p className='mt-1 text-xs text-text-subtle line-clamp-1 break-all'>{profileLine}</p>
+                                                </div>
+                                            </div>
+
+                                            <span className='shrink-0 pt-0.5 text-xs text-text-muted'>{t('common.pointsShort', { points: entry.score })}</span>
+                                        </button>
+                                    )
+                                })
                             )}
                         </div>
                     </div>

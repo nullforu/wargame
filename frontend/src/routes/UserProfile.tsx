@@ -330,7 +330,7 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
                         </>
                     ) : null}
 
-                    <div className='mt-8 rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-2xl md:border md:border-border md:bg-surface md:p-6'>
+                    <div className='mt-8 rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-lg md:border md:border-border md:bg-surface md:p-6'>
                         <div className='flex flex-wrap items-center justify-between gap-2'>
                             <h3 className='text-lg text-text'>{t('profile.solvedChallenges')}</h3>
                             <span className='text-sm text-text-muted'>{solved.length === 1 ? t('profile.problemSingular', { count: solved.length }) : t('profile.problemPlural', { count: solved.length })}</span>
