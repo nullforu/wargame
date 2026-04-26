@@ -1566,3 +1566,264 @@ func TestHandlerGetUser(t *testing.T) {
 		}
 	})
 }
+
+func TestHandlerWriteupHandlers(t *testing.T) {
+	env := setupHandlerTest(t)
+	writer := createHandlerUser(t, env, "hwriter@example.com", "hwriter", "pass", models.UserRole)
+	viewer := createHandlerUser(t, env, "hviewer@example.com", "hviewer", "pass", models.UserRole)
+	challenge := createHandlerChallenge(t, env, "Handler Writeup", 250, "flag{hwriteup}", true)
+	viewerAccess, err := auth.GenerateAccessToken(env.cfg.JWT, viewer.ID, viewer.Role)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken viewer: %v", err)
+	}
+
+	t.Run("challenge writeups validation", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/bad/writeups", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "bad"))
+		env.handler.ChallengeWriteups(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for bad challenge id, got %d", rec.Code)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(challenge.ID)+"/writeups?page=bad", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		env.handler.ChallengeWriteups(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for bad pagination, got %d", rec.Code)
+		}
+	})
+
+	t.Run("create writeup flow", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPost, "/api/challenges/"+toStringID(challenge.ID)+"/writeups", []byte(`{"content":123}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		ctx.Set("userID", writer.ID)
+		env.handler.CreateWriteup(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for invalid create payload, got %d", rec.Code)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/challenges/"+toStringID(challenge.ID)+"/writeups", []byte(`{"content":"first body"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		ctx.Set("userID", writer.ID)
+		env.handler.CreateWriteup(ctx)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("expected 403 before solve, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		createHandlerSubmission(t, env, writer.ID, challenge.ID, true, time.Now().UTC())
+
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/challenges/"+toStringID(challenge.ID)+"/writeups", []byte(`{"content":"first body"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		ctx.Set("userID", writer.ID)
+		env.handler.CreateWriteup(ctx)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 create, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var created writeupResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+			t.Fatalf("decode created writeup: %v", err)
+		}
+
+		if created.ID <= 0 || created.Content == nil || *created.Content != "first body" || !created.IsMine {
+			t.Fatalf("unexpected create response: %+v", created)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/challenges/"+toStringID(challenge.ID)+"/writeups", []byte(`{"content":"dup"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		ctx.Set("userID", writer.ID)
+		env.handler.CreateWriteup(ctx)
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("expected 409 duplicate create, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("challenge writeups visibility", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(challenge.ID)+"/writeups?page=1&page_size=10", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		ctx.Request.Header.Set("Authorization", "Bearer "+viewerAccess)
+		env.handler.ChallengeWriteups(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 list unsolved viewer, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var unsolved writeupsListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &unsolved); err != nil {
+			t.Fatalf("decode unsolved writeups list: %v", err)
+		}
+
+		if unsolved.CanViewContent || len(unsolved.Writeups) != 1 || unsolved.Writeups[0].Content != nil {
+			t.Fatalf("unexpected unsolved writeups list: %+v", unsolved)
+		}
+	})
+
+	var writeupID int64
+	t.Run("get/update/delete and user/my writeups", func(t *testing.T) {
+		rows, _, _, err := env.wargameSvc.ChallengeWriteupsPage(context.Background(), challenge.ID, writer.ID, 1, 10)
+		if err != nil || len(rows) != 1 {
+			t.Fatalf("seed fetch created writeup failed rows=%+v err=%v", rows, err)
+		}
+		writeupID = rows[0].ID
+
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/writeups/bad", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "bad"))
+		env.handler.GetWriteup(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 bad writeup id, got %d", rec.Code)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodGet, "/api/writeups/"+toStringID(writeupID), nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writeupID)))
+		ctx.Request.Header.Set("Authorization", "Bearer "+viewerAccess)
+		env.handler.GetWriteup(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 get unsolved viewer, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var unsolvedDetail writeupDetailResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &unsolvedDetail); err != nil {
+			t.Fatalf("decode unsolved detail: %v", err)
+		}
+
+		if unsolvedDetail.CanViewContent || unsolvedDetail.Writeup.Content != nil {
+			t.Fatalf("unexpected unsolved detail response: %+v", unsolvedDetail)
+		}
+
+		createHandlerSubmission(t, env, viewer.ID, challenge.ID, true, time.Now().UTC())
+
+		ctx, rec = newJSONContext(t, http.MethodGet, "/api/writeups/"+toStringID(writeupID), nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writeupID)))
+		ctx.Request.Header.Set("Authorization", "Bearer "+viewerAccess)
+		env.handler.GetWriteup(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 get solved viewer, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var solvedDetail writeupDetailResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &solvedDetail); err != nil {
+			t.Fatalf("decode solved detail: %v", err)
+		}
+
+		if !solvedDetail.CanViewContent || solvedDetail.Writeup.Content == nil || *solvedDetail.Writeup.Content == "" {
+			t.Fatalf("unexpected solved detail response: %+v", solvedDetail)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPatch, "/api/writeups/"+toStringID(writeupID), []byte(`{"content":123}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writeupID)))
+		ctx.Set("userID", writer.ID)
+		env.handler.UpdateWriteup(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 invalid patch body, got %d", rec.Code)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPatch, "/api/writeups/"+toStringID(writeupID), []byte(`{}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writeupID)))
+		ctx.Set("userID", writer.ID)
+		env.handler.UpdateWriteup(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 empty patch body, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPatch, "/api/writeups/"+toStringID(writeupID), []byte(`{"content":"hacked"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writeupID)))
+		ctx.Set("userID", viewer.ID)
+		env.handler.UpdateWriteup(ctx)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("expected 403 forbidden patch, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPatch, "/api/writeups/"+toStringID(writeupID), []byte(`{"content":"updated by owner"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writeupID)))
+		ctx.Set("userID", writer.ID)
+		env.handler.UpdateWriteup(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 owner patch, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodGet, "/api/me/writeups?page=bad", nil)
+		ctx.Set("userID", writer.ID)
+		env.handler.MyWriteups(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 my writeups bad page, got %d", rec.Code)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodGet, "/api/me/writeups?page=1&page_size=10", nil)
+		ctx.Set("userID", writer.ID)
+		env.handler.MyWriteups(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 my writeups, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var myResp writeupsListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &myResp); err != nil {
+			t.Fatalf("decode my writeups: %v", err)
+		}
+
+		if !myResp.CanViewContent || len(myResp.Writeups) != 1 || myResp.Writeups[0].Content == nil || !myResp.Writeups[0].IsMine {
+			t.Fatalf("unexpected my writeups response: %+v", myResp)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodGet, "/api/users/bad/writeups", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "bad"))
+		env.handler.GetUserWriteups(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 user writeups bad id, got %d", rec.Code)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodGet, "/api/users/999999/writeups", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "999999"))
+		env.handler.GetUserWriteups(ctx)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected 404 user writeups not found user, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodGet, "/api/users/"+toStringID(writer.ID)+"/writeups?page=1&page_size=10", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writer.ID)))
+		ctx.Request.Header.Set("Authorization", "Bearer "+viewerAccess)
+		env.handler.GetUserWriteups(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 user writeups, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var userWriteupsResp writeupsListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &userWriteupsResp); err != nil {
+			t.Fatalf("decode user writeups: %v", err)
+		}
+
+		if !userWriteupsResp.CanViewContent || len(userWriteupsResp.Writeups) != 1 || userWriteupsResp.Writeups[0].Content == nil {
+			t.Fatalf("unexpected user writeups response: %+v", userWriteupsResp)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodDelete, "/api/writeups/bad", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "bad"))
+		ctx.Set("userID", writer.ID)
+		env.handler.DeleteWriteup(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 bad delete id, got %d", rec.Code)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodDelete, "/api/writeups/"+toStringID(writeupID), nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writeupID)))
+		ctx.Set("userID", viewer.ID)
+		env.handler.DeleteWriteup(ctx)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("expected 403 forbidden delete, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodDelete, "/api/writeups/"+toStringID(writeupID), nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writeupID)))
+		ctx.Set("userID", writer.ID)
+		env.handler.DeleteWriteup(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 owner delete, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodGet, "/api/writeups/"+toStringID(writeupID), nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writeupID)))
+		ctx.Set("userID", writer.ID)
+		env.handler.GetWriteup(ctx)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected 404 after delete, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+}
