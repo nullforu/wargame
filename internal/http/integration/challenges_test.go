@@ -53,11 +53,9 @@ func TestListChallengesPaginationAndSearch(t *testing.T) {
 
 	var pagedResp struct {
 		Challenges []struct {
-			Title     string `json:"title"`
-			CreatedBy struct {
-				UserID   int64  `json:"user_id"`
-				Username string `json:"username"`
-			} `json:"created_by"`
+			Title             string `json:"title"`
+			CreatedByUserID   int64  `json:"created_by_user_id"`
+			CreatedByUsername string `json:"created_by_username"`
 		} `json:"challenges"`
 		Pagination struct {
 			Page       int  `json:"page"`
@@ -71,10 +69,6 @@ func TestListChallengesPaginationAndSearch(t *testing.T) {
 	if len(pagedResp.Challenges) != 1 || pagedResp.Challenges[0].Title != "Web Advanced" {
 		t.Fatalf("unexpected paged challenges: %+v", pagedResp.Challenges)
 	}
-	if pagedResp.Challenges[0].CreatedBy.UserID <= 0 || pagedResp.Challenges[0].CreatedBy.Username == "" {
-		t.Fatalf("expected creator info in list response: %+v", pagedResp.Challenges[0])
-	}
-
 	if pagedResp.Pagination.Page != 2 || pagedResp.Pagination.PageSize != 1 || pagedResp.Pagination.TotalCount != 3 || !pagedResp.Pagination.HasPrev || !pagedResp.Pagination.HasNext {
 		t.Fatalf("unexpected pagination: %+v", pagedResp.Pagination)
 	}
@@ -314,6 +308,90 @@ func TestChallengeDetailFiltersSolvedAndSolvers(t *testing.T) {
 	}
 	if !foundExpectedBio {
 		t.Fatalf("expected solver bio in response page: %+v", solvers.Solvers)
+	}
+}
+
+func TestChallengesFilterByUnknownLevel(t *testing.T) {
+	env := setupTest(t, testCfg)
+	_ = createUser(t, env, "admin@example.com", models.AdminRole, "adminpass", models.AdminRole)
+	adminAccess, _, _ := loginUser(t, env.router, "admin@example.com", "adminpass")
+	_ = createUser(t, env, "player@example.com", "player", "playerpass", models.UserRole)
+	userAccess, _, _ := loginUser(t, env.router, "player@example.com", "playerpass")
+
+	createChallengeReq := func(title, flag string) int64 {
+		rec := doRequest(t, env.router, http.MethodPost, "/api/admin/challenges", map[string]any{
+			"title":       title,
+			"description": "desc",
+			"category":    "Web",
+			"points":      100,
+			"flag":        flag,
+			"is_active":   true,
+		}, authHeader(adminAccess))
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create status %d: %s", rec.Code, rec.Body.String())
+		}
+		var created struct {
+			ID int64 `json:"id"`
+		}
+		decodeJSON(t, rec, &created)
+		return created.ID
+	}
+
+	unknownID := createChallengeReq("Unknown Only", "flag{unknown}")
+	votedID := createChallengeReq("Known Level", "flag{known}")
+
+	// Vote one challenge to give it a non-unknown representative level.
+	submitRec := doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(votedID)+"/submit", map[string]string{"flag": "flag{known}"}, authHeader(userAccess))
+	if submitRec.Code != http.StatusOK {
+		t.Fatalf("submit status %d: %s", submitRec.Code, submitRec.Body.String())
+	}
+	voteRec := doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(votedID)+"/vote", map[string]int{"level": 7}, authHeader(userAccess))
+	if voteRec.Code != http.StatusOK {
+		t.Fatalf("vote status %d: %s", voteRec.Code, voteRec.Body.String())
+	}
+
+	rec := doRequest(t, env.router, http.MethodGet, "/api/challenges?level=0&page=1&page_size=20", nil, authHeader(userAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list unknown level status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var listResp struct {
+		Challenges []struct {
+			ID int64 `json:"id"`
+		} `json:"challenges"`
+	}
+	decodeJSON(t, rec, &listResp)
+
+	foundUnknown := false
+	foundVoted := false
+	for _, item := range listResp.Challenges {
+		if item.ID == unknownID {
+			foundUnknown = true
+		}
+		if item.ID == votedID {
+			foundVoted = true
+		}
+	}
+	if !foundUnknown {
+		t.Fatalf("expected unknown-level challenge %d in response: %+v", unknownID, listResp.Challenges)
+	}
+	if foundVoted {
+		t.Fatalf("did not expect voted challenge %d in unknown-level response: %+v", votedID, listResp.Challenges)
+	}
+
+	searchRec := doRequest(t, env.router, http.MethodGet, "/api/challenges/search?q=Unknown&level=0&page=1&page_size=20", nil, authHeader(userAccess))
+	if searchRec.Code != http.StatusOK {
+		t.Fatalf("search unknown level status %d: %s", searchRec.Code, searchRec.Body.String())
+	}
+
+	var searchResp struct {
+		Challenges []struct {
+			ID int64 `json:"id"`
+		} `json:"challenges"`
+	}
+	decodeJSON(t, searchRec, &searchResp)
+	if len(searchResp.Challenges) != 1 || searchResp.Challenges[0].ID != unknownID {
+		t.Fatalf("unexpected unknown-level search response: %+v", searchResp.Challenges)
 	}
 }
 

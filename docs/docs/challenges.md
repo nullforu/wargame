@@ -9,8 +9,8 @@ nav_order: 4
 
 Query parameters:
 
-- `q` (optional, title keyword)
 - `category` (optional, exact category)
+- `level` (optional, representative level filter `0`..`10`; `0` means `Unknown`)
 - `solved` (optional, `true`/`false`, requires authenticated user context)
 - `sort` (optional, one of `latest`, `oldest`, `most_solved`, `least_solved`; default `latest`)
 - `page` (optional, default `1`)
@@ -30,13 +30,10 @@ Response 200
             "level": 0,
             "points": 100,
             "solve_count": 12,
-            "created_by": {
-                "user_id": 1,
-                "username": "admin",
-                "affiliation_id": 3,
-                "affiliation": "Blue Team High",
-                "bio": "Challenge author"
-            },
+            "created_by_user_id": 1,
+            "created_by_username": "admin",
+            "created_by_affiliation_id": 3,
+            "created_by_affiliation": "Blue Team High",
             "is_active": true,
             "is_locked": false,
             "is_solved": true,
@@ -76,6 +73,7 @@ Query parameters:
 
 - `q` (required, challenge title keyword)
 - `category` (optional, exact category)
+- `level` (optional, representative level filter `0`..`10`; `0` means `Unknown`)
 - `solved` (optional, `true`/`false`, requires authenticated user context)
 - `sort` (optional, one of `latest`, `oldest`, `most_solved`, `least_solved`; default `latest`)
 - `page` (optional, default `1`)
@@ -95,13 +93,10 @@ Response 200
             "level": 0,
             "points": 100,
             "solve_count": 12,
-            "created_by": {
-                "user_id": 1,
-                "username": "admin",
-                "affiliation_id": 3,
-                "affiliation": "Blue Team High",
-                "bio": "Challenge author"
-            },
+            "created_by_user_id": 1,
+            "created_by_username": "admin",
+            "created_by_affiliation_id": 3,
+            "created_by_affiliation": "Blue Team High",
             "is_active": true,
             "is_locked": false,
             "is_solved": true,
@@ -148,13 +143,10 @@ Response 200
     ],
     "points": 100,
     "solve_count": 12,
-    "created_by": {
-        "user_id": 1,
-        "username": "admin",
-        "affiliation_id": 3,
-        "affiliation": "Blue Team High",
-        "bio": "Challenge author"
-    },
+    "created_by_user_id": 1,
+    "created_by_username": "admin",
+    "created_by_affiliation_id": 3,
+    "created_by_affiliation": "Blue Team High",
     "is_active": true,
     "is_locked": false,
     "is_solved": true,
@@ -189,8 +181,6 @@ Response 200
         {
             "user_id": 7,
             "username": "alice",
-            "affiliation": "Blue Team High",
-            "bio": "Web solver",
             "solved_at": "2026-01-24T12:00:00Z",
             "is_first_blood": true
         }

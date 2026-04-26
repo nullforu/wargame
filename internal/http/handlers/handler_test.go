@@ -876,6 +876,14 @@ func TestParseChallengeFilters(t *testing.T) {
 		}
 	})
 
+	t.Run("success unknown level", func(t *testing.T) {
+		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges?level=0", nil)
+		filters, ok := parseChallengeFilters(ctx)
+		if !ok || filters.Level == nil || *filters.Level != 0 {
+			t.Fatalf("unexpected filters for unknown level: ok=%v filters=%+v", ok, filters)
+		}
+	})
+
 	t.Run("invalid level", func(t *testing.T) {
 		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges?level=abc", nil)
 		_, ok := parseChallengeFilters(ctx)
