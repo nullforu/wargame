@@ -43,6 +43,7 @@ export interface ChallengeDetail {
     created_at: string
     level: number
     level_vote_counts?: LevelVoteCount[]
+    first_blood?: ChallengeSolver | null
     points: number
     solve_count: number
     created_by?: ChallengeCreator | null
@@ -64,6 +65,7 @@ export interface LockedChallenge {
     level: number
     points: number
     solve_count: number
+    first_blood?: ChallengeSolver | null
     created_by?: ChallengeCreator | null
     is_active: boolean
     previous_challenge_id?: number | null

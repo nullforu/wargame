@@ -188,6 +188,7 @@ type challengeResponse struct {
 	SolveCount          int                       `json:"solve_count"`
 	LevelVoteCounts     []models.LevelVoteCount   `json:"level_vote_counts,omitempty"`
 	CreatedBy           *challengeCreatorResponse `json:"created_by,omitempty"`
+	FirstBlood          *challengeSolverResponse  `json:"first_blood,omitempty"`
 	PreviousChallengeID *int64                    `json:"previous_challenge_id,omitempty"`
 	IsActive            bool                      `json:"is_active"`
 	IsLocked            bool                      `json:"is_locked"`
@@ -207,6 +208,7 @@ type lockedChallengeResponse struct {
 	Points                    int                       `json:"points"`
 	SolveCount                int                       `json:"solve_count"`
 	CreatedBy                 *challengeCreatorResponse `json:"created_by,omitempty"`
+	FirstBlood                *challengeSolverResponse  `json:"first_blood,omitempty"`
 	PreviousChallengeID       *int64                    `json:"previous_challenge_id,omitempty"`
 	PreviousChallengeTitle    *string                   `json:"previous_challenge_title,omitempty"`
 	PreviousChallengeCategory *string                   `json:"previous_challenge_category,omitempty"`
@@ -443,8 +445,14 @@ func newAdminUserResponse(user *models.User) adminUserResponse {
 	}
 }
 
-func newChallengeResponse(challenge *models.Challenge, isSolved bool) challengeResponse {
+func newChallengeResponse(challenge *models.Challenge, isSolved bool, firstBlood *models.ChallengeSolver) challengeResponse {
 	hasFile := challenge.FileKey != nil && *challenge.FileKey != ""
+	firstBloodResp := (*challengeSolverResponse)(nil)
+	if firstBlood != nil {
+		mapped := newChallengeSolverResponse(*firstBlood)
+		firstBloodResp = &mapped
+	}
+
 	return challengeResponse{
 		ID:                  challenge.ID,
 		Title:               challenge.Title,
@@ -456,6 +464,7 @@ func newChallengeResponse(challenge *models.Challenge, isSolved bool) challengeR
 		SolveCount:          challenge.SolveCount,
 		LevelVoteCounts:     challenge.LevelVotes,
 		CreatedBy:           newChallengeCreatorResponse(challenge),
+		FirstBlood:          firstBloodResp,
 		PreviousChallengeID: challenge.PreviousChallengeID,
 		IsActive:            challenge.IsActive,
 		IsLocked:            false,
@@ -467,12 +476,17 @@ func newChallengeResponse(challenge *models.Challenge, isSolved bool) challengeR
 	}
 }
 
-func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Challenge, isSolved bool) lockedChallengeResponse {
+func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Challenge, isSolved bool, firstBlood *models.ChallengeSolver) lockedChallengeResponse {
 	var prevTitle *string
 	var prevCategory *string
+	firstBloodResp := (*challengeSolverResponse)(nil)
 	if previous != nil {
 		prevTitle = &previous.Title
 		prevCategory = &previous.Category
+	}
+	if firstBlood != nil {
+		mapped := newChallengeSolverResponse(*firstBlood)
+		firstBloodResp = &mapped
 	}
 	return lockedChallengeResponse{
 		ID:                        challenge.ID,
@@ -483,6 +497,7 @@ func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Ch
 		Points:                    challenge.Points,
 		SolveCount:                challenge.SolveCount,
 		CreatedBy:                 newChallengeCreatorResponse(challenge),
+		FirstBlood:                firstBloodResp,
 		PreviousChallengeID:       challenge.PreviousChallengeID,
 		PreviousChallengeTitle:    prevTitle,
 		PreviousChallengeCategory: prevCategory,
@@ -503,6 +518,17 @@ func newChallengeCreatorResponse(challenge *models.Challenge) *challengeCreatorR
 		AffiliationID: challenge.CreatedByAffiliationID,
 		Affiliation:   challenge.CreatedByAffiliation,
 		Bio:           challenge.CreatedByBio,
+	}
+}
+
+func newChallengeSolverResponse(row models.ChallengeSolver) challengeSolverResponse {
+	return challengeSolverResponse{
+		UserID:       row.UserID,
+		Username:     row.Username,
+		Affiliation:  row.Affiliation,
+		Bio:          row.Bio,
+		SolvedAt:     row.SolvedAt.UTC(),
+		IsFirstBlood: row.IsFirstBlood,
 	}
 }
 

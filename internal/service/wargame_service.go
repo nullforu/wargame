@@ -851,6 +851,26 @@ func (s *WargameService) ChallengeSolversPage(ctx context.Context, challengeID i
 	return rows, BuildPagination(params.Page, params.PageSize, totalCount), nil
 }
 
+func (s *WargameService) ChallengeFirstBlood(ctx context.Context, challengeID int64) (*models.ChallengeSolver, error) {
+	if challengeID <= 0 {
+		return nil, ErrInvalidInput
+	}
+
+	if _, err := s.challengeRepo.GetByID(ctx, challengeID); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrChallengeNotFound
+		}
+		return nil, fmt.Errorf("wargame.ChallengeFirstBlood lookup: %w", err)
+	}
+
+	row, err := s.submissionRepo.ChallengeFirstBlood(ctx, challengeID)
+	if err != nil {
+		return nil, fmt.Errorf("wargame.ChallengeFirstBlood: %w", err)
+	}
+
+	return row, nil
+}
+
 func (s *WargameService) ListAllSubmissions(ctx context.Context) ([]models.Submission, error) {
 	rows, err := s.submissionRepo.ListAll(ctx)
 	if err != nil {

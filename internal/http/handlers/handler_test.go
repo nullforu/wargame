@@ -1233,6 +1233,32 @@ func TestHandlerGetChallengeAndSolvers(t *testing.T) {
 		}
 	})
 
+	t.Run("get challenge includes first blood", func(t *testing.T) {
+		now := time.Now().UTC()
+		sub := &models.Submission{UserID: user.ID, ChallengeID: prev.ID, Provided: "FLAG{PREV}", Correct: true, SubmittedAt: now.Add(-2 * time.Minute)}
+		inserted, err := env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), sub)
+		if err != nil || !inserted {
+			t.Fatalf("seed first blood: inserted=%v err=%v", inserted, err)
+		}
+
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(prev.ID), nil)
+		ctx.Request.Header.Set("Authorization", "Bearer "+token)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(prev.ID)))
+		env.handler.GetChallenge(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var resp challengeResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+
+		if resp.FirstBlood == nil || resp.FirstBlood.UserID != user.ID || !resp.FirstBlood.IsFirstBlood {
+			t.Fatalf("expected first blood in detail response, got %+v", resp.FirstBlood)
+		}
+	})
+
 	t.Run("challenge solvers invalid id", func(t *testing.T) {
 		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/abc/solvers", nil)
 		ctx.Params = append(ctx.Params, ginParam("id", "abc"))

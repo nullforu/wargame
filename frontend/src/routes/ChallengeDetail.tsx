@@ -309,24 +309,25 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
 
         setSubmission({ status: 'loading' })
 
+        const handleSolveSuccess = async () => {
+            setSubmission({ status: 'success', message: t('challenge.correct') })
+            setFlagInput('')
+            setChallenge((prev) => (prev ? { ...prev, is_solved: true } : prev))
+            setCanViewWriteupContent(true)
+            await Promise.all([loadChallenge(), loadSolvers(solverPage), loadWriteups(writeupPage)])
+            openVoteModal('solved')
+        }
+
         try {
             const result = await api.submitFlag(challengeId, flagInput)
             if (result.correct) {
-                setSubmission({ status: 'success', message: t('challenge.correct') })
-                setFlagInput('')
-                await loadChallenge()
-                await loadSolvers(solverPage)
-                openVoteModal('solved')
+                await handleSolveSuccess()
             } else {
                 setSubmission({ status: 'error', message: t('challenge.incorrect') })
             }
         } catch (error) {
             if (error instanceof ApiError && error.status === 409) {
-                setSubmission({ status: 'success', message: t('challenge.correct') })
-                setFlagInput('')
-                await loadChallenge()
-                await loadSolvers(solverPage)
-                openVoteModal('solved')
+                await handleSolveSuccess()
                 return
             }
             setSubmission({ status: 'error', message: formatApiError(error, t).message })
@@ -417,7 +418,10 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         const min = String(date.getMinutes()).padStart(2, '0')
         return `${yyyy}-${mm}-${dd} ${hh}:${min}`
     }
-    const firstBloodSolver = useMemo(() => solvers.find((solver) => solver.is_first_blood) ?? null, [solvers])
+    const firstBloodSolver = useMemo(() => {
+        if (challenge && 'first_blood' in challenge && challenge.first_blood) return challenge.first_blood
+        return solvers.find((solver) => solver.is_first_blood) ?? null
+    }, [challenge, solvers])
     const firstBloodDuration = useMemo(() => {
         if (!challenge?.created_at || !firstBloodSolver?.solved_at) return null
         return calculateFirstBloodDuration(challenge.created_at, firstBloodSolver.solved_at)

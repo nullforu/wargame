@@ -147,6 +147,14 @@ Response 200
     "created_by_username": "admin",
     "created_by_affiliation_id": 3,
     "created_by_affiliation": "Blue Team High",
+    "first_blood": {
+        "user_id": 7,
+        "username": "alice",
+        "affiliation": "Blue Team High",
+        "bio": "pwn lover",
+        "solved_at": "2026-01-24T12:03:00Z",
+        "is_first_blood": true
+    },
     "is_active": true,
     "is_locked": false,
     "is_solved": true,

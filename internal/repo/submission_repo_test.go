@@ -187,3 +187,49 @@ func TestSubmissionRepoChallengeSolversPageOrdersLatestFirst(t *testing.T) {
 		t.Fatalf("expected older solver in second page, got %+v", page2)
 	}
 }
+
+func TestSubmissionRepoChallengeFirstBlood(t *testing.T) {
+	env := setupRepoTest(t)
+	ch := createChallenge(t, env, "first-blood", 100, "FLAG{FB}", true)
+	first := createUserForTestUserScope(t, env, "first@example.com", "first", "pass", models.UserRole)
+	second := createUserForTestUserScope(t, env, "second@example.com", "second", "pass", models.UserRole)
+
+	now := time.Now().UTC()
+	firstSub := &models.Submission{UserID: first.ID, ChallengeID: ch.ID, Provided: "FLAG{FB}", Correct: true, SubmittedAt: now.Add(-2 * time.Minute)}
+	inserted, err := env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), firstSub)
+	if err != nil || !inserted {
+		t.Fatalf("seed first solve: inserted=%v err=%v", inserted, err)
+	}
+
+	secondSub := &models.Submission{UserID: second.ID, ChallengeID: ch.ID, Provided: "FLAG{FB}", Correct: true, SubmittedAt: now.Add(-time.Minute)}
+	inserted, err = env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), secondSub)
+	if err != nil || !inserted {
+		t.Fatalf("seed second solve: inserted=%v err=%v", inserted, err)
+	}
+
+	row, err := env.submissionRepo.ChallengeFirstBlood(context.Background(), ch.ID)
+	if err != nil {
+		t.Fatalf("ChallengeFirstBlood: %v", err)
+	}
+
+	if row == nil {
+		t.Fatalf("expected first blood row")
+	}
+
+	if row.UserID != first.ID || !row.IsFirstBlood {
+		t.Fatalf("unexpected first blood row: %+v", row)
+	}
+}
+
+func TestSubmissionRepoChallengeFirstBloodEmpty(t *testing.T) {
+	env := setupRepoTest(t)
+	ch := createChallenge(t, env, "no-first-blood", 100, "FLAG{NONE}", true)
+
+	row, err := env.submissionRepo.ChallengeFirstBlood(context.Background(), ch.ID)
+	if err != nil {
+		t.Fatalf("ChallengeFirstBlood empty: %v", err)
+	}
+	if row != nil {
+		t.Fatalf("expected nil first blood, got %+v", row)
+	}
+}

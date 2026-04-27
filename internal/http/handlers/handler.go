@@ -396,11 +396,11 @@ func (h *Handler) ListChallenges(ctx *gin.Context) {
 		_, isSolved := solved[ch.ID]
 		if isChallengeLocked(ch, solved, userID) {
 			previous := h.previousChallengeForResponse(ctx.Request.Context(), byID, ch.PreviousChallengeID)
-			resp = append(resp, newLockedChallengeResponse(&ch, previous, isSolved))
+			resp = append(resp, newLockedChallengeResponse(&ch, previous, isSolved, nil))
 			continue
 		}
 
-		resp = append(resp, newChallengeResponse(&ch, isSolved))
+		resp = append(resp, newChallengeResponse(&ch, isSolved, nil))
 	}
 
 	ctx.JSON(http.StatusOK, challengesListResponse{Challenges: resp, Pagination: pagination})
@@ -456,11 +456,11 @@ func (h *Handler) SearchChallenges(ctx *gin.Context) {
 		_, isSolved := solved[ch.ID]
 		if isChallengeLocked(ch, solved, userID) {
 			previous := h.previousChallengeForResponse(ctx.Request.Context(), byID, ch.PreviousChallengeID)
-			resp = append(resp, newLockedChallengeResponse(&ch, previous, isSolved))
+			resp = append(resp, newLockedChallengeResponse(&ch, previous, isSolved, nil))
 			continue
 		}
 
-		resp = append(resp, newChallengeResponse(&ch, isSolved))
+		resp = append(resp, newChallengeResponse(&ch, isSolved, nil))
 	}
 
 	ctx.JSON(http.StatusOK, challengesListResponse{Challenges: resp, Pagination: pagination})
@@ -487,15 +487,21 @@ func (h *Handler) GetChallenge(ctx *gin.Context) {
 			return
 		}
 	}
-	_, isSolved := solved[challenge.ID]
 
-	if isChallengeLocked(*challenge, solved, userID) {
-		previous := h.previousChallengeForResponse(ctx.Request.Context(), map[int64]*models.Challenge{}, challenge.PreviousChallengeID)
-		ctx.JSON(http.StatusOK, newLockedChallengeResponse(challenge, previous, isSolved))
+	_, isSolved := solved[challenge.ID]
+	firstBlood, err := h.wargame.ChallengeFirstBlood(ctx.Request.Context(), challenge.ID)
+	if err != nil {
+		writeError(ctx, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, isSolved))
+	if isChallengeLocked(*challenge, solved, userID) {
+		previous := h.previousChallengeForResponse(ctx.Request.Context(), map[int64]*models.Challenge{}, challenge.PreviousChallengeID)
+		ctx.JSON(http.StatusOK, newLockedChallengeResponse(challenge, previous, isSolved, firstBlood))
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, isSolved, firstBlood))
 }
 
 func (h *Handler) ChallengeSolvers(ctx *gin.Context) {
@@ -517,14 +523,7 @@ func (h *Handler) ChallengeSolvers(ctx *gin.Context) {
 
 	solvers := make([]challengeSolverResponse, 0, len(rows))
 	for _, row := range rows {
-		solvers = append(solvers, challengeSolverResponse{
-			UserID:       row.UserID,
-			Username:     row.Username,
-			Affiliation:  row.Affiliation,
-			Bio:          row.Bio,
-			SolvedAt:     row.SolvedAt.UTC(),
-			IsFirstBlood: row.IsFirstBlood,
-		})
+		solvers = append(solvers, newChallengeSolverResponse(row))
 	}
 
 	ctx.JSON(http.StatusOK, challengeSolversResponse{Solvers: solvers, Pagination: pagination})
@@ -842,7 +841,7 @@ func (h *Handler) CreateChallenge(ctx *gin.Context) {
 	}
 
 	h.notifyScoreboardChanged(ctx.Request.Context(), "challenge_created")
-	ctx.JSON(http.StatusCreated, newChallengeResponse(challenge, false))
+	ctx.JSON(http.StatusCreated, newChallengeResponse(challenge, false, nil))
 }
 
 func (h *Handler) UpdateChallenge(ctx *gin.Context) {
@@ -895,7 +894,7 @@ func (h *Handler) UpdateChallenge(ctx *gin.Context) {
 	}
 
 	h.notifyScoreboardChanged(ctx.Request.Context(), "challenge_updated")
-	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, false))
+	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, false, nil))
 }
 
 func requireNonNullOptionalString(field string, value optionalString) (*string, error) {
@@ -935,7 +934,7 @@ func (h *Handler) AdminGetChallenge(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, adminChallengeResponse{challengeResponse: newChallengeResponse(challenge, false), StackPodSpec: challenge.StackPodSpec})
+	ctx.JSON(http.StatusOK, adminChallengeResponse{challengeResponse: newChallengeResponse(challenge, false, nil), StackPodSpec: challenge.StackPodSpec})
 }
 
 func (h *Handler) DeleteChallenge(ctx *gin.Context) {
@@ -971,7 +970,7 @@ func (h *Handler) RequestChallengeFileUpload(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, challengeFileUploadResponse{Challenge: newChallengeResponse(challenge, false), Upload: presignedPostResponse{URL: upload.URL, Fields: upload.Fields, ExpiresAt: upload.ExpiresAt}})
+	ctx.JSON(http.StatusOK, challengeFileUploadResponse{Challenge: newChallengeResponse(challenge, false, nil), Upload: presignedPostResponse{URL: upload.URL, Fields: upload.Fields, ExpiresAt: upload.ExpiresAt}})
 }
 
 func (h *Handler) RequestChallengeFileDownload(ctx *gin.Context) {
@@ -1001,7 +1000,7 @@ func (h *Handler) DeleteChallengeFile(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, false))
+	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, false, nil))
 }
 
 func (h *Handler) VoteChallengeLevel(ctx *gin.Context) {

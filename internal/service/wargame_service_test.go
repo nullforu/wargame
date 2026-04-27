@@ -294,6 +294,50 @@ func TestWargameServiceChallengeFiltersAndPagedSolvedAndSolvers(t *testing.T) {
 	}
 }
 
+func TestWargameServiceChallengeFirstBlood(t *testing.T) {
+	env := setupServiceTest(t)
+	first := createUser(t, env, "fb1@example.com", "fb1", "pass", models.UserRole)
+	second := createUser(t, env, "fb2@example.com", "fb2", "pass", models.UserRole)
+	challenge := createChallenge(t, env, "firstblood", 100, "FLAG{FIRST}", true)
+
+	now := time.Now().UTC()
+	firstSub := &models.Submission{UserID: first.ID, ChallengeID: challenge.ID, Provided: "FLAG{FIRST}", Correct: true, SubmittedAt: now.Add(-2 * time.Minute)}
+	inserted, err := env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), firstSub)
+	if err != nil || !inserted {
+		t.Fatalf("seed first solve: inserted=%v err=%v", inserted, err)
+	}
+
+	secondSub := &models.Submission{UserID: second.ID, ChallengeID: challenge.ID, Provided: "FLAG{FIRST}", Correct: true, SubmittedAt: now.Add(-time.Minute)}
+	inserted, err = env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), secondSub)
+	if err != nil || !inserted {
+		t.Fatalf("seed second solve: inserted=%v err=%v", inserted, err)
+	}
+
+	row, err := env.wargameSvc.ChallengeFirstBlood(context.Background(), challenge.ID)
+	if err != nil {
+		t.Fatalf("ChallengeFirstBlood: %v", err)
+	}
+	if row == nil || row.UserID != first.ID || !row.IsFirstBlood {
+		t.Fatalf("unexpected first blood row: %+v", row)
+	}
+
+	emptyChallenge := createChallenge(t, env, "empty-firstblood", 100, "FLAG{EMPTY}", true)
+	emptyRow, err := env.wargameSvc.ChallengeFirstBlood(context.Background(), emptyChallenge.ID)
+	if err != nil {
+		t.Fatalf("ChallengeFirstBlood empty: %v", err)
+	}
+	if emptyRow != nil {
+		t.Fatalf("expected nil first blood for unsolved challenge, got %+v", emptyRow)
+	}
+
+	if _, err := env.wargameSvc.ChallengeFirstBlood(context.Background(), 0); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput, got %v", err)
+	}
+	if _, err := env.wargameSvc.ChallengeFirstBlood(context.Background(), 999999); !errors.Is(err, ErrChallengeNotFound) {
+		t.Fatalf("expected ErrChallengeNotFound, got %v", err)
+	}
+}
+
 func TestWargameServiceLevelFilterValidation(t *testing.T) {
 	env := setupServiceTest(t)
 
