@@ -43,6 +43,9 @@ func TestSubmissionRepoSolvedChallengesPageAndIDs(t *testing.T) {
 	if totalCount != 2 {
 		t.Fatalf("expected total count 2, got %d", totalCount)
 	}
+	if rows[0].ChallengeID != ch2.ID || rows[1].ChallengeID != ch1.ID {
+		t.Fatalf("expected solved challenges ordered by latest solve time, got %+v", rows)
+	}
 
 	ids, err := env.submissionRepo.SolvedChallengeIDs(context.Background(), user.ID)
 	if err != nil {
@@ -152,5 +155,35 @@ func TestSubmissionRepoEmptyAndErrorPaths(t *testing.T) {
 	if _, err := env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), &models.Submission{UserID: 0, ChallengeID: 0, Correct: true, SubmittedAt: time.Now().UTC()}); err == nil && !errors.Is(err, ErrNotFound) {
 		// Any non-nil DB error is acceptable here; this assert only guards accidental silent success.
 		t.Fatalf("expected failure for invalid ids")
+	}
+}
+
+func TestSubmissionRepoChallengeSolversPageOrdersLatestFirst(t *testing.T) {
+	env := setupRepoTest(t)
+	ch := createChallenge(t, env, "solvers", 100, "FLAG{SOLVERS}", true)
+	older := createUserForTestUserScope(t, env, "older@example.com", "older", "pass", models.UserRole)
+	newer := createUserForTestUserScope(t, env, "newer@example.com", "newer", "pass", models.UserRole)
+
+	now := time.Now().UTC()
+	createSubmission(t, env, older.ID, ch.ID, true, now.Add(-2*time.Minute))
+	createSubmission(t, env, newer.ID, ch.ID, true, now.Add(-time.Minute))
+
+	page1, totalCount, err := env.submissionRepo.ChallengeSolversPage(context.Background(), ch.ID, 1, 1)
+	if err != nil {
+		t.Fatalf("ChallengeSolversPage page1: %v", err)
+	}
+	if totalCount != 2 {
+		t.Fatalf("expected total count 2, got %d", totalCount)
+	}
+	if len(page1) != 1 || page1[0].UserID != newer.ID {
+		t.Fatalf("expected newest solver in first page, got %+v", page1)
+	}
+
+	page2, _, err := env.submissionRepo.ChallengeSolversPage(context.Background(), ch.ID, 2, 1)
+	if err != nil {
+		t.Fatalf("ChallengeSolversPage page2: %v", err)
+	}
+	if len(page2) != 1 || page2[0].UserID != older.ID {
+		t.Fatalf("expected older solver in second page, got %+v", page2)
 	}
 }

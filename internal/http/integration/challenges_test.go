@@ -299,6 +299,9 @@ func TestChallengeDetailFiltersSolvedAndSolvers(t *testing.T) {
 	if len(solvers.Solvers) != 2 || solvers.Pagination.TotalCount < 3 || !solvers.Pagination.HasNext {
 		t.Fatalf("unexpected solvers response: %+v", solvers)
 	}
+	if solvers.Solvers[0].UserID != other2.ID || solvers.Solvers[1].UserID != other1.ID {
+		t.Fatalf("expected latest solvers first, got %+v", solvers.Solvers)
+	}
 	foundExpectedBio := false
 	for _, solver := range solvers.Solvers {
 		if solver.Bio != nil && (*solver.Bio == solver1Bio || *solver.Bio == solver2Bio) {

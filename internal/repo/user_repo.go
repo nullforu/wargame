@@ -100,7 +100,7 @@ func (r *UserRepo) listWithQuery(ctx context.Context, query string, page, pageSi
 	}
 
 	offset := (page - 1) * pageSize
-	if err := listQuery.OrderExpr("u.id ASC").Limit(pageSize).Offset(offset).Scan(ctx, &users); err != nil {
+	if err := listQuery.OrderExpr("u.id DESC").Limit(pageSize).Offset(offset).Scan(ctx, &users); err != nil {
 		return nil, 0, wrapError("userRepo.listWithQuery list", err)
 	}
 
@@ -133,7 +133,7 @@ func (r *UserRepo) ListByAffiliation(ctx context.Context, affiliationID int64, p
 	}
 
 	offset := (page - 1) * pageSize
-	if err := base.OrderExpr("u.id ASC").Limit(pageSize).Offset(offset).Scan(ctx, &rows); err != nil {
+	if err := base.OrderExpr("u.id DESC").Limit(pageSize).Offset(offset).Scan(ctx, &rows); err != nil {
 		return nil, 0, wrapError("userRepo.ListByAffiliation list", err)
 	}
 

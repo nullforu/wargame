@@ -51,15 +51,15 @@ func TestListUsers(t *testing.T) {
 		t.Fatalf("expected 3 users, got %d", len(resp.Users))
 	}
 
-	if resp.Users[0].Username != "user1" || resp.Users[1].Username != "user2" || resp.Users[2].Username != models.AdminRole {
+	if resp.Users[0].Username != models.AdminRole || resp.Users[1].Username != "user2" || resp.Users[2].Username != "user1" {
 		t.Fatalf("unexpected response: %+v", resp.Users)
 	}
 
-	if resp.Users[0].BlockedReason == nil {
+	if resp.Users[2].BlockedReason == nil {
 		t.Fatalf("expected blocked reason for user1")
 	}
-	if resp.Users[0].Bio == nil || *resp.Users[0].Bio != bio {
-		t.Fatalf("expected bio for user1, got %+v", resp.Users[0].Bio)
+	if resp.Users[2].Bio == nil || *resp.Users[2].Bio != bio {
+		t.Fatalf("expected bio for user1, got %+v", resp.Users[2].Bio)
 	}
 
 	if resp.Pagination.Page != 1 || resp.Pagination.PageSize != 20 || resp.Pagination.TotalCount != 3 || resp.Pagination.HasNext {
@@ -190,8 +190,11 @@ func TestGetUserSolved(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		env := setupTest(t, testCfg)
 		user := createUser(t, env, "user1@example.com", "user1", "pass1", models.UserRole)
-		challenge := createChallenge(t, env, "Warmup", 100, "flag{ok}", true)
-		createSubmission(t, env, user.ID, challenge.ID, true, time.Now().UTC())
+		challenge1 := createChallenge(t, env, "Warmup", 100, "flag{ok}", true)
+		challenge2 := createChallenge(t, env, "Warmup 2", 150, "flag{ok2}", true)
+		now := time.Now().UTC()
+		createSubmission(t, env, user.ID, challenge1.ID, true, now.Add(-2*time.Minute))
+		createSubmission(t, env, user.ID, challenge2.ID, true, now.Add(-time.Minute))
 
 		rec := doRequest(t, env.router, http.MethodGet, "/api/users/"+itoa(user.ID)+"/solved", nil, nil)
 		if rec.Code != http.StatusOK {
@@ -212,14 +215,14 @@ func TestGetUserSolved(t *testing.T) {
 		}
 		decodeJSON(t, rec, &resp)
 
-		if len(resp.Solved) != 1 {
-			t.Fatalf("expected 1 solved challenge, got %d", len(resp.Solved))
+		if len(resp.Solved) != 2 {
+			t.Fatalf("expected 2 solved challenges, got %d", len(resp.Solved))
 		}
 
-		if resp.Solved[0].ChallengeID != challenge.ID || resp.Solved[0].Title != "Warmup" || resp.Solved[0].Points != 100 {
+		if resp.Solved[0].ChallengeID != challenge2.ID || resp.Solved[0].Title != "Warmup 2" || resp.Solved[0].Points != 150 {
 			t.Fatalf("unexpected response: %+v", resp)
 		}
-		if resp.Pagination.Page != 1 || resp.Pagination.TotalCount != 1 {
+		if resp.Pagination.Page != 1 || resp.Pagination.TotalCount != 2 {
 			t.Fatalf("unexpected pagination: %+v", resp.Pagination)
 		}
 	})

@@ -269,6 +269,9 @@ func TestWargameServiceChallengeFiltersAndPagedSolvedAndSolvers(t *testing.T) {
 	if len(solversPage1) != 1 || solversPagination1.TotalCount != 2 || !solversPagination1.HasNext {
 		t.Fatalf("unexpected solvers page1: rows=%+v pagination=%+v", solversPage1, solversPagination1)
 	}
+	if solversPage1[0].UserID != user2.ID {
+		t.Fatalf("expected latest solver first, got %+v", solversPage1[0])
+	}
 
 	solversPage2, solversPagination2, err := env.wargameSvc.ChallengeSolversPage(context.Background(), chWeb.ID, 2, 1)
 	if err != nil {
@@ -277,6 +280,9 @@ func TestWargameServiceChallengeFiltersAndPagedSolvedAndSolvers(t *testing.T) {
 
 	if len(solversPage2) != 1 || solversPagination2.TotalCount != 2 || solversPagination2.HasNext {
 		t.Fatalf("unexpected solvers page2: rows=%+v pagination=%+v", solversPage2, solversPagination2)
+	}
+	if solversPage2[0].UserID != user1.ID {
+		t.Fatalf("expected older solver second, got %+v", solversPage2[0])
 	}
 
 	if _, _, err := env.wargameSvc.ChallengeSolversPage(context.Background(), 0, 1, 20); !errors.Is(err, ErrInvalidInput) {

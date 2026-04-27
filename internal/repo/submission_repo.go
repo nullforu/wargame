@@ -175,7 +175,7 @@ func (r *SubmissionRepo) SolvedChallengesPage(ctx context.Context, userID int64,
 	}
 
 	err = base.
-		OrderExpr("solved_at ASC").
+		OrderExpr("solved_at DESC, challenge_id DESC").
 		Limit(pageSize).
 		Offset((page-1)*pageSize).
 		Scan(ctx, &rows)
@@ -231,7 +231,7 @@ func (r *SubmissionRepo) ChallengeSolversPage(ctx context.Context, challengeID i
 	}
 
 	err = base.
-		OrderExpr("solved_at ASC, user_id ASC").
+		OrderExpr("solved_at DESC, user_id ASC").
 		Limit(pageSize).
 		Offset((page-1)*pageSize).
 		Scan(ctx, &rows)

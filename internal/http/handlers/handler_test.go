@@ -306,6 +306,10 @@ func TestHandlerAffiliationsAndRankings(t *testing.T) {
 	if err := env.userRepo.Update(context.Background(), user1); err != nil {
 		t.Fatalf("update user1 affiliation: %v", err)
 	}
+	user2.AffiliationID = &created.ID
+	if err := env.userRepo.Update(context.Background(), user2); err != nil {
+		t.Fatalf("update user2 affiliation: %v", err)
+	}
 
 	ch1 := createHandlerChallenge(t, env, "Ch1", 100, "FLAG{1}", true)
 	ch2 := createHandlerChallenge(t, env, "Ch2", 200, "FLAG{2}", true)
@@ -373,7 +377,7 @@ func TestHandlerAffiliationsAndRankings(t *testing.T) {
 			t.Fatalf("decode response: %v", err)
 		}
 
-		if len(resp.Users) != 1 || resp.Users[0].ID != user1.ID {
+		if len(resp.Users) != 2 || resp.Users[0].ID != user2.ID || resp.Users[1].ID != user1.ID {
 			t.Fatalf("unexpected affiliation users: %+v", resp.Users)
 		}
 	})
@@ -457,7 +461,7 @@ func TestHandlerAffiliationsAndRankings(t *testing.T) {
 			t.Fatalf("decode response: %v", err)
 		}
 
-		if len(resp.Entries) != 1 || resp.Entries[0].UserID != user1.ID {
+		if len(resp.Entries) != 2 || resp.Entries[0].UserID != user1.ID || resp.Entries[1].UserID != user2.ID {
 			t.Fatalf("unexpected ranking affiliation users: %+v", resp.Entries)
 		}
 	})
@@ -1023,7 +1027,7 @@ func TestHandlerSearchChallengesAndUsers(t *testing.T) {
 func TestHandlerListChallengesAndUsers(t *testing.T) {
 	env := setupHandlerTest(t)
 	user1 := createHandlerUser(t, env, "user1@example.com", "user1", "pass", models.UserRole)
-	_ = createHandlerUser(t, env, "user2@example.com", "user2", "pass", models.UserRole)
+	user2 := createHandlerUser(t, env, "user2@example.com", "user2", "pass", models.UserRole)
 	_ = createHandlerChallenge(t, env, "Challenge 1", 100, "FLAG{1}", true)
 	_ = createHandlerChallenge(t, env, "Challenge 2", 200, "FLAG{2}", true)
 
@@ -1041,6 +1045,9 @@ func TestHandlerListChallengesAndUsers(t *testing.T) {
 
 		if len(resp.Users) != 1 || resp.Pagination.TotalCount != 2 {
 			t.Fatalf("unexpected users list response: %+v", resp)
+		}
+		if resp.Users[0].ID != user2.ID || resp.Users[0].ID == user1.ID {
+			t.Fatalf("expected newest user first, got %+v", resp.Users[0])
 		}
 	})
 
@@ -1260,8 +1267,11 @@ func TestHandlerGetChallengeAndSolvers(t *testing.T) {
 func TestHandlerGetUserSolved(t *testing.T) {
 	env := setupHandlerTest(t)
 	user := createHandlerUser(t, env, "solved@example.com", "solved-user", "pass", models.UserRole)
-	challenge := createHandlerChallenge(t, env, "Solved Challenge", 100, "FLAG{SOLVED}", true)
-	createHandlerSubmission(t, env, user.ID, challenge.ID, true, time.Now().UTC())
+	challenge1 := createHandlerChallenge(t, env, "Solved Challenge 1", 100, "FLAG{SOLVED1}", true)
+	challenge2 := createHandlerChallenge(t, env, "Solved Challenge 2", 200, "FLAG{SOLVED2}", true)
+	now := time.Now().UTC()
+	createHandlerSubmission(t, env, user.ID, challenge1.ID, true, now.Add(-2*time.Minute))
+	createHandlerSubmission(t, env, user.ID, challenge2.ID, true, now.Add(-time.Minute))
 
 	t.Run("invalid user id", func(t *testing.T) {
 		ctx, rec := newJSONContext(t, http.MethodGet, "/api/users/abc/solved", nil)
@@ -1285,7 +1295,7 @@ func TestHandlerGetUserSolved(t *testing.T) {
 			t.Fatalf("decode: %v", err)
 		}
 
-		if len(resp.Solved) != 1 || resp.Solved[0].ChallengeID != challenge.ID {
+		if len(resp.Solved) != 2 || resp.Solved[0].ChallengeID != challenge2.ID || resp.Solved[1].ChallengeID != challenge1.ID {
 			t.Fatalf("unexpected solved response: %+v", resp)
 		}
 	})
