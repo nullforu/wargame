@@ -109,6 +109,14 @@ type levelVoteRequest struct {
 	Level int `json:"level" binding:"required"`
 }
 
+type createWriteupRequest struct {
+	Content string `json:"content" binding:"required"`
+}
+
+type updateWriteupRequest struct {
+	Content optionalString `json:"content"`
+}
+
 type adminBlockUserRequest struct {
 	Reason string `json:"reason" binding:"required"`
 }
@@ -180,6 +188,7 @@ type challengeResponse struct {
 	SolveCount          int                       `json:"solve_count"`
 	LevelVoteCounts     []models.LevelVoteCount   `json:"level_vote_counts,omitempty"`
 	CreatedBy           *challengeCreatorResponse `json:"created_by,omitempty"`
+	FirstBlood          *challengeSolverResponse  `json:"first_blood,omitempty"`
 	PreviousChallengeID *int64                    `json:"previous_challenge_id,omitempty"`
 	IsActive            bool                      `json:"is_active"`
 	IsLocked            bool                      `json:"is_locked"`
@@ -199,6 +208,7 @@ type lockedChallengeResponse struct {
 	Points                    int                       `json:"points"`
 	SolveCount                int                       `json:"solve_count"`
 	CreatedBy                 *challengeCreatorResponse `json:"created_by,omitempty"`
+	FirstBlood                *challengeSolverResponse  `json:"first_blood,omitempty"`
 	PreviousChallengeID       *int64                    `json:"previous_challenge_id,omitempty"`
 	PreviousChallengeTitle    *string                   `json:"previous_challenge_title,omitempty"`
 	PreviousChallengeCategory *string                   `json:"previous_challenge_category,omitempty"`
@@ -251,6 +261,42 @@ type challengeSolverResponse struct {
 type challengeSolversResponse struct {
 	Solvers    []challengeSolverResponse `json:"solvers,omitempty"`
 	Pagination models.Pagination         `json:"pagination"`
+}
+
+type writeupAuthorResponse struct {
+	UserID        int64   `json:"user_id"`
+	Username      string  `json:"username"`
+	AffiliationID *int64  `json:"affiliation_id,omitempty"`
+	Affiliation   *string `json:"affiliation,omitempty"`
+	Bio           *string `json:"bio,omitempty"`
+}
+
+type writeupChallengeResponse struct {
+	ID       int64  `json:"id"`
+	Title    string `json:"title"`
+	Category string `json:"category"`
+	Points   int    `json:"points"`
+	Level    int    `json:"level"`
+}
+
+type writeupResponse struct {
+	ID        int64                    `json:"id"`
+	Content   *string                  `json:"content,omitempty"`
+	CreatedAt time.Time                `json:"created_at"`
+	UpdatedAt time.Time                `json:"updated_at"`
+	Author    writeupAuthorResponse    `json:"author"`
+	Challenge writeupChallengeResponse `json:"challenge"`
+}
+
+type writeupsListResponse struct {
+	Writeups       []writeupResponse `json:"writeups,omitempty"`
+	CanViewContent bool              `json:"can_view_content"`
+	Pagination     models.Pagination `json:"pagination"`
+}
+
+type writeupDetailResponse struct {
+	Writeup        writeupResponse `json:"writeup"`
+	CanViewContent bool            `json:"can_view_content"`
 }
 
 type adminChallengeResponse struct {
@@ -398,8 +444,14 @@ func newAdminUserResponse(user *models.User) adminUserResponse {
 	}
 }
 
-func newChallengeResponse(challenge *models.Challenge, isSolved bool) challengeResponse {
+func newChallengeResponse(challenge *models.Challenge, isSolved bool, firstBlood *models.ChallengeSolver) challengeResponse {
 	hasFile := challenge.FileKey != nil && *challenge.FileKey != ""
+	firstBloodResp := (*challengeSolverResponse)(nil)
+	if firstBlood != nil {
+		mapped := newChallengeSolverResponse(*firstBlood)
+		firstBloodResp = &mapped
+	}
+
 	return challengeResponse{
 		ID:                  challenge.ID,
 		Title:               challenge.Title,
@@ -411,6 +463,7 @@ func newChallengeResponse(challenge *models.Challenge, isSolved bool) challengeR
 		SolveCount:          challenge.SolveCount,
 		LevelVoteCounts:     challenge.LevelVotes,
 		CreatedBy:           newChallengeCreatorResponse(challenge),
+		FirstBlood:          firstBloodResp,
 		PreviousChallengeID: challenge.PreviousChallengeID,
 		IsActive:            challenge.IsActive,
 		IsLocked:            false,
@@ -422,12 +475,17 @@ func newChallengeResponse(challenge *models.Challenge, isSolved bool) challengeR
 	}
 }
 
-func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Challenge, isSolved bool) lockedChallengeResponse {
+func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Challenge, isSolved bool, firstBlood *models.ChallengeSolver) lockedChallengeResponse {
 	var prevTitle *string
 	var prevCategory *string
+	firstBloodResp := (*challengeSolverResponse)(nil)
 	if previous != nil {
 		prevTitle = &previous.Title
 		prevCategory = &previous.Category
+	}
+	if firstBlood != nil {
+		mapped := newChallengeSolverResponse(*firstBlood)
+		firstBloodResp = &mapped
 	}
 	return lockedChallengeResponse{
 		ID:                        challenge.ID,
@@ -438,6 +496,7 @@ func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Ch
 		Points:                    challenge.Points,
 		SolveCount:                challenge.SolveCount,
 		CreatedBy:                 newChallengeCreatorResponse(challenge),
+		FirstBlood:                firstBloodResp,
 		PreviousChallengeID:       challenge.PreviousChallengeID,
 		PreviousChallengeTitle:    prevTitle,
 		PreviousChallengeCategory: prevCategory,
@@ -458,5 +517,45 @@ func newChallengeCreatorResponse(challenge *models.Challenge) *challengeCreatorR
 		AffiliationID: challenge.CreatedByAffiliationID,
 		Affiliation:   challenge.CreatedByAffiliation,
 		Bio:           challenge.CreatedByBio,
+	}
+}
+
+func newChallengeSolverResponse(row models.ChallengeSolver) challengeSolverResponse {
+	return challengeSolverResponse{
+		UserID:       row.UserID,
+		Username:     row.Username,
+		Affiliation:  row.Affiliation,
+		Bio:          row.Bio,
+		SolvedAt:     row.SolvedAt.UTC(),
+		IsFirstBlood: row.IsFirstBlood,
+	}
+}
+
+func newWriteupResponse(row models.WriteupDetail, includeContent bool) writeupResponse {
+	content := (*string)(nil)
+	if includeContent {
+		value := row.Content
+		content = &value
+	}
+
+	return writeupResponse{
+		ID:        row.ID,
+		Content:   content,
+		CreatedAt: row.CreatedAt.UTC(),
+		UpdatedAt: row.UpdatedAt.UTC(),
+		Author: writeupAuthorResponse{
+			UserID:        row.UserID,
+			Username:      row.Username,
+			AffiliationID: row.AffiliationID,
+			Affiliation:   row.Affiliation,
+			Bio:           row.Bio,
+		},
+		Challenge: writeupChallengeResponse{
+			ID:       row.ChallengeID,
+			Title:    row.ChallengeTitle,
+			Category: row.ChallengeCategory,
+			Points:   row.ChallengePoints,
+			Level:    row.ChallengeLevel,
+		},
 	}
 }

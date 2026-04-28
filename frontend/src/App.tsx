@@ -11,11 +11,14 @@ import Users from './routes/Users'
 import UserProfile from './routes/UserProfile'
 import Admin from './routes/Admin'
 import NotFound from './routes/NotFound'
+import WriteupDetail from './routes/WriteupDetail'
+import WriteupEditor from './routes/WriteupEditor'
 import { useAuth } from './lib/auth'
 import { useApi } from './lib/useApi'
 import { useLocale, useT } from './lib/i18n'
 import { SITE_CONFIG } from './lib/siteConfig'
 import './index.css'
+import DismissibleNotice from './components/DismissibleNotice'
 
 interface RouteProps {
     routeParams?: Record<string, string>
@@ -41,10 +44,26 @@ const dynamicRoutes: Array<{
     extractParams: (path: string) => Record<string, string>
 }> = [
     {
+        pattern: /^\/challenges\/(\d+)\/writeup$/,
+        component: WriteupEditor,
+        extractParams: (path) => {
+            const match = path.match(/^\/challenges\/(\d+)\/writeup$/)
+            return match ? { id: match[1] } : { id: '' }
+        },
+    },
+    {
         pattern: /^\/challenges\/(\d+)$/,
         component: ChallengeDetail,
         extractParams: (path) => {
             const match = path.match(/^\/challenges\/(\d+)$/)
+            return match ? { id: match[1] } : { id: '' }
+        },
+    },
+    {
+        pattern: /^\/writeups\/(\d+)$/,
+        component: WriteupDetail,
+        extractParams: (path) => {
+            const match = path.match(/^\/writeups\/(\d+)$/)
             return match ? { id: match[1] } : { id: '' }
         },
     },
@@ -137,6 +156,11 @@ const App = () => {
     return (
         <div className='min-h-screen bg-background flex flex-col overflow-x-hidden'>
             <Header user={auth.user} />
+            {/* --- 임시 알림 --- */}
+            <DismissibleNotice storageKey='maintenance_notice_dismissed'>
+                <p className='font-medium'>특정한 인물을 사칭/비방하는 닉네임을 허용하지 않습니다.</p>
+            </DismissibleNotice>
+
             <main className='mx-auto w-full max-w-7xl flex-1 overflow-x-hidden px-4 py-5 md:px-6 md:py-6'>{content}</main>
             <footer className='border-t border-border bg-surface-muted py-5 text-center text-xs text-text-subtle dark:border-border dark:bg-surface dark:text-text-muted'>
                 <p className='mx-auto max-w-7xl px-4 md:px-6'>{t('footer.copyright')}</p>

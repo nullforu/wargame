@@ -236,7 +236,12 @@ func TestChallengeDetailFiltersSolvedAndSolvers(t *testing.T) {
 		Level           int                     `json:"level"`
 		LevelVoteCounts []models.LevelVoteCount `json:"level_vote_counts"`
 		IsSolved        bool                    `json:"is_solved"`
-		CreatedBy       struct {
+		FirstBlood      *struct {
+			UserID       int64  `json:"user_id"`
+			Username     string `json:"username"`
+			IsFirstBlood bool   `json:"is_first_blood"`
+		} `json:"first_blood"`
+		CreatedBy struct {
 			UserID        int64   `json:"user_id"`
 			Username      string  `json:"username"`
 			AffiliationID *int64  `json:"affiliation_id"`
@@ -247,6 +252,9 @@ func TestChallengeDetailFiltersSolvedAndSolvers(t *testing.T) {
 	decodeJSON(t, rec, &detail)
 	if detail.ID != created[0].ID || detail.Level != models.UnknownLevel || !detail.IsSolved || len(detail.LevelVoteCounts) != 0 {
 		t.Fatalf("unexpected detail: %+v", detail)
+	}
+	if detail.FirstBlood == nil || detail.FirstBlood.UserID != user.ID || !detail.FirstBlood.IsFirstBlood {
+		t.Fatalf("expected first_blood in detail response: %+v", detail)
 	}
 	if detail.CreatedBy.UserID <= 0 || detail.CreatedBy.Username == "" {
 		t.Fatalf("expected creator info in detail response: %+v", detail)
@@ -298,6 +306,9 @@ func TestChallengeDetailFiltersSolvedAndSolvers(t *testing.T) {
 	decodeJSON(t, rec, &solvers)
 	if len(solvers.Solvers) != 2 || solvers.Pagination.TotalCount < 3 || !solvers.Pagination.HasNext {
 		t.Fatalf("unexpected solvers response: %+v", solvers)
+	}
+	if solvers.Solvers[0].UserID != other2.ID || solvers.Solvers[1].UserID != other1.ID {
+		t.Fatalf("expected latest solvers first, got %+v", solvers.Solvers)
 	}
 	foundExpectedBio := false
 	for _, solver := range solvers.Solvers {

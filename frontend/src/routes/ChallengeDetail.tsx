@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ApiError } from '../lib/api'
-import type { Challenge, ChallengeSolver, ChallengeVote, LevelVoteCount, PaginationMeta, Stack } from '../lib/types'
+import type { Challenge, ChallengeSolver, ChallengeVote, LevelVoteCount, PaginationMeta, Stack, Writeup } from '../lib/types'
 import { formatApiError, formatDateTime, parseRouteId } from '../lib/utils'
 import { getLocaleTag, useLocale, useTemplate, useT } from '../lib/i18n'
 import { navigate } from '../lib/router'
 import { useAuth } from '../lib/auth'
 import { useApi } from '../lib/useApi'
 import Markdown from '../components/Markdown'
+import UserAvatar from '../components/UserAvatar'
 import { LEVEL_VOTE_OPTIONS, normalizeLevel } from '../lib/level'
 import VoteModal from './challenge-detail/VoteModal'
 import VoteSection from './challenge-detail/VoteSection'
@@ -26,6 +27,7 @@ type VoteModalMode = 'solved' | 'revote'
 
 const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: 5, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
 const EMPTY_VOTE_PAGINATION: PaginationMeta = { page: 1, page_size: 3, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
+const EMPTY_WRITEUP_PAGINATION: PaginationMeta = { page: 1, page_size: 5, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
 type FirstBloodDurationUnit = 'minute' | 'hour' | 'day' | 'month' | 'year'
 
 const calculateFirstBloodDuration = (createdAt: string, solvedAt: string): { unit: FirstBloodDurationUnit; count: number } | null => {
@@ -72,6 +74,12 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         const value = Number(params.get('solver_page'))
         return Number.isInteger(value) && value > 0 ? value : 1
     }
+    const readWriteupPageFromQuery = () => {
+        if (typeof window === 'undefined') return 1
+        const params = new URLSearchParams(window.location.search)
+        const value = Number(params.get('writeup_page'))
+        return Number.isInteger(value) && value > 0 ? value : 1
+    }
     const [solvers, setSolvers] = useState<ChallengeSolver[]>([])
     const [solverPage, setSolverPage] = useState(readSolverPageFromQuery)
     const [solverPagination, setSolverPagination] = useState<PaginationMeta>(EMPTY_PAGINATION)
@@ -92,12 +100,31 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const [isVoteModalOpen, setIsVoteModalOpen] = useState(false)
     const [voteModalMode, setVoteModalMode] = useState<VoteModalMode>('solved')
     const [voteModalLevel, setVoteModalLevel] = useState(1)
+    const [writeups, setWriteups] = useState<Writeup[]>([])
+    const [writeupPage, setWriteupPage] = useState(readWriteupPageFromQuery)
+    const [writeupPagination, setWriteupPagination] = useState<PaginationMeta>(EMPTY_WRITEUP_PAGINATION)
+    const [writeupLoading, setWriteupLoading] = useState(false)
+    const [writeupError, setWriteupError] = useState('')
+    const [canViewWriteupContent, setCanViewWriteupContent] = useState(false)
+    const [hasMyWriteup, setHasMyWriteup] = useState(false)
 
     const pushSolverPageQuery = (nextPage: number) => {
         if (typeof window === 'undefined') return
         const params = new URLSearchParams(window.location.search)
         if (nextPage > 1) params.set('solver_page', String(nextPage))
         else params.delete('solver_page')
+        const query = params.toString()
+        const nextURL = query ? `${window.location.pathname}?${query}` : window.location.pathname
+        const currentURL = `${window.location.pathname}${window.location.search}`
+        if (nextURL !== currentURL) {
+            window.history.pushState({}, '', nextURL)
+        }
+    }
+    const pushWriteupPageQuery = (nextPage: number) => {
+        if (typeof window === 'undefined') return
+        const params = new URLSearchParams(window.location.search)
+        if (nextPage > 1) params.set('writeup_page', String(nextPage))
+        else params.delete('writeup_page')
         const query = params.toString()
         const nextURL = query ? `${window.location.pathname}?${query}` : window.location.pathname
         const currentURL = `${window.location.pathname}${window.location.search}`
@@ -144,6 +171,38 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         } catch {
             setVotes([])
             setVotePagination(EMPTY_VOTE_PAGINATION)
+        }
+    }
+
+    const loadWriteups = async (page: number) => {
+        if (!challengeId) return
+        setWriteupLoading(true)
+        setWriteupError('')
+        try {
+            const data = await api.challengeWriteups(challengeId, page, 5)
+            setWriteups(data.writeups)
+            setWriteupPagination(data.pagination)
+            setCanViewWriteupContent(data.can_view_content)
+        } catch {
+            setWriteups([])
+            setWriteupPagination(EMPTY_WRITEUP_PAGINATION)
+            setCanViewWriteupContent(false)
+            setWriteupError(t('errors.requestFailed'))
+        } finally {
+            setWriteupLoading(false)
+        }
+    }
+
+    const loadMyWriteup = async () => {
+        if (!challengeId || !auth.user) {
+            setHasMyWriteup(false)
+            return
+        }
+        try {
+            await api.challengeMyWriteup(challengeId)
+            setHasMyWriteup(true)
+        } catch {
+            setHasMyWriteup(false)
         }
     }
 
@@ -194,6 +253,16 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
 
     useEffect(() => {
         if (!challengeId) return
+        void loadWriteups(writeupPage)
+    }, [challengeId, writeupPage])
+
+    useEffect(() => {
+        if (!challengeId) return
+        void loadMyWriteup()
+    }, [challengeId, auth.user?.id])
+
+    useEffect(() => {
+        if (!challengeId) return
         setMyVoteLoaded(false)
         void loadMyVote()
     }, [challengeId])
@@ -203,6 +272,13 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         setMyVoteLevel(null)
         setMyVoteLoaded(false)
         setSelectedLevel(null)
+        setWriteupPage(1)
+        setWriteups([])
+        setWriteupPagination(EMPTY_WRITEUP_PAGINATION)
+        setWriteupLoading(false)
+        setWriteupError('')
+        setHasMyWriteup(false)
+        setCanViewWriteupContent(false)
     }, [challengeId])
 
     useEffect(() => {
@@ -213,6 +289,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     useEffect(() => {
         const onPopState = () => {
             setSolverPage(readSolverPageFromQuery())
+            setWriteupPage(readWriteupPageFromQuery())
         }
         window.addEventListener('popstate', onPopState)
         return () => window.removeEventListener('popstate', onPopState)
@@ -252,24 +329,25 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
 
         setSubmission({ status: 'loading' })
 
+        const handleSolveSuccess = async () => {
+            setSubmission({ status: 'success', message: t('challenge.correct') })
+            setFlagInput('')
+            setChallenge((prev) => (prev ? { ...prev, is_solved: true } : prev))
+            setCanViewWriteupContent(true)
+            await Promise.all([loadChallenge(), loadSolvers(solverPage), loadWriteups(writeupPage)])
+            openVoteModal('solved')
+        }
+
         try {
             const result = await api.submitFlag(challengeId, flagInput)
             if (result.correct) {
-                setSubmission({ status: 'success', message: t('challenge.correct') })
-                setFlagInput('')
-                await loadChallenge()
-                await loadSolvers(solverPage)
-                openVoteModal('solved')
+                await handleSolveSuccess()
             } else {
                 setSubmission({ status: 'error', message: t('challenge.incorrect') })
             }
         } catch (error) {
             if (error instanceof ApiError && error.status === 409) {
-                setSubmission({ status: 'success', message: t('challenge.correct') })
-                setFlagInput('')
-                await loadChallenge()
-                await loadSolvers(solverPage)
-                openVoteModal('solved')
+                await handleSolveSuccess()
                 return
             }
             setSubmission({ status: 'error', message: formatApiError(error, t).message })
@@ -342,6 +420,14 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }
 
     const formatTimestamp = (value: string) => formatDateTime(value, localeTag)
+    const formatWriteupDate = (value: string) => {
+        const date = new Date(value)
+        if (Number.isNaN(date.getTime())) return t('common.na')
+        const yyyy = date.getFullYear()
+        const mm = String(date.getMonth() + 1).padStart(2, '0')
+        const dd = String(date.getDate()).padStart(2, '0')
+        return `${yyyy}.${mm}.${dd}`
+    }
     const formatCompactDateTime = (value: string) => {
         const date = new Date(value)
         if (Number.isNaN(date.getTime())) return t('common.na')
@@ -352,7 +438,10 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         const min = String(date.getMinutes()).padStart(2, '0')
         return `${yyyy}-${mm}-${dd} ${hh}:${min}`
     }
-    const firstBloodSolver = useMemo(() => solvers.find((solver) => solver.is_first_blood) ?? null, [solvers])
+    const firstBloodSolver = useMemo(() => {
+        if (challenge && 'first_blood' in challenge && challenge.first_blood) return challenge.first_blood
+        return solvers.find((solver) => solver.is_first_blood) ?? null
+    }, [challenge, solvers])
     const firstBloodDuration = useMemo(() => {
         if (!challenge?.created_at || !firstBloodSolver?.solved_at) return null
         return calculateFirstBloodDuration(challenge.created_at, firstBloodSolver.solved_at)
@@ -417,11 +506,27 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                     </div>
 
                     <div className='hidden lg:block'>
-                        <div className='rounded-2xl border border-border bg-surface p-5 animate-pulse space-y-3'>
-                            <div className='h-4 w-28 rounded bg-surface-muted' />
-                            <div className='h-8 w-full rounded bg-surface-muted' />
-                            <div className='h-8 w-full rounded bg-surface-muted' />
-                            <div className='h-20 w-full rounded bg-surface-muted' />
+                        <div className='space-y-8'>
+                            <div className='rounded-2xl border border-border/20 bg-surface p-5 shadow-sm animate-pulse space-y-3'>
+                                <div className='h-6 w-16 rounded bg-surface-muted' />
+                                <div className='h-9 w-full rounded bg-surface-muted' />
+                                <div className='h-5 w-1/3 rounded bg-surface-muted' />
+                                <div className='h-5 w-4/5 rounded bg-surface-muted' />
+                            </div>
+
+                            <section className='space-y-3 px-1'>
+                                <div className='h-7 w-24 rounded bg-surface-muted animate-pulse' />
+                                <div className='rounded-2xl bg-surface/70 p-2 animate-pulse'>
+                                    <div className='flex items-start gap-3.75'>
+                                        <div className='h-10 w-10 rounded-full bg-surface-muted' />
+                                        <div className='min-w-0 flex-1 space-y-2'>
+                                            <div className='h-5 w-1/2 rounded bg-surface-muted' />
+                                            <div className='h-4 w-1/3 rounded bg-surface-muted' />
+                                            <div className='h-4 w-2/3 rounded bg-surface-muted' />
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
                         </div>
                     </div>
                 </div>
@@ -442,7 +547,6 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const isSubmissionDisabled = !auth.user || !isChallengeActive || challenge.is_solved || submission.status === 'loading'
     const createdSummary = challenge.created_at ? formatCompactDateTime(challenge.created_at) : t('common.na')
     const voteSubmittedMessage = t('challenge.voteSubmitted')
-
     return (
         <section className='animate space-y-4 px-0 sm:px-1 md:px-2 lg:px-0'>
             <div className='grid items-start gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(320px,0.92fr)]'>
@@ -632,6 +736,92 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                             onNextVotePage={() => setVotePage((prev) => prev + 1)}
                             t={t}
                         />
+
+                        {!challenge.is_locked ? (
+                            <section className='mt-8'>
+                                <div className='flex flex-wrap items-center justify-between gap-2'>
+                                    <h3 className='text-lg font-semibold text-text'>
+                                        {t('writeup.sectionTitle')} <span className='text-accent'>{writeupPagination.total_count}</span>
+                                    </h3>
+                                    {challenge.is_solved && !hasMyWriteup ? (
+                                        <button
+                                            className='rounded-md border border-accent/40 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10'
+                                            onClick={() => {
+                                                if (!challengeId) return
+                                                navigate(`/challenges/${challengeId}/writeup`)
+                                            }}
+                                        >
+                                            {t('writeup.createTitle')}
+                                        </button>
+                                    ) : null}
+                                </div>
+
+                                <div className='mt-3 rounded-lg border border-accent/25 bg-accent/7 px-3 py-2 text-sm text-text-muted'>{t('writeup.hint')}</div>
+
+                                <div className='mt-4 space-y-2'>
+                                    {writeupLoading ? <p className='py-4 text-sm text-text-muted'>{t('common.loading')}</p> : null}
+                                    {!writeupLoading && writeupError ? <p className='py-4 text-sm text-danger'>{writeupError}</p> : null}
+                                    {!writeupLoading &&
+                                        !writeupError &&
+                                        writeups.map((item) => (
+                                            <button
+                                                key={item.id}
+                                                className='w-full rounded-none border-b border-border/60 text-left disabled:cursor-not-allowed disabled:opacity-60 pb-4'
+                                                onClick={() => navigate(`/writeups/${item.id}`)}
+                                                disabled={!canViewWriteupContent}
+                                            >
+                                                <div className='flex items-start justify-between gap-4 py-1'>
+                                                    <div className='min-w-0 flex flex-1 items-center gap-3.75'>
+                                                        <UserAvatar username={item.author.username} size='md' />
+                                                        <div className='min-w-0'>
+                                                            <div className='flex items-center gap-2'>
+                                                                <span className='block max-w-full truncate text-left text-base font-semibold text-text'>{item.author.username}</span>
+                                                            </div>
+                                                            <p className='mt-1 max-w-full truncate text-sm text-text-subtle'>
+                                                                {item.author.affiliation && item.author.affiliation.trim().length > 0 ? `${item.author.affiliation} · ` : ''}
+                                                                {item.author.bio && item.author.bio.trim().length > 0 ? item.author.bio : t('profile.noBio')}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <span className='shrink-0 text-sm text-text-subtle'>{formatWriteupDate(item.created_at)}</span>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    {!writeupLoading && !writeupError && writeups.length === 0 ? <p className='py-4 text-sm text-text-muted'>{t('writeup.empty')}</p> : null}
+                                </div>
+
+                                {writeupPagination.total_pages > 0 ? (
+                                    <div className='mt-6 flex items-center justify-center gap-4 text-sm text-text-muted'>
+                                        <button
+                                            disabled={!writeupPagination.has_prev || writeupLoading}
+                                            className='rounded border border-border px-2 py-1 disabled:opacity-50'
+                                            onClick={() => {
+                                                const nextPage = Math.max(1, writeupPage - 1)
+                                                setWriteupPage(nextPage)
+                                                pushWriteupPageQuery(nextPage)
+                                            }}
+                                        >
+                                            {t('common.previous')}
+                                        </button>
+                                        <span>
+                                            {writeupPagination.page} / {writeupPagination.total_pages || 1}
+                                        </span>
+                                        <button
+                                            disabled={!writeupPagination.has_next || writeupLoading}
+                                            className='rounded border border-border px-2 py-1 disabled:opacity-50'
+                                            onClick={() => {
+                                                const nextPage = writeupPage + 1
+                                                setWriteupPage(nextPage)
+                                                pushWriteupPageQuery(nextPage)
+                                            }}
+                                        >
+                                            {t('common.next')}
+                                        </button>
+                                    </div>
+                                ) : null}
+                            </section>
+                        ) : null}
                     </div>
                 </div>
 

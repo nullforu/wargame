@@ -2,6 +2,8 @@ package repo
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"wargame/internal/models"
 
@@ -175,7 +177,7 @@ func (r *SubmissionRepo) SolvedChallengesPage(ctx context.Context, userID int64,
 	}
 
 	err = base.
-		OrderExpr("solved_at ASC").
+		OrderExpr("solved_at DESC, challenge_id DESC").
 		Limit(pageSize).
 		Offset((page-1)*pageSize).
 		Scan(ctx, &rows)
@@ -231,7 +233,7 @@ func (r *SubmissionRepo) ChallengeSolversPage(ctx context.Context, challengeID i
 	}
 
 	err = base.
-		OrderExpr("solved_at ASC, user_id ASC").
+		OrderExpr("solved_at DESC, user_id ASC").
 		Limit(pageSize).
 		Offset((page-1)*pageSize).
 		Scan(ctx, &rows)
@@ -240,4 +242,33 @@ func (r *SubmissionRepo) ChallengeSolversPage(ctx context.Context, challengeID i
 	}
 
 	return rows, totalCount, nil
+}
+
+func (r *SubmissionRepo) ChallengeFirstBlood(ctx context.Context, challengeID int64) (*models.ChallengeSolver, error) {
+	row := new(models.ChallengeSolver)
+	err := r.db.NewSelect().
+		TableExpr("submissions AS s").
+		ColumnExpr("s.user_id AS user_id").
+		ColumnExpr("u.username AS username").
+		ColumnExpr("aff.name AS affiliation").
+		ColumnExpr("u.bio AS bio").
+		ColumnExpr("s.submitted_at AS solved_at").
+		ColumnExpr("s.is_first_blood AS is_first_blood").
+		Join("JOIN users AS u ON u.id = s.user_id").
+		Join("LEFT JOIN affiliations AS aff ON aff.id = u.affiliation_id").
+		Where("s.correct = true").
+		Where("s.challenge_id = ?", challengeID).
+		Where("s.is_first_blood = true").
+		OrderExpr("s.submitted_at ASC, s.user_id ASC").
+		Limit(1).
+		Scan(ctx, row)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, wrapError("submissionRepo.ChallengeFirstBlood", err)
+	}
+
+	return row, nil
 }

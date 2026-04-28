@@ -315,6 +315,26 @@ func (h *Handler) Me(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
 }
 
+func (h *Handler) MyWriteups(ctx *gin.Context) {
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	rows, pagination, err := h.wargame.MyWriteupsPage(ctx.Request.Context(), middleware.UserID(ctx), page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]writeupResponse, 0, len(rows))
+	for _, row := range rows {
+		resp = append(resp, newWriteupResponse(row, true))
+	}
+
+	ctx.JSON(http.StatusOK, writeupsListResponse{Writeups: resp, CanViewContent: true, Pagination: pagination})
+}
+
 func (h *Handler) UpdateMe(ctx *gin.Context) {
 	var req meUpdateRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -376,11 +396,11 @@ func (h *Handler) ListChallenges(ctx *gin.Context) {
 		_, isSolved := solved[ch.ID]
 		if isChallengeLocked(ch, solved, userID) {
 			previous := h.previousChallengeForResponse(ctx.Request.Context(), byID, ch.PreviousChallengeID)
-			resp = append(resp, newLockedChallengeResponse(&ch, previous, isSolved))
+			resp = append(resp, newLockedChallengeResponse(&ch, previous, isSolved, nil))
 			continue
 		}
 
-		resp = append(resp, newChallengeResponse(&ch, isSolved))
+		resp = append(resp, newChallengeResponse(&ch, isSolved, nil))
 	}
 
 	ctx.JSON(http.StatusOK, challengesListResponse{Challenges: resp, Pagination: pagination})
@@ -436,11 +456,11 @@ func (h *Handler) SearchChallenges(ctx *gin.Context) {
 		_, isSolved := solved[ch.ID]
 		if isChallengeLocked(ch, solved, userID) {
 			previous := h.previousChallengeForResponse(ctx.Request.Context(), byID, ch.PreviousChallengeID)
-			resp = append(resp, newLockedChallengeResponse(&ch, previous, isSolved))
+			resp = append(resp, newLockedChallengeResponse(&ch, previous, isSolved, nil))
 			continue
 		}
 
-		resp = append(resp, newChallengeResponse(&ch, isSolved))
+		resp = append(resp, newChallengeResponse(&ch, isSolved, nil))
 	}
 
 	ctx.JSON(http.StatusOK, challengesListResponse{Challenges: resp, Pagination: pagination})
@@ -467,15 +487,21 @@ func (h *Handler) GetChallenge(ctx *gin.Context) {
 			return
 		}
 	}
-	_, isSolved := solved[challenge.ID]
 
-	if isChallengeLocked(*challenge, solved, userID) {
-		previous := h.previousChallengeForResponse(ctx.Request.Context(), map[int64]*models.Challenge{}, challenge.PreviousChallengeID)
-		ctx.JSON(http.StatusOK, newLockedChallengeResponse(challenge, previous, isSolved))
+	_, isSolved := solved[challenge.ID]
+	firstBlood, err := h.wargame.ChallengeFirstBlood(ctx.Request.Context(), challenge.ID)
+	if err != nil {
+		writeError(ctx, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, isSolved))
+	if isChallengeLocked(*challenge, solved, userID) {
+		previous := h.previousChallengeForResponse(ctx.Request.Context(), map[int64]*models.Challenge{}, challenge.PreviousChallengeID)
+		ctx.JSON(http.StatusOK, newLockedChallengeResponse(challenge, previous, isSolved, firstBlood))
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, isSolved, firstBlood))
 }
 
 func (h *Handler) ChallengeSolvers(ctx *gin.Context) {
@@ -497,17 +523,129 @@ func (h *Handler) ChallengeSolvers(ctx *gin.Context) {
 
 	solvers := make([]challengeSolverResponse, 0, len(rows))
 	for _, row := range rows {
-		solvers = append(solvers, challengeSolverResponse{
-			UserID:       row.UserID,
-			Username:     row.Username,
-			Affiliation:  row.Affiliation,
-			Bio:          row.Bio,
-			SolvedAt:     row.SolvedAt.UTC(),
-			IsFirstBlood: row.IsFirstBlood,
-		})
+		solvers = append(solvers, newChallengeSolverResponse(row))
 	}
 
 	ctx.JSON(http.StatusOK, challengeSolversResponse{Solvers: solvers, Pagination: pagination})
+}
+
+func (h *Handler) ChallengeWriteups(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	viewerID := h.optionalUserID(ctx)
+	rows, pagination, canViewContent, err := h.wargame.ChallengeWriteupsPage(ctx.Request.Context(), challengeID, viewerID, page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]writeupResponse, 0, len(rows))
+	for _, row := range rows {
+		resp = append(resp, newWriteupResponse(row, canViewContent))
+	}
+
+	ctx.JSON(http.StatusOK, writeupsListResponse{Writeups: resp, CanViewContent: canViewContent, Pagination: pagination})
+}
+
+func (h *Handler) GetWriteup(ctx *gin.Context) {
+	writeupID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	viewerID := h.optionalUserID(ctx)
+	row, canViewContent, err := h.wargame.GetWriteupByID(ctx.Request.Context(), writeupID, viewerID)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, writeupDetailResponse{Writeup: newWriteupResponse(*row, canViewContent), CanViewContent: canViewContent})
+}
+
+func (h *Handler) MyChallengeWriteup(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	row, err := h.wargame.MyWriteupByChallenge(ctx.Request.Context(), middleware.UserID(ctx), challengeID)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, writeupDetailResponse{Writeup: newWriteupResponse(*row, true), CanViewContent: true})
+}
+
+func (h *Handler) CreateWriteup(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req createWriteupRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	row, err := h.wargame.CreateWriteup(ctx.Request.Context(), middleware.UserID(ctx), challengeID, req.Content)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, newWriteupResponse(*row, true))
+}
+
+func (h *Handler) UpdateWriteup(ctx *gin.Context) {
+	writeupID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req updateWriteupRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	content, err := requireNonNullOptionalString("content", req.Content)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	row, err := h.wargame.UpdateWriteup(ctx.Request.Context(), middleware.UserID(ctx), writeupID, content)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newWriteupResponse(*row, true))
+}
+
+func (h *Handler) DeleteWriteup(ctx *gin.Context) {
+	writeupID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.wargame.DeleteWriteup(ctx.Request.Context(), middleware.UserID(ctx), writeupID); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 func (h *Handler) SubmitFlag(ctx *gin.Context) {
@@ -716,7 +854,7 @@ func (h *Handler) CreateChallenge(ctx *gin.Context) {
 	}
 
 	h.notifyScoreboardChanged(ctx.Request.Context(), "challenge_created")
-	ctx.JSON(http.StatusCreated, newChallengeResponse(challenge, false))
+	ctx.JSON(http.StatusCreated, newChallengeResponse(challenge, false, nil))
 }
 
 func (h *Handler) UpdateChallenge(ctx *gin.Context) {
@@ -769,7 +907,7 @@ func (h *Handler) UpdateChallenge(ctx *gin.Context) {
 	}
 
 	h.notifyScoreboardChanged(ctx.Request.Context(), "challenge_updated")
-	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, false))
+	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, false, nil))
 }
 
 func requireNonNullOptionalString(field string, value optionalString) (*string, error) {
@@ -809,7 +947,7 @@ func (h *Handler) AdminGetChallenge(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, adminChallengeResponse{challengeResponse: newChallengeResponse(challenge, false), StackPodSpec: challenge.StackPodSpec})
+	ctx.JSON(http.StatusOK, adminChallengeResponse{challengeResponse: newChallengeResponse(challenge, false, nil), StackPodSpec: challenge.StackPodSpec})
 }
 
 func (h *Handler) DeleteChallenge(ctx *gin.Context) {
@@ -845,7 +983,7 @@ func (h *Handler) RequestChallengeFileUpload(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, challengeFileUploadResponse{Challenge: newChallengeResponse(challenge, false), Upload: presignedPostResponse{URL: upload.URL, Fields: upload.Fields, ExpiresAt: upload.ExpiresAt}})
+	ctx.JSON(http.StatusOK, challengeFileUploadResponse{Challenge: newChallengeResponse(challenge, false, nil), Upload: presignedPostResponse{URL: upload.URL, Fields: upload.Fields, ExpiresAt: upload.ExpiresAt}})
 }
 
 func (h *Handler) RequestChallengeFileDownload(ctx *gin.Context) {
@@ -875,7 +1013,7 @@ func (h *Handler) DeleteChallengeFile(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, false))
+	ctx.JSON(http.StatusOK, newChallengeResponse(challenge, false, nil))
 }
 
 func (h *Handler) VoteChallengeLevel(ctx *gin.Context) {
@@ -1198,6 +1336,42 @@ func (h *Handler) GetUserSolved(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, userSolvedListResponse{Solved: rows, Pagination: pagination})
+}
+
+func (h *Handler) GetUserWriteups(ctx *gin.Context) {
+	userID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	if _, err := h.users.GetByID(ctx.Request.Context(), userID); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	viewerID := h.optionalUserID(ctx)
+	rows, pagination, err := h.wargame.UserWriteupsPage(ctx.Request.Context(), userID, viewerID, page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]writeupResponse, 0, len(rows))
+	canViewAnyContent := false
+	for _, row := range rows {
+		includeContent := row.Content != ""
+		if includeContent {
+			canViewAnyContent = true
+		}
+		resp = append(resp, newWriteupResponse(row, includeContent))
+	}
+
+	ctx.JSON(http.StatusOK, writeupsListResponse{Writeups: resp, CanViewContent: canViewAnyContent, Pagination: pagination})
 }
 
 func (h *Handler) AdminBlockUser(ctx *gin.Context) {

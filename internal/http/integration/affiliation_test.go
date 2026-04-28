@@ -75,10 +75,16 @@ func TestAffiliationsAndProfileUpdate(t *testing.T) {
 
 	user := createUser(t, env, "aff-user@example.com", "aff-user", "pass", models.UserRole)
 	userToken, _, _ := loginUser(t, env.router, user.Email, "pass")
+	otherUser := createUser(t, env, "aff-user-2@example.com", "aff-user-2", "pass", models.UserRole)
+	otherUserToken, _, _ := loginUser(t, env.router, otherUser.Email, "pass")
 
 	updateRec := doRequest(t, env.router, http.MethodPut, "/api/me", map[string]any{"affiliation_id": created.ID}, authHeader(userToken))
 	if updateRec.Code != http.StatusOK {
 		t.Fatalf("update affiliation status %d: %s", updateRec.Code, updateRec.Body.String())
+	}
+	updateRec2 := doRequest(t, env.router, http.MethodPut, "/api/me", map[string]any{"affiliation_id": created.ID}, authHeader(otherUserToken))
+	if updateRec2.Code != http.StatusOK {
+		t.Fatalf("update affiliation for second user status %d: %s", updateRec2.Code, updateRec2.Body.String())
 	}
 
 	var meResp struct {
@@ -105,7 +111,7 @@ func TestAffiliationsAndProfileUpdate(t *testing.T) {
 		} `json:"users"`
 	}
 	decodeJSON(t, usersRec, &usersResp)
-	if len(usersResp.Users) != 1 || usersResp.Users[0].ID != user.ID {
+	if len(usersResp.Users) != 2 || usersResp.Users[0].ID != otherUser.ID || usersResp.Users[1].ID != user.ID {
 		t.Fatalf("unexpected affiliation users: %+v", usersResp.Users)
 	}
 

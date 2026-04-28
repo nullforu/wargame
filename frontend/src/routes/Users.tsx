@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { PaginationMeta, UserListItem } from '../lib/types'
 import { formatApiError } from '../lib/utils'
 import { navigate } from '../lib/router'
@@ -68,8 +68,6 @@ const Users = ({ routeParams = {} }: RouteProps) => {
             setLoading(false)
         }
     }
-
-    const sortedUsers = useMemo(() => [...users].sort((a, b) => a.id - b.id), [users])
 
     useEffect(() => {
         void loadUsers()
@@ -175,7 +173,7 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                 {!loading && !errorMessage ? (
                     <>
                         <div className='divide-y divide-border/60 md:hidden'>
-                            {sortedUsers.map((user) => (
+                            {users.map((user) => (
                                 <div key={user.id} className='px-4 py-3 cursor-pointer' onClick={() => navigate(`/users/${user.id}${window.location.search}`)}>
                                     <div className='flex items-center justify-between gap-3'>
                                         <div className='min-w-0 flex items-center gap-3.75'>
@@ -190,7 +188,7 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                                     </div>
                                 </div>
                             ))}
-                            {sortedUsers.length === 0 ? <p className='px-6 py-8 text-center text-sm text-text-muted'>{appliedSearch ? t('users.noResults') : t('users.noUsers')}</p> : null}
+                            {users.length === 0 ? <p className='px-6 py-8 text-center text-sm text-text-muted'>{appliedSearch ? t('users.noResults') : t('users.noUsers')}</p> : null}
                         </div>
 
                         <div className='hidden md:block'>
@@ -199,7 +197,7 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                                 <p className='font-medium'>{t('common.username')}</p>
                                 <p className='font-medium'>{t('common.role')}</p>
                             </div>
-                            {sortedUsers.map((user) => (
+                            {users.map((user) => (
                                 <div
                                     key={user.id}
                                     className='grid grid-cols-[80px_minmax(0,1fr)_180px] items-center px-4 py-4 transition hover:bg-surface-muted/40 dark:hover:bg-surface-muted cursor-pointer'
@@ -217,7 +215,7 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                                     <p className='text-xs text-text-muted dark:text-text-muted bg-accent/10 inline-block rounded px-1.5 py-0.5 w-max max-w-full whitespace-nowrap dark:bg-accent/20'>{t(getRoleKey(user.role))}</p>
                                 </div>
                             ))}
-                            {sortedUsers.length === 0 ? <p className='px-6 py-8 text-center text-sm text-text-muted dark:text-text-muted'>{appliedSearch ? t('users.noResults') : t('users.noUsers')}</p> : null}
+                            {users.length === 0 ? <p className='px-6 py-8 text-center text-sm text-text-muted dark:text-text-muted'>{appliedSearch ? t('users.noResults') : t('users.noUsers')}</p> : null}
                         </div>
                     </>
                 ) : null}

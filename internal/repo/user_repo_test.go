@@ -60,7 +60,7 @@ func TestUserRepoList(t *testing.T) {
 	env := setupRepoTest(t)
 	userA := createUserForTestUserScope(t, env, "a@example.com", "user-a", "pass", "user")
 	userB := createUserForTestUserScope(t, env, "b@example.com", "user-b", "pass", "user")
-	_ = createUserForTestUserScope(t, env, "c@example.com", "user-c", "pass", "user")
+	userC := createUserForTestUserScope(t, env, "c@example.com", "user-c", "pass", "user")
 
 	firstPage, totalCount, err := env.userRepo.List(context.Background(), 1, 2)
 	if err != nil {
@@ -75,8 +75,8 @@ func TestUserRepoList(t *testing.T) {
 		t.Fatalf("expected 2 users in first page, got %d", len(firstPage))
 	}
 
-	if firstPage[0].ID != userA.ID || firstPage[1].ID != userB.ID {
-		t.Fatalf("expected ordered users by id, got %+v", firstPage)
+	if firstPage[0].ID != userC.ID || firstPage[1].ID != userB.ID || firstPage[0].ID <= firstPage[1].ID || firstPage[1].ID <= userA.ID {
+		t.Fatalf("expected users ordered by newest id first, got %+v", firstPage)
 	}
 }
 
@@ -108,7 +108,7 @@ func TestUserRepoSearch(t *testing.T) {
 		t.Fatalf("expected paged total_count 2, got %d", pagedTotalCount)
 	}
 
-	if len(pagedRows) != 1 || pagedRows[0].Username != "beta-user" {
+	if len(pagedRows) != 1 || pagedRows[0].Username != "alpha-user" {
 		t.Fatalf("unexpected paged rows: %+v", pagedRows)
 	}
 }
@@ -138,13 +138,18 @@ func TestUserRepoAffiliationJoinAndListByAffiliation(t *testing.T) {
 		t.Fatalf("create affiliation: %v", err)
 	}
 
-	user := createUserForTestUserScope(t, env, "aff@example.com", "aff-user", "pass", "user")
-	user.AffiliationID = &affiliation.ID
-	if err := env.userRepo.Update(context.Background(), user); err != nil {
-		t.Fatalf("update user affiliation: %v", err)
+	userA := createUserForTestUserScope(t, env, "aff@example.com", "aff-user", "pass", "user")
+	userA.AffiliationID = &affiliation.ID
+	if err := env.userRepo.Update(context.Background(), userA); err != nil {
+		t.Fatalf("update userA affiliation: %v", err)
+	}
+	userB := createUserForTestUserScope(t, env, "aff2@example.com", "aff-user-2", "pass", "user")
+	userB.AffiliationID = &affiliation.ID
+	if err := env.userRepo.Update(context.Background(), userB); err != nil {
+		t.Fatalf("update userB affiliation: %v", err)
 	}
 
-	got, err := env.userRepo.GetByID(context.Background(), user.ID)
+	got, err := env.userRepo.GetByID(context.Background(), userA.ID)
 	if err != nil {
 		t.Fatalf("get user by id: %v", err)
 	}
@@ -158,7 +163,7 @@ func TestUserRepoAffiliationJoinAndListByAffiliation(t *testing.T) {
 		t.Fatalf("list by affiliation: %v", err)
 	}
 
-	if totalCount != 1 || len(rows) != 1 || rows[0].ID != user.ID {
+	if totalCount != 2 || len(rows) != 2 || rows[0].ID != userB.ID || rows[1].ID != userA.ID {
 		t.Fatalf("unexpected list by affiliation result: total=%d rows=%+v", totalCount, rows)
 	}
 }

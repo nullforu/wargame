@@ -68,6 +68,7 @@ func main() {
 	challengeRepo := repo.NewChallengeRepo(database)
 	submissionRepo := repo.NewSubmissionRepo(database)
 	voteRepo := repo.NewChallengeVoteRepo(database)
+	writeupRepo := repo.NewWriteupRepo(database)
 	scoreRepo := repo.NewScoreboardRepo(database)
 	stackRepo := repo.NewStackRepo(database)
 
@@ -85,7 +86,7 @@ func main() {
 	userSvc := service.NewUserService(userRepo, affiliationRepo)
 	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
-	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, redisClient, fileStore)
+	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, redisClient, fileStore)
 
 	var stackClient stack.API
 	var stackClientCloser func() error

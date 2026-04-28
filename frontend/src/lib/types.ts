@@ -43,6 +43,7 @@ export interface ChallengeDetail {
     created_at: string
     level: number
     level_vote_counts?: LevelVoteCount[]
+    first_blood?: ChallengeSolver | null
     points: number
     solve_count: number
     created_by?: ChallengeCreator | null
@@ -64,6 +65,7 @@ export interface LockedChallenge {
     level: number
     points: number
     solve_count: number
+    first_blood?: ChallengeSolver | null
     created_by?: ChallengeCreator | null
     is_active: boolean
     previous_challenge_id?: number | null
@@ -240,6 +242,42 @@ export interface ChallengeSolver {
 export interface ChallengeSolversResponse {
     solvers: ChallengeSolver[]
     pagination: PaginationMeta
+}
+
+export interface WriteupAuthor {
+    user_id: number
+    username: string
+    affiliation_id?: number | null
+    affiliation?: string | null
+    bio?: string | null
+}
+
+export interface WriteupChallenge {
+    id: number
+    title: string
+    category: string
+    points: number
+    level: number
+}
+
+export interface Writeup {
+    id: number
+    content?: string | null
+    created_at: string
+    updated_at: string
+    author: WriteupAuthor
+    challenge: WriteupChallenge
+}
+
+export interface ChallengeWriteupsResponse {
+    writeups: Writeup[]
+    can_view_content: boolean
+    pagination: PaginationMeta
+}
+
+export interface WriteupDetailResponse {
+    writeup: Writeup
+    can_view_content: boolean
 }
 
 export interface LeaderboardChallenge {

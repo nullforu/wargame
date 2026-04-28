@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Affiliation, PaginationMeta, Stack, UserDetail, SolvedChallenge } from '../lib/types'
+import type { Affiliation, PaginationMeta, Stack, UserDetail, SolvedChallenge, Writeup } from '../lib/types'
 import { formatApiError, formatDateTime, parseRouteId } from '../lib/utils'
 import { navigate } from '../lib/router'
 import ProfileHeader from '../components/UserProfile/ProfileHeader'
@@ -31,6 +31,15 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     }
     const [solvedPage, setSolvedPage] = useState(readSolvedPageFromQuery)
     const [solvedPagination, setSolvedPagination] = useState({ page: 1, page_size: 20, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
+    const [writeups, setWriteups] = useState<Writeup[]>([])
+    const readWriteupPageFromQuery = () => {
+        if (typeof window === 'undefined') return 1
+        const params = new URLSearchParams(window.location.search)
+        const value = Number(params.get('writeup_page'))
+        return Number.isInteger(value) && value > 0 ? value : 1
+    }
+    const [writeupPage, setWriteupPage] = useState(readWriteupPageFromQuery)
+    const [writeupPagination, setWriteupPagination] = useState({ page: 1, page_size: 10, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
     const [loading, setLoading] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
     const [stacks, setStacks] = useState<Stack[]>([])
@@ -65,6 +74,7 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     const formatOptionalDateTime = useCallback((value?: string | null) => (value ? formatDateTime(value, localeTag) : t('common.na')), [localeTag, t])
 
     const formatSolvedDateTime = useCallback((value: string) => formatDateTime(value, localeTag), [localeTag])
+    const formatWriteupDateTime = useCallback((value: string) => formatDateTime(value, localeTag), [localeTag])
 
     const loadUserProfile = useCallback(
         async (userId: number) => {
@@ -72,19 +82,24 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
             setErrorMessage('')
             setSolved([])
             setSolvedPagination({ page: 1, page_size: 20, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
+            setWriteups([])
+            setWriteupPagination({ page: 1, page_size: 10, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
 
             try {
-                const [userDetail, solvedData] = await Promise.all([api.user(userId), api.userSolved(userId, solvedPage, 20)])
+                const writeupsPromise = isOwnProfile && auth.user?.id === userId ? api.myWriteups(writeupPage, 10) : api.userWriteups(userId, writeupPage, 10)
+                const [userDetail, solvedData, writeupData] = await Promise.all([api.user(userId), api.userSolved(userId, solvedPage, 20), writeupsPromise])
                 setUser(userDetail)
                 setSolved(solvedData.solved)
                 setSolvedPagination(solvedData.pagination)
+                setWriteups(writeupData.writeups)
+                setWriteupPagination(writeupData.pagination)
             } catch (error) {
                 setErrorMessage(formatApiError(error, t).message)
             } finally {
                 setLoading(false)
             }
         },
-        [api, solvedPage, t],
+        [api, auth.user?.id, isOwnProfile, solvedPage, t, writeupPage],
     )
 
     const loadStacks = useCallback(async () => {
@@ -199,13 +214,27 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
         }
     }, [])
 
+    const pushWriteupPageQuery = useCallback((nextPage: number) => {
+        if (typeof window === 'undefined') return
+        const params = new URLSearchParams(window.location.search)
+        if (nextPage > 1) params.set('writeup_page', String(nextPage))
+        else params.delete('writeup_page')
+        const query = params.toString()
+        const nextURL = query ? `${window.location.pathname}?${query}` : window.location.pathname
+        const currentURL = `${window.location.pathname}${window.location.search}`
+        if (nextURL !== currentURL) {
+            window.history.pushState({}, '', nextURL)
+        }
+    }, [])
+
     const backToUsersURL = useMemo(() => {
         if (typeof window === 'undefined') return '/users'
         const params = new URLSearchParams(window.location.search)
         params.delete('solved_page')
+        params.delete('writeup_page')
         const query = params.toString()
         return query ? `/users?${query}` : '/users'
-    }, [routeParams.id, solvedPage])
+    }, [routeParams.id, solvedPage, writeupPage])
 
     useEffect(() => {
         if (user && isOwnProfile) {
@@ -234,11 +263,12 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     useEffect(() => {
         if (targetUserId === null) return
         void loadUserProfile(targetUserId)
-    }, [loadUserProfile, targetUserId, solvedPage])
+    }, [loadUserProfile, targetUserId, solvedPage, writeupPage])
 
     useEffect(() => {
         const onPopState = () => {
             setSolvedPage(readSolvedPageFromQuery())
+            setWriteupPage(readWriteupPageFromQuery())
         }
         window.addEventListener('popstate', onPopState)
         return () => window.removeEventListener('popstate', onPopState)
@@ -399,6 +429,65 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
                                         const nextPage = solvedPage + 1
                                         setSolvedPage(nextPage)
                                         pushSolvedPageQuery(nextPage)
+                                    }}
+                                >
+                                    {t('common.next')}
+                                </button>
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <div className='mt-8 rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-lg md:border md:border-border md:bg-surface md:p-6'>
+                        <div className='flex flex-wrap items-center justify-between gap-2'>
+                            <h3 className='text-lg text-text'>{t('writeup.sectionTitle')}</h3>
+                            <span className='text-sm text-text-muted'>{t('writeup.profileTitle', { count: writeupPagination.total_count || writeups.length })}</span>
+                        </div>
+
+                        <div className='mt-6 space-y-3'>
+                            {writeups.map((item) => (
+                                <button
+                                    key={item.id}
+                                    className='w-full rounded-none border-0 bg-transparent p-3 text-left md:rounded-xl md:border md:border-border md:bg-surface-muted md:p-5'
+                                    onClick={() => navigate(`/writeups/${item.id}`)}
+                                >
+                                    <h4 className='text-base font-medium text-text'>
+                                        {item.challenge.category} · {item.challenge.title}
+                                        <span className='ml-2 text-xs text-accent'>{t('common.pointsShort', { points: item.challenge.points })}</span>
+                                    </h4>
+                                    <p className='mt-2 text-sm text-text-muted'>{t('writeup.updatedAt', { time: formatWriteupDateTime(item.updated_at) })}</p>
+                                </button>
+                            ))}
+
+                            {writeups.length === 0 ? (
+                                <div className='rounded-none border-0 bg-surface-muted p-5 text-center md:rounded-xl md:border md:border-border md:p-8'>
+                                    <p className='text-sm text-text-muted'>{t('writeup.empty')}</p>
+                                </div>
+                            ) : null}
+                        </div>
+
+                        {writeupPagination.total_pages > 0 ? (
+                            <div className='mt-3 flex flex-wrap items-center justify-end gap-2 text-xs text-text-muted md:px-3'>
+                                <button
+                                    className='rounded-md border border-border px-2 py-1 disabled:opacity-50'
+                                    disabled={!writeupPagination.has_prev}
+                                    onClick={() => {
+                                        const nextPage = Math.max(1, writeupPage - 1)
+                                        setWriteupPage(nextPage)
+                                        pushWriteupPageQuery(nextPage)
+                                    }}
+                                >
+                                    {t('common.previous')}
+                                </button>
+                                <span>
+                                    {writeupPagination.page} / {writeupPagination.total_pages || 1}
+                                </span>
+                                <button
+                                    className='rounded-md border border-border px-2 py-1 disabled:opacity-50'
+                                    disabled={!writeupPagination.has_next}
+                                    onClick={() => {
+                                        const nextPage = writeupPage + 1
+                                        setWriteupPage(nextPage)
+                                        pushWriteupPageQuery(nextPage)
                                     }}
                                 >
                                     {t('common.next')}

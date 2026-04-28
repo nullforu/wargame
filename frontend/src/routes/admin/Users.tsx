@@ -39,9 +39,8 @@ const AdminUsers = () => {
     const [unblockingUserId, setUnblockingUserId] = useState<number | null>(null)
 
     const filteredUsers = useMemo(() => {
-        const sorted = [...users].sort((a, b) => a.id - b.id)
-        if (roleFilter === 'all') return sorted
-        return sorted.filter((user) => user.role === roleFilter)
+        if (roleFilter === 'all') return users
+        return users.filter((user) => user.role === roleFilter)
     }, [users, roleFilter])
 
     const pushQueryState = useCallback((next: { q: string; page: number; role: RoleFilter }) => {
