@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"wargame/internal/config"
+	"wargame/internal/db"
 	"wargame/internal/models"
 	"wargame/internal/repo"
 	"wargame/internal/stack"
@@ -928,6 +929,9 @@ func (s *WargameService) CreateWriteup(ctx context.Context, userID, challengeID 
 	}
 
 	if err := s.writeupRepo.Create(ctx, row); err != nil {
+		if db.IsUniqueViolation(err) {
+			return nil, ErrWriteupExists
+		}
 		return nil, fmt.Errorf("wargame.CreateWriteup create: %w", err)
 	}
 
@@ -1045,7 +1049,21 @@ func (s *WargameService) ChallengeWriteupsPage(ctx context.Context, challengeID,
 		return nil, models.Pagination{}, false, fmt.Errorf("wargame.ChallengeWriteupsPage challenge lookup: %w", err)
 	}
 
-	rows, totalCount, err := s.writeupRepo.ChallengePage(ctx, challengeID, params.Page, params.PageSize)
+	canViewContent := false
+	if viewerUserID > 0 {
+		canViewContent, err = s.submissionRepo.HasCorrect(ctx, viewerUserID, challengeID)
+		if err != nil {
+			return nil, models.Pagination{}, false, fmt.Errorf("wargame.ChallengeWriteupsPage viewer solved check: %w", err)
+		}
+	}
+
+	var rows []models.WriteupDetail
+	var totalCount int
+	if canViewContent {
+		rows, totalCount, err = s.writeupRepo.ChallengePage(ctx, challengeID, params.Page, params.PageSize)
+	} else {
+		rows, totalCount, err = s.writeupRepo.ChallengePageWithoutContent(ctx, challengeID, params.Page, params.PageSize)
+	}
 	if err != nil {
 		return nil, models.Pagination{}, false, fmt.Errorf("wargame.ChallengeWriteupsPage list: %w", err)
 	}
@@ -1059,20 +1077,6 @@ func (s *WargameService) ChallengeWriteupsPage(ctx context.Context, challengeID,
 		return nil, models.Pagination{}, false, fmt.Errorf("wargame.ChallengeWriteupsPage level: %w", err)
 	}
 
-	canViewContent := false
-	if viewerUserID > 0 {
-		canViewContent, err = s.submissionRepo.HasCorrect(ctx, viewerUserID, challengeID)
-		if err != nil {
-			return nil, models.Pagination{}, false, fmt.Errorf("wargame.ChallengeWriteupsPage viewer solved check: %w", err)
-		}
-	}
-
-	if !canViewContent {
-		for i := range rows {
-			rows[i].Content = ""
-		}
-	}
-
 	return rows, BuildPagination(params.Page, params.PageSize, totalCount), canViewContent, nil
 }
 
@@ -1081,17 +1085,13 @@ func (s *WargameService) GetWriteupByID(ctx context.Context, writeupID, viewerUs
 		return nil, false, ErrInvalidInput
 	}
 
-	row, err := s.writeupRepo.GetDetailByID(ctx, writeupID)
+	row, err := s.writeupRepo.GetDetailByIDWithoutContent(ctx, writeupID)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
 			return nil, false, ErrWriteupNotFound
 		}
 
 		return nil, false, fmt.Errorf("wargame.GetWriteupByID detail: %w", err)
-	}
-
-	if err := s.applyWriteupChallengeLevels(ctx, []*models.WriteupDetail{row}); err != nil {
-		return nil, false, fmt.Errorf("wargame.GetWriteupByID level: %w", err)
 	}
 
 	canViewContent := false
@@ -1102,11 +1102,52 @@ func (s *WargameService) GetWriteupByID(ctx context.Context, writeupID, viewerUs
 		}
 	}
 
-	if !canViewContent {
-		row.Content = ""
+	if canViewContent {
+		row, err = s.writeupRepo.GetDetailByID(ctx, writeupID)
+		if err != nil {
+			if errors.Is(err, repo.ErrNotFound) {
+				return nil, false, ErrWriteupNotFound
+			}
+			return nil, false, fmt.Errorf("wargame.GetWriteupByID detail with content: %w", err)
+		}
+	}
+
+	if err := s.applyWriteupChallengeLevels(ctx, []*models.WriteupDetail{row}); err != nil {
+		return nil, false, fmt.Errorf("wargame.GetWriteupByID level: %w", err)
 	}
 
 	return row, canViewContent, nil
+}
+
+func (s *WargameService) MyWriteupByChallenge(ctx context.Context, userID, challengeID int64) (*models.WriteupDetail, error) {
+	validator := newFieldValidator()
+	validator.PositiveID("user_id", userID)
+	validator.PositiveID("challenge_id", challengeID)
+	if err := validator.Error(); err != nil {
+		return nil, err
+	}
+
+	row, err := s.writeupRepo.GetByUserAndChallenge(ctx, userID, challengeID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrWriteupNotFound
+		}
+		return nil, fmt.Errorf("wargame.MyWriteupByChallenge lookup: %w", err)
+	}
+
+	detail, err := s.writeupRepo.GetDetailByID(ctx, row.ID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrWriteupNotFound
+		}
+		return nil, fmt.Errorf("wargame.MyWriteupByChallenge detail: %w", err)
+	}
+
+	if err := s.applyWriteupChallengeLevels(ctx, []*models.WriteupDetail{detail}); err != nil {
+		return nil, fmt.Errorf("wargame.MyWriteupByChallenge level: %w", err)
+	}
+
+	return detail, nil
 }
 
 func (s *WargameService) MyWriteupsPage(ctx context.Context, userID int64, page, pageSize int) ([]models.WriteupDetail, models.Pagination, error) {

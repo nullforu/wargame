@@ -106,6 +106,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const [writeupLoading, setWriteupLoading] = useState(false)
     const [writeupError, setWriteupError] = useState('')
     const [canViewWriteupContent, setCanViewWriteupContent] = useState(false)
+    const [hasMyWriteup, setHasMyWriteup] = useState(false)
 
     const pushSolverPageQuery = (nextPage: number) => {
         if (typeof window === 'undefined') return
@@ -192,6 +193,19 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         }
     }
 
+    const loadMyWriteup = async () => {
+        if (!challengeId || !auth.user) {
+            setHasMyWriteup(false)
+            return
+        }
+        try {
+            await api.challengeMyWriteup(challengeId)
+            setHasMyWriteup(true)
+        } catch {
+            setHasMyWriteup(false)
+        }
+    }
+
     const loadMyVote = async () => {
         if (!challengeId) return
         try {
@@ -244,6 +258,11 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
 
     useEffect(() => {
         if (!challengeId) return
+        void loadMyWriteup()
+    }, [challengeId, auth.user?.id])
+
+    useEffect(() => {
+        if (!challengeId) return
         setMyVoteLoaded(false)
         void loadMyVote()
     }, [challengeId])
@@ -258,6 +277,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         setWriteupPagination(EMPTY_WRITEUP_PAGINATION)
         setWriteupLoading(false)
         setWriteupError('')
+        setHasMyWriteup(false)
         setCanViewWriteupContent(false)
     }, [challengeId])
 
@@ -527,8 +547,6 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const isSubmissionDisabled = !auth.user || !isChallengeActive || challenge.is_solved || submission.status === 'loading'
     const createdSummary = challenge.created_at ? formatCompactDateTime(challenge.created_at) : t('common.na')
     const voteSubmittedMessage = t('challenge.voteSubmitted')
-    const hasMyWriteup = writeups.some((item) => item.is_mine)
-
     return (
         <section className='animate space-y-4 px-0 sm:px-1 md:px-2 lg:px-0'>
             <div className='grid items-start gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(320px,0.92fr)]'>
@@ -758,7 +776,6 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                         <div className='min-w-0'>
                                                             <div className='flex items-center gap-2'>
                                                                 <span className='block max-w-full truncate text-left text-base font-semibold text-text'>{item.author.username}</span>
-                                                                {item.is_mine ? <span className='rounded bg-accent/15 px-1.5 py-0.5 text-[11px] font-semibold text-accent'>{t('common.mine')}</span> : null}
                                                             </div>
                                                             <p className='mt-1 max-w-full truncate text-sm text-text-subtle'>
                                                                 {item.author.affiliation && item.author.affiliation.trim().length > 0 ? `${item.author.affiliation} · ` : ''}

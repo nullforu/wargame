@@ -74,13 +74,12 @@ func (r *WriteupRepo) GetByUserAndChallenge(ctx context.Context, userID, challen
 	return row, nil
 }
 
-func (r *WriteupRepo) baseDetailQuery() *bun.SelectQuery {
-	return r.db.NewSelect().
+func (r *WriteupRepo) baseDetailQuery(includeContent bool) *bun.SelectQuery {
+	query := r.db.NewSelect().
 		TableExpr("writeups AS w").
 		ColumnExpr("w.id").
 		ColumnExpr("w.user_id").
 		ColumnExpr("w.challenge_id").
-		ColumnExpr("w.content").
 		ColumnExpr("w.created_at").
 		ColumnExpr("w.updated_at").
 		ColumnExpr("u.username").
@@ -93,11 +92,25 @@ func (r *WriteupRepo) baseDetailQuery() *bun.SelectQuery {
 		Join("JOIN users AS u ON u.id = w.user_id").
 		Join("JOIN challenges AS c ON c.id = w.challenge_id").
 		Join("LEFT JOIN affiliations AS aff ON aff.id = u.affiliation_id")
+
+	if includeContent {
+		query = query.ColumnExpr("w.content")
+	}
+
+	return query
 }
 
 func (r *WriteupRepo) GetDetailByID(ctx context.Context, id int64) (*models.WriteupDetail, error) {
+	return r.getDetailByID(ctx, id, true)
+}
+
+func (r *WriteupRepo) GetDetailByIDWithoutContent(ctx context.Context, id int64) (*models.WriteupDetail, error) {
+	return r.getDetailByID(ctx, id, false)
+}
+
+func (r *WriteupRepo) getDetailByID(ctx context.Context, id int64, includeContent bool) (*models.WriteupDetail, error) {
 	row := new(models.WriteupDetail)
-	if err := r.baseDetailQuery().
+	if err := r.baseDetailQuery(includeContent).
 		Where("w.id = ?", id).
 		Limit(1).
 		Scan(ctx, row); err != nil {
@@ -108,9 +121,17 @@ func (r *WriteupRepo) GetDetailByID(ctx context.Context, id int64) (*models.Writ
 }
 
 func (r *WriteupRepo) ChallengePage(ctx context.Context, challengeID int64, page, pageSize int) ([]models.WriteupDetail, int, error) {
+	return r.challengePage(ctx, challengeID, page, pageSize, true)
+}
+
+func (r *WriteupRepo) ChallengePageWithoutContent(ctx context.Context, challengeID int64, page, pageSize int) ([]models.WriteupDetail, int, error) {
+	return r.challengePage(ctx, challengeID, page, pageSize, false)
+}
+
+func (r *WriteupRepo) challengePage(ctx context.Context, challengeID int64, page, pageSize int, includeContent bool) ([]models.WriteupDetail, int, error) {
 	rows := make([]models.WriteupDetail, 0, pageSize)
 
-	base := r.baseDetailQuery().Where("w.challenge_id = ?", challengeID)
+	base := r.baseDetailQuery(includeContent).Where("w.challenge_id = ?", challengeID)
 
 	totalCount, err := r.db.NewSelect().
 		TableExpr("(?) AS writeups", base).
@@ -134,7 +155,7 @@ func (r *WriteupRepo) ChallengePage(ctx context.Context, challengeID int64, page
 func (r *WriteupRepo) UserPage(ctx context.Context, userID int64, page, pageSize int) ([]models.WriteupDetail, int, error) {
 	rows := make([]models.WriteupDetail, 0, pageSize)
 
-	base := r.baseDetailQuery().Where("w.user_id = ?", userID)
+	base := r.baseDetailQuery(true).Where("w.user_id = ?", userID)
 
 	totalCount, err := r.db.NewSelect().
 		TableExpr("(?) AS writeups", base).

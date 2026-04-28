@@ -1661,7 +1661,7 @@ func TestHandlerWriteupHandlers(t *testing.T) {
 			t.Fatalf("decode created writeup: %v", err)
 		}
 
-		if created.ID <= 0 || created.Content == nil || *created.Content != "first body" || !created.IsMine {
+		if created.ID <= 0 || created.Content == nil || *created.Content != "first body" {
 			t.Fatalf("unexpected create response: %+v", created)
 		}
 
@@ -1795,7 +1795,7 @@ func TestHandlerWriteupHandlers(t *testing.T) {
 			t.Fatalf("decode my writeups: %v", err)
 		}
 
-		if !myResp.CanViewContent || len(myResp.Writeups) != 1 || myResp.Writeups[0].Content == nil || !myResp.Writeups[0].IsMine {
+		if !myResp.CanViewContent || len(myResp.Writeups) != 1 || myResp.Writeups[0].Content == nil {
 			t.Fatalf("unexpected my writeups response: %+v", myResp)
 		}
 

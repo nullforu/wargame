@@ -62,6 +62,7 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		auth.Use(middleware.Auth(cfg.JWT))
 		auth.GET("/me", h.Me)
 		auth.GET("/me/writeups", h.MyWriteups)
+		auth.GET("/challenges/:id/my-writeup", h.MyChallengeWriteup)
 		auth.GET("/stacks", h.ListStacks)
 		auth.GET("/challenges/:id/stack", h.GetStack)
 		auth.GET("/challenges/:id/my-vote", h.ChallengeMyVote)

@@ -136,7 +136,7 @@ const WriteupDetail = ({ routeParams = {} }: RouteProps) => {
         )
     }
 
-    const isMine = Boolean(auth.user && writeup.is_mine)
+    const isMine = Boolean(auth.user && auth.user.id === writeup.author.user_id)
     const createdAtLabel = formatDateTime(writeup.created_at, localeTag)
     const authorName = writeup.author.username.trim()
     const authorAffiliation = writeup.author.affiliation?.trim() ?? ''

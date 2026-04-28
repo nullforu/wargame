@@ -38,10 +38,10 @@ const WriteupEditor = ({ routeParams = {} }: RouteProps) => {
         setMessage('')
 
         try {
-            const [challengeData, writeupData] = await Promise.all([api.challenge(challengeId), api.challengeWriteups(challengeId, 1, 100)])
+            const [challengeData, myWriteupResult] = await Promise.all([api.challenge(challengeId), auth.user ? api.challengeMyWriteup(challengeId).catch(() => null) : Promise.resolve(null)])
             setSummaryChallenge(challengeData)
-            setCanViewContent(writeupData.can_view_content)
-            const myWriteup = writeupData.writeups.find((item) => item.is_mine) ?? null
+            setCanViewContent(Boolean(challengeData.is_solved))
+            const myWriteup = myWriteupResult?.writeup ?? null
             setWriteup(myWriteup)
             setContent(myWriteup?.content ?? '')
         } catch (error) {

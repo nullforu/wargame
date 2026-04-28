@@ -329,7 +329,7 @@ func (h *Handler) MyWriteups(ctx *gin.Context) {
 
 	resp := make([]writeupResponse, 0, len(rows))
 	for _, row := range rows {
-		resp = append(resp, newWriteupResponse(row, true, true))
+		resp = append(resp, newWriteupResponse(row, true))
 	}
 
 	ctx.JSON(http.StatusOK, writeupsListResponse{Writeups: resp, CanViewContent: true, Pagination: pagination})
@@ -549,8 +549,7 @@ func (h *Handler) ChallengeWriteups(ctx *gin.Context) {
 
 	resp := make([]writeupResponse, 0, len(rows))
 	for _, row := range rows {
-		isMine := viewerID > 0 && row.UserID == viewerID
-		resp = append(resp, newWriteupResponse(row, canViewContent, isMine))
+		resp = append(resp, newWriteupResponse(row, canViewContent))
 	}
 
 	ctx.JSON(http.StatusOK, writeupsListResponse{Writeups: resp, CanViewContent: canViewContent, Pagination: pagination})
@@ -569,8 +568,22 @@ func (h *Handler) GetWriteup(ctx *gin.Context) {
 		return
 	}
 
-	isMine := viewerID > 0 && row.UserID == viewerID
-	ctx.JSON(http.StatusOK, writeupDetailResponse{Writeup: newWriteupResponse(*row, canViewContent, isMine), CanViewContent: canViewContent})
+	ctx.JSON(http.StatusOK, writeupDetailResponse{Writeup: newWriteupResponse(*row, canViewContent), CanViewContent: canViewContent})
+}
+
+func (h *Handler) MyChallengeWriteup(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	row, err := h.wargame.MyWriteupByChallenge(ctx.Request.Context(), middleware.UserID(ctx), challengeID)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, writeupDetailResponse{Writeup: newWriteupResponse(*row, true), CanViewContent: true})
 }
 
 func (h *Handler) CreateWriteup(ctx *gin.Context) {
@@ -591,7 +604,7 @@ func (h *Handler) CreateWriteup(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, newWriteupResponse(*row, true, true))
+	ctx.JSON(http.StatusCreated, newWriteupResponse(*row, true))
 }
 
 func (h *Handler) UpdateWriteup(ctx *gin.Context) {
@@ -618,7 +631,7 @@ func (h *Handler) UpdateWriteup(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, newWriteupResponse(*row, true, true))
+	ctx.JSON(http.StatusOK, newWriteupResponse(*row, true))
 }
 
 func (h *Handler) DeleteWriteup(ctx *gin.Context) {
@@ -1351,12 +1364,11 @@ func (h *Handler) GetUserWriteups(ctx *gin.Context) {
 	resp := make([]writeupResponse, 0, len(rows))
 	canViewAnyContent := false
 	for _, row := range rows {
-		isMine := viewerID > 0 && row.UserID == viewerID
 		includeContent := row.Content != ""
 		if includeContent {
 			canViewAnyContent = true
 		}
-		resp = append(resp, newWriteupResponse(row, includeContent, isMine))
+		resp = append(resp, newWriteupResponse(row, includeContent))
 	}
 
 	ctx.JSON(http.StatusOK, writeupsListResponse{Writeups: resp, CanViewContent: canViewAnyContent, Pagination: pagination})

@@ -350,7 +350,7 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
             } as ChallengeVotesResponse
         },
         challengeWriteups: async (id: number, page?: number, pageSize?: number) => {
-            const data = await request<Partial<ChallengeWriteupsResponse>>(withPagination(`/api/challenges/${id}/writeups`, page, pageSize), { auth: true })
+            const data = await request<Partial<ChallengeWriteupsResponse>>(withPagination(`/api/challenges/${id}/writeups`, page, pageSize))
             return {
                 writeups: Array.isArray(data?.writeups) ? data.writeups : [],
                 can_view_content: Boolean(data?.can_view_content),
@@ -358,10 +358,17 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
             } as ChallengeWriteupsResponse
         },
         writeup: async (id: number) => {
-            const data = await request<Partial<WriteupDetailResponse>>(`/api/writeups/${id}`, { auth: true })
+            const data = await request<Partial<WriteupDetailResponse>>(`/api/writeups/${id}`)
             return {
                 writeup: data?.writeup as Writeup,
                 can_view_content: Boolean(data?.can_view_content),
+            } as WriteupDetailResponse
+        },
+        challengeMyWriteup: async (id: number) => {
+            const data = await request<Partial<WriteupDetailResponse>>(`/api/challenges/${id}/my-writeup`, { auth: true })
+            return {
+                writeup: data?.writeup as Writeup,
+                can_view_content: true,
             } as WriteupDetailResponse
         },
         createWriteup: (challengeID: number, content: string) =>
@@ -530,7 +537,7 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
             } as UserSolvedResponse
         },
         userWriteups: async (id: number, page?: number, pageSize?: number) => {
-            const data = await request<Partial<ChallengeWriteupsResponse>>(withPagination(`/api/users/${id}/writeups`, page, pageSize), { auth: true })
+            const data = await request<Partial<ChallengeWriteupsResponse>>(withPagination(`/api/users/${id}/writeups`, page, pageSize))
             return {
                 writeups: Array.isArray(data?.writeups) ? data.writeups : [],
                 can_view_content: Boolean(data?.can_view_content),

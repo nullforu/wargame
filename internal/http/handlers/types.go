@@ -286,7 +286,6 @@ type writeupResponse struct {
 	UpdatedAt time.Time                `json:"updated_at"`
 	Author    writeupAuthorResponse    `json:"author"`
 	Challenge writeupChallengeResponse `json:"challenge"`
-	IsMine    bool                     `json:"is_mine"`
 }
 
 type writeupsListResponse struct {
@@ -532,7 +531,7 @@ func newChallengeSolverResponse(row models.ChallengeSolver) challengeSolverRespo
 	}
 }
 
-func newWriteupResponse(row models.WriteupDetail, includeContent bool, isMine bool) writeupResponse {
+func newWriteupResponse(row models.WriteupDetail, includeContent bool) writeupResponse {
 	content := (*string)(nil)
 	if includeContent {
 		value := row.Content
@@ -558,6 +557,5 @@ func newWriteupResponse(row models.WriteupDetail, includeContent bool, isMine bo
 			Points:   row.ChallengePoints,
 			Level:    row.ChallengeLevel,
 		},
-		IsMine: isMine,
 	}
 }

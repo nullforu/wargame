@@ -267,7 +267,6 @@ export interface Writeup {
     updated_at: string
     author: WriteupAuthor
     challenge: WriteupChallenge
-    is_mine: boolean
 }
 
 export interface ChallengeWriteupsResponse {
