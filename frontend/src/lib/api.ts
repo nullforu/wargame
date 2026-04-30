@@ -171,11 +171,15 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
             ?.slice(encoded.length)
     }
 
-    const buildHeaders = () => {
+    const buildHeaders = (method: string) => {
         const headers: Record<string, string> = { Accept: 'application/json' }
 
-        const csrfToken = getCookie('csrf_token')
-        if (csrfToken) headers['X-CSRF-Token'] = csrfToken
+        const upper = method.toUpperCase()
+        const needsCSRF = upper === 'POST' || upper === 'PUT' || upper === 'PATCH' || upper === 'DELETE'
+        if (needsCSRF) {
+            const csrfToken = getCookie('csrf_token')
+            if (csrfToken) headers['X-CSRF-Token'] = csrfToken
+        }
 
         return headers
     }
@@ -183,10 +187,7 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
     const refreshToken = async () => {
         const response = await fetch(`${API_BASE}/api/auth/refresh`, {
             method: 'POST',
-            headers: {
-                Accept: 'application/json',
-                ...(getCookie('csrf_token') ? { 'X-CSRF-Token': getCookie('csrf_token') as string } : {}),
-            },
+            headers: buildHeaders('POST'),
             credentials: 'include',
         })
 
@@ -197,10 +198,10 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
             throw new ApiError(data?.error ?? translate('errors.invalidCredentials'), response.status, data?.details, extractRateLimit(response, data))
         }
 
-		return 'ok'
+        return 'ok'
     }
 
-	let refreshInFlight: Promise<string> | null = null
+    let refreshInFlight: Promise<string> | null = null
 
     const getFreshToken = async () => {
         if (refreshInFlight) return refreshInFlight
@@ -230,20 +231,20 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
             noCache?: boolean
         } = {},
     ): Promise<T> => {
-		const headers = buildHeaders()
+        const headers = buildHeaders(method)
         if (body !== undefined) headers['Content-Type'] = 'application/json'
         if (noCache) {
             headers['Cache-Control'] = 'no-cache'
             headers.Pragma = 'no-cache'
         }
 
-		const response = await fetch(`${API_BASE}${path}`, {
-			method,
-			headers,
-			body: body !== undefined ? JSON.stringify(body) : undefined,
-			credentials: 'include',
-			cache: noCache ? 'no-store' : 'default',
-		})
+        const response = await fetch(`${API_BASE}${path}`, {
+            method,
+            headers,
+            body: body !== undefined ? JSON.stringify(body) : undefined,
+            credentials: 'include',
+            cache: noCache ? 'no-store' : 'default',
+        })
 
         if (response.ok) {
             if (response.status === 204) return null as T
@@ -253,21 +254,21 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
 
         if (response.status === 401 && auth && retryOnAuth) {
             try {
-				await getFreshToken()
-				const retryHeaders = buildHeaders()
+                await getFreshToken()
+                const retryHeaders = buildHeaders(method)
                 if (body !== undefined) retryHeaders['Content-Type'] = 'application/json'
                 if (noCache) {
                     retryHeaders['Cache-Control'] = 'no-cache'
                     retryHeaders.Pragma = 'no-cache'
                 }
 
-				const retryResponse = await fetch(`${API_BASE}${path}`, {
-					method,
-					headers: retryHeaders,
-					body: body !== undefined ? JSON.stringify(body) : undefined,
-					credentials: 'include',
-					cache: noCache ? 'no-store' : 'default',
-				})
+                const retryResponse = await fetch(`${API_BASE}${path}`, {
+                    method,
+                    headers: retryHeaders,
+                    body: body !== undefined ? JSON.stringify(body) : undefined,
+                    credentials: 'include',
+                    cache: noCache ? 'no-store' : 'default',
+                })
 
                 if (retryResponse.ok) {
                     if (retryResponse.status === 204) return null as T

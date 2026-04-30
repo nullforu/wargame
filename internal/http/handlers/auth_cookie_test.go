@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -46,7 +47,9 @@ func TestSetAuthCookiesGeneratesCookiesAndHeaders(t *testing.T) {
 	ctx, rec := newCookieTestContext(t)
 	cfg := testConfig("local", time.Hour, 2*time.Hour)
 
-	setAuthCookies(ctx, cfg, "access-abc", "refresh-def")
+	if err := setAuthCookies(ctx, cfg, "access-abc", "refresh-def"); err != nil {
+		t.Fatalf("setAuthCookies: %v", err)
+	}
 
 	cookies := rec.Header().Values("Set-Cookie")
 	if len(cookies) != 3 {
@@ -87,7 +90,9 @@ func TestSetAuthCookiesReusesExistingCSRFToken(t *testing.T) {
 	cfg := testConfig("local", 2*time.Hour, time.Hour)
 
 	ctx.Request.AddCookie(&http.Cookie{Name: csrfTokenCookieName, Value: "persist-csrf"})
-	setAuthCookies(ctx, cfg, "access", "refresh")
+	if err := setAuthCookies(ctx, cfg, "access", "refresh"); err != nil {
+		t.Fatalf("setAuthCookies: %v", err)
+	}
 
 	csrfHeader := rec.Header().Get(csrfTokenHeaderName)
 	if csrfHeader != "persist-csrf" {
@@ -173,8 +178,25 @@ func TestSetCookieProductionSecureFlag(t *testing.T) {
 }
 
 func TestRandomTokenHex_Length(t *testing.T) {
-	tok := randomTokenHex(32)
+	tok, err := randomTokenHex(32)
+	if err != nil {
+		t.Fatalf("randomTokenHex: %v", err)
+	}
 	if len(tok) != 64 {
 		t.Fatalf("expected hex length 64, got %d", len(tok))
+	}
+}
+
+func TestSetAuthCookies_ReturnsErrorWhenRandomFails(t *testing.T) {
+	ctx, _ := newCookieTestContext(t)
+	cfg := testConfig("local", time.Hour, 2*time.Hour)
+
+	prev := randRead
+	randRead = func([]byte) (int, error) { return 0, errors.New("rng down") }
+	t.Cleanup(func() { randRead = prev })
+
+	err := setAuthCookies(ctx, cfg, "access", "refresh")
+	if !errors.Is(err, errCSRFTokenGeneration) {
+		t.Fatalf("expected errCSRFTokenGeneration, got %v", err)
 	}
 }

@@ -1091,7 +1091,7 @@ func TestHandlerListChallengesAndUsers(t *testing.T) {
 		}
 
 		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges?page=1&page_size=10", nil)
-		ctx.Request.Header.Set("Authorization", "Bearer "+accessToken)
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: accessToken})
 		env.handler.ListChallenges(ctx)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
@@ -1157,15 +1157,16 @@ func TestParseIDParamOrError(t *testing.T) {
 func TestOptionalUserID(t *testing.T) {
 	env := setupHandlerTest(t)
 
-	t.Run("no authorization header", func(t *testing.T) {
+	t.Run("no access token cookie", func(t *testing.T) {
 		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
 		if got := env.handler.optionalUserID(ctx); got != 0 {
 			t.Fatalf("expected 0, got %d", got)
 		}
 	})
 
-	t.Run("missing access token cookie", func(t *testing.T) {
+	t.Run("invalid access token cookie", func(t *testing.T) {
 		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: "not-a-jwt"})
 		if got := env.handler.optionalUserID(ctx); got != 0 {
 			t.Fatalf("expected 0, got %d", got)
 		}
@@ -1212,7 +1213,7 @@ func TestHandlerGetChallengeAndSolvers(t *testing.T) {
 
 	t.Run("get challenge locked response", func(t *testing.T) {
 		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(locked.ID), nil)
-		ctx.Request.Header.Set("Authorization", "Bearer "+token)
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: token})
 		ctx.Params = append(ctx.Params, ginParam("id", toStringID(locked.ID)))
 		env.handler.GetChallenge(ctx)
 		if rec.Code != http.StatusOK {
@@ -1242,7 +1243,7 @@ func TestHandlerGetChallengeAndSolvers(t *testing.T) {
 		}
 
 		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(prev.ID), nil)
-		ctx.Request.Header.Set("Authorization", "Bearer "+token)
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: token})
 		ctx.Params = append(ctx.Params, ginParam("id", toStringID(prev.ID)))
 		env.handler.GetChallenge(ctx)
 		if rec.Code != http.StatusOK {

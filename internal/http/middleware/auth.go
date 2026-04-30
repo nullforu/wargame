@@ -16,7 +16,7 @@ const (
 	ctxUserIDKey = "userID"
 	ctxRoleKey   = "role"
 
-	errMissingAuth  = "missing authorization"
+	errMissingAuth  = "missing access_token cookie"
 	errInvalidToken = "invalid token"
 	errForbidden    = "forbidden"
 )

@@ -264,7 +264,10 @@ func (h *Handler) Login(ctx *gin.Context) {
 		return
 	}
 
-	setAuthCookies(ctx, h.cfg, accessToken, refreshToken)
+	if err := setAuthCookies(ctx, h.cfg, accessToken, refreshToken); err != nil {
+		writeError(ctx, err)
+		return
+	}
 	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
 	ctx.JSON(http.StatusOK, loginResponse{User: newUserMeResponse(user, stackCount, stackLimit)})
 }
@@ -282,7 +285,10 @@ func (h *Handler) Refresh(ctx *gin.Context) {
 		return
 	}
 
-	setAuthCookies(ctx, h.cfg, accessToken, refreshToken)
+	if err := setAuthCookies(ctx, h.cfg, accessToken, refreshToken); err != nil {
+		writeError(ctx, err)
+		return
+	}
 	ctx.JSON(http.StatusOK, refreshResponse{Status: "ok"})
 }
 

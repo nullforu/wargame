@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"net/http"
 
 	"wargame/internal/config"
@@ -17,13 +18,21 @@ const (
 	csrfTokenHeaderName    = "X-CSRF-Token"
 )
 
-func setAuthCookies(ctx *gin.Context, cfg config.Config, accessToken, refreshToken string) {
+var errCSRFTokenGeneration = errors.New("failed to generate csrf token")
+
+var randRead = rand.Read
+
+func setAuthCookies(ctx *gin.Context, cfg config.Config, accessToken, refreshToken string) error {
 	setCookie(ctx, cfg, accessTokenCookieName, accessToken, int(cfg.JWT.AccessTTL.Seconds()), true)
 	setCookie(ctx, cfg, refreshTokenCookieName, refreshToken, int(cfg.JWT.RefreshTTL.Seconds()), true)
 
 	csrfToken, ok := currentCSRFToken(ctx)
 	if !ok {
-		csrfToken = randomTokenHex(32)
+		var err error
+		csrfToken, err = randomTokenHex(32)
+		if err != nil {
+			return err
+		}
 	}
 
 	maxAge := max(int(cfg.JWT.RefreshTTL.Seconds()), int(cfg.JWT.AccessTTL.Seconds()))
@@ -32,6 +41,7 @@ func setAuthCookies(ctx *gin.Context, cfg config.Config, accessToken, refreshTok
 	ctx.Header(csrfTokenHeaderName, csrfToken)
 	ctx.Header("Cache-Control", "no-store")
 	ctx.Header("Pragma", "no-cache")
+	return nil
 }
 
 func clearAuthCookies(ctx *gin.Context, cfg config.Config) {
@@ -67,11 +77,11 @@ func setCookie(ctx *gin.Context, cfg config.Config, name, value string, maxAge i
 	ctx.SetCookie(name, value, maxAge, "/", "", secure, httpOnly)
 }
 
-func randomTokenHex(bytesLen int) string {
+func randomTokenHex(bytesLen int) (string, error) {
 	b := make([]byte, bytesLen)
-	if _, err := rand.Read(b); err != nil {
-		return "fallback-csrf-token"
+	if _, err := randRead(b); err != nil {
+		return "", errCSRFTokenGeneration
 	}
 
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }
