@@ -134,9 +134,7 @@ type registerResponse struct {
 type loginUserResponse = userMeResponse
 
 type loginResponse struct {
-	AccessToken  string            `json:"access_token,omitempty"`
-	RefreshToken string            `json:"refresh_token,omitempty"`
-	User         loginUserResponse `json:"user"`
+	User loginUserResponse `json:"user"`
 }
 
 type refreshResponse struct {

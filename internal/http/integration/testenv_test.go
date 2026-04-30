@@ -330,15 +330,6 @@ func doRequest(t *testing.T, router *gin.Engine, method, path string, body any, 
 				}
 			}
 		}
-
-		if req.Header.Get("Cookie") == "" {
-			if payload, ok := body.(map[string]string); ok {
-				if refreshToken := payload["refresh_token"]; refreshToken != "" {
-					req.Header.Set("Cookie", "refresh_token="+refreshToken+"; csrf_token=test-csrf")
-					req.Header.Set("X-CSRF-Token", "test-csrf")
-				}
-			}
-		}
 	}
 
 	rec := httptest.NewRecorder()
@@ -357,6 +348,10 @@ func decodeJSON(t *testing.T, rec *httptest.ResponseRecorder, dest any) {
 
 func authHeader(token string) map[string]string {
 	return map[string]string{"Cookie": "access_token=" + token + "; csrf_token=test-csrf", "X-CSRF-Token": "test-csrf"}
+}
+
+func refreshHeader(token string) map[string]string {
+	return map[string]string{"Cookie": "refresh_token=" + token + "; csrf_token=test-csrf", "X-CSRF-Token": "test-csrf"}
 }
 
 func cookieValueFromSetCookie(rec *httptest.ResponseRecorder, name string) string {

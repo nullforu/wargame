@@ -10,7 +10,7 @@ nav_order: 8
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Response 200
@@ -43,7 +43,7 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie` or `invalid token`
 - 503 `stack feature disabled`
 
 Notes:
@@ -59,7 +59,7 @@ Notes:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Response 201
@@ -89,7 +89,7 @@ Response 201
 Errors:
 
 - 400 `invalid input` or `stack not enabled for challenge`
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie` or `invalid token`
 - 403 `user blocked` or `challenge locked`
 - 404 `challenge not found`
 - 409 `stack limit reached` or `challenge already solved`
@@ -105,7 +105,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Response 200
@@ -134,7 +134,7 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie` or `invalid token`
 - 404 `stack not found`
 - 503 `stack feature disabled` or `stack provisioner unavailable`
 
@@ -151,7 +151,7 @@ Notes:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Response 200
@@ -164,7 +164,7 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie` or `invalid token`
 - 404 `stack not found`
 - 503 `stack feature disabled` or `stack provisioner unavailable`
 

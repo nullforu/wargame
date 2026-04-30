@@ -130,7 +130,7 @@ func TestRefreshAndLogout(t *testing.T) {
 	env := setupTest(t, testCfg)
 	_, refresh, _ := registerAndLogin(t, env, "user@example.com", "user1", "strong-password")
 
-	rec := doRequest(t, env.router, http.MethodPost, "/api/auth/refresh", map[string]string{"refresh_token": refresh}, nil)
+	rec := doRequest(t, env.router, http.MethodPost, "/api/auth/refresh", nil, refreshHeader(refresh))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
@@ -144,17 +144,17 @@ func TestRefreshAndLogout(t *testing.T) {
 		t.Fatalf("refresh token should rotate")
 	}
 
-	rec = doRequest(t, env.router, http.MethodPost, "/api/auth/refresh", map[string]string{"refresh_token": refresh}, nil)
+	rec = doRequest(t, env.router, http.MethodPost, "/api/auth/refresh", nil, refreshHeader(refresh))
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
 
-	rec = doRequest(t, env.router, http.MethodPost, "/api/auth/logout", map[string]string{"refresh_token": refreshed}, nil)
+	rec = doRequest(t, env.router, http.MethodPost, "/api/auth/logout", nil, refreshHeader(refreshed))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
 
-	rec = doRequest(t, env.router, http.MethodPost, "/api/auth/refresh", map[string]string{"refresh_token": refreshed}, nil)
+	rec = doRequest(t, env.router, http.MethodPost, "/api/auth/refresh", nil, refreshHeader(refreshed))
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
