@@ -135,17 +135,12 @@ func TestRefreshAndLogout(t *testing.T) {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var refreshResp struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-	}
-	decodeJSON(t, rec, &refreshResp)
-
-	if refreshResp.AccessToken == "" || refreshResp.RefreshToken == "" {
-		t.Fatalf("tokens should not be empty")
+	refreshed := cookieValueFromSetCookie(rec, "refresh_token")
+	if refreshed == "" {
+		t.Fatalf("refresh cookie should be set")
 	}
 
-	if refreshResp.RefreshToken == refresh {
+	if refreshed == refresh {
 		t.Fatalf("refresh token should rotate")
 	}
 
@@ -154,12 +149,12 @@ func TestRefreshAndLogout(t *testing.T) {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
 
-	rec = doRequest(t, env.router, http.MethodPost, "/api/auth/logout", map[string]string{"refresh_token": refreshResp.RefreshToken}, nil)
+	rec = doRequest(t, env.router, http.MethodPost, "/api/auth/logout", map[string]string{"refresh_token": refreshed}, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
 
-	rec = doRequest(t, env.router, http.MethodPost, "/api/auth/refresh", map[string]string{"refresh_token": refreshResp.RefreshToken}, nil)
+	rec = doRequest(t, env.router, http.MethodPost, "/api/auth/refresh", map[string]string{"refresh_token": refreshed}, nil)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}

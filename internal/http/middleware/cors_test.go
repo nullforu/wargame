@@ -26,8 +26,8 @@ func TestCORSAllowAll(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
-		t.Fatalf("expected '*', got %q", got)
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://evil.example.com" {
+		t.Fatalf("expected origin echo, got %q", got)
 	}
 
 	if got := rec.Header().Get("Access-Control-Allow-Methods"); got == "" {
@@ -117,7 +117,7 @@ func TestCORSPreflight(t *testing.T) {
 		t.Fatalf("expected 204, got %d", rec.Code)
 	}
 
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
-		t.Fatalf("expected '*', got %q", got)
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://example.com" {
+		t.Fatalf("expected origin echo, got %q", got)
 	}
 }
