@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ApiError } from '../lib/api'
-import type { Challenge, ChallengeSolver, ChallengeVote, LevelVoteCount, PaginationMeta, Stack, Writeup } from '../lib/types'
+import type { Challenge, ChallengeCommentItem, ChallengeSolver, ChallengeVote, LevelVoteCount, PaginationMeta, Stack, Writeup } from '../lib/types'
 import { formatApiError, formatDateTime, parseRouteId } from '../lib/utils'
 import { getLocaleTag, useLocale, useTemplate, useT } from '../lib/i18n'
 import { navigate } from '../lib/router'
 import { useAuth } from '../lib/auth'
 import { useApi } from '../lib/useApi'
 import Markdown from '../components/Markdown'
-import UserAvatar from '../components/UserAvatar'
 import { LEVEL_VOTE_OPTIONS, normalizeLevel } from '../lib/level'
 import VoteModal from './challenge-detail/VoteModal'
 import VoteSection from './challenge-detail/VoteSection'
 import ChallengeSummaryCard from './challenge-detail/ChallengeSummaryCard'
 import ChallengeInfoPanels from './challenge-detail/ChallengeInfoPanels'
+import WriteupsSection from './challenge-detail/WriteupsSection'
+import SubmitFlagSection from './challenge-detail/SubmitFlagSection'
 
 interface RouteProps {
     routeParams?: Record<string, string>
@@ -28,6 +29,7 @@ type VoteModalMode = 'solved' | 'revote'
 const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: 5, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
 const EMPTY_VOTE_PAGINATION: PaginationMeta = { page: 1, page_size: 3, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
 const EMPTY_WRITEUP_PAGINATION: PaginationMeta = { page: 1, page_size: 5, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
+const EMPTY_COMMENT_PAGINATION: PaginationMeta = { page: 1, page_size: 5, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
 type FirstBloodDurationUnit = 'minute' | 'hour' | 'day' | 'month' | 'year'
 
 const calculateFirstBloodDuration = (createdAt: string, solvedAt: string): { unit: FirstBloodDurationUnit; count: number } | null => {
@@ -107,6 +109,15 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const [writeupError, setWriteupError] = useState('')
     const [canViewWriteupContent, setCanViewWriteupContent] = useState(false)
     const [hasMyWriteup, setHasMyWriteup] = useState(false)
+    const [comments, setComments] = useState<ChallengeCommentItem[]>([])
+    const [commentPage, setCommentPage] = useState(1)
+    const [commentPagination, setCommentPagination] = useState<PaginationMeta>(EMPTY_COMMENT_PAGINATION)
+    const [commentLoading, setCommentLoading] = useState(false)
+    const [commentError, setCommentError] = useState('')
+    const [commentInput, setCommentInput] = useState('')
+    const [commentSubmitting, setCommentSubmitting] = useState(false)
+    const [editingCommentID, setEditingCommentID] = useState<number | null>(null)
+    const [editingCommentContent, setEditingCommentContent] = useState('')
 
     const pushSolverPageQuery = (nextPage: number) => {
         if (typeof window === 'undefined') return
@@ -218,6 +229,23 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         }
     }
 
+    const loadComments = async (page: number) => {
+        if (!challengeId) return
+        setCommentLoading(true)
+        setCommentError('')
+        try {
+            const data = await api.challengeComments(challengeId, page, 5)
+            setComments(data.comments)
+            setCommentPagination(data.pagination)
+        } catch {
+            setComments([])
+            setCommentPagination(EMPTY_COMMENT_PAGINATION)
+            setCommentError(t('errors.requestFailed'))
+        } finally {
+            setCommentLoading(false)
+        }
+    }
+
     useEffect(() => {
         if (!challengeId) return
         void loadChallenge()
@@ -255,6 +283,10 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         if (!challengeId) return
         void loadWriteups(writeupPage)
     }, [challengeId, writeupPage])
+    useEffect(() => {
+        if (!challengeId) return
+        void loadComments(commentPage)
+    }, [challengeId, commentPage])
 
     useEffect(() => {
         if (!challengeId) return
@@ -279,6 +311,13 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         setWriteupError('')
         setHasMyWriteup(false)
         setCanViewWriteupContent(false)
+        setCommentPage(1)
+        setComments([])
+        setCommentPagination(EMPTY_COMMENT_PAGINATION)
+        setCommentError('')
+        setCommentInput('')
+        setEditingCommentID(null)
+        setEditingCommentContent('')
     }, [challengeId])
 
     useEffect(() => {
@@ -479,6 +518,46 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         return t('challenge.voteLevelDescription.9_10')
     }, [voteModalLevel, t])
     const voteModalTitle = voteModalMode === 'solved' ? t('challenge.voteModalSolvedTitle') : t('challenge.voteModalRevoteTitle')
+    const submitComment = async () => {
+        if (!challengeId || !auth.user || commentSubmitting) return
+        setCommentSubmitting(true)
+        try {
+            await api.createChallengeComment(challengeId, commentInput)
+            setCommentInput('')
+            setCommentPage(1)
+            await loadComments(1)
+        } catch (error) {
+            setCommentError(formatApiError(error, t).message)
+        } finally {
+            setCommentSubmitting(false)
+        }
+    }
+    const updateComment = async (commentID: number) => {
+        if (!auth.user || commentSubmitting) return
+        setCommentSubmitting(true)
+        try {
+            await api.updateChallengeComment(commentID, { content: editingCommentContent })
+            setEditingCommentID(null)
+            setEditingCommentContent('')
+            await loadComments(commentPage)
+        } catch (error) {
+            setCommentError(formatApiError(error, t).message)
+        } finally {
+            setCommentSubmitting(false)
+        }
+    }
+    const deleteComment = async (commentID: number) => {
+        if (!auth.user || commentSubmitting) return
+        setCommentSubmitting(true)
+        try {
+            await api.deleteChallengeComment(commentID)
+            await loadComments(commentPage)
+        } catch (error) {
+            setCommentError(formatApiError(error, t).message)
+        } finally {
+            setCommentSubmitting(false)
+        }
+    }
     if (!challengeId) {
         return (
             <section className='animate'>
@@ -591,6 +670,28 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                 formatTimestamp={formatTimestamp}
                                 onSetSolverPage={setSolverPage}
                                 onPushSolverPageQuery={pushSolverPageQuery}
+                                comments={comments}
+                                commentPagination={commentPagination}
+                                commentPage={commentPage}
+                                commentLoading={commentLoading}
+                                commentError={commentError}
+                                commentInput={commentInput}
+                                commentSubmitting={commentSubmitting}
+                                editingCommentID={editingCommentID}
+                                editingCommentContent={editingCommentContent}
+                                isAuthenticated={Boolean(auth.user)}
+                                currentUserID={auth.user?.id}
+                                onCommentInputChange={setCommentInput}
+                                onCreateComment={() => void submitComment()}
+                                onEditStart={(id, content) => {
+                                    setEditingCommentID(id)
+                                    setEditingCommentContent(content)
+                                }}
+                                onEditCancel={() => setEditingCommentID(null)}
+                                onEditContentChange={setEditingCommentContent}
+                                onUpdateComment={(id) => void updateComment(id)}
+                                onDeleteComment={(id) => void deleteComment(id)}
+                                onSetCommentPage={setCommentPage}
                                 t={t}
                             />
                         </div>
@@ -682,43 +783,17 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                             </div>
                         ) : null}
 
-                        {!challenge.is_locked && !challenge.is_solved && (
-                            <form
-                                className='rounded-md bg-surface-muted p-3 sm:p-4 mt-4 shadow-sm border border-border/30'
-                                onSubmit={(e) => {
-                                    e.preventDefault()
-                                    void submitFlag()
-                                }}
-                            >
-                                <label className='text-sm font-semibold text-text'>{t('challenge.enterFlag')}</label>
-
-                                <div className='mt-3 flex flex-col gap-2 sm:flex-row'>
-                                    <input
-                                        className='min-w-0 flex-1 rounded-md border border-border/40 bg-surface px-3 py-2.5 text-sm text-text focus:border-accent focus:outline-none'
-                                        type='text'
-                                        value={flagInput}
-                                        onChange={(e) => setFlagInput(e.target.value)}
-                                        disabled={isSubmissionDisabled}
-                                    />
-
-                                    <button className='w-full rounded-md bg-accent px-4 py-2.5 text-sm text-white hover:bg-accent-strong disabled:opacity-60 sm:w-auto sm:min-w-30' disabled={isSubmissionDisabled}>
-                                        {submission.status === 'loading' ? t('challenge.submitting') : t('challenge.submit')}
-                                    </button>
-                                </div>
-
-                                {!auth.user ? (
-                                    <p className='mt-2 text-xs text-warning'>
-                                        {t('challenge.loginToSubmitPrefix')}{' '}
-                                        <a className='underline cursor-pointer' href='/login' onClick={(e) => navigate('/login', e)}>
-                                            {t('auth.loginLink')}
-                                        </a>{' '}
-                                        {t('challenge.loginToSubmitSuffix')}
-                                    </p>
-                                ) : null}
-
-                                {submission.message && <p className={`mt-2 text-sm ${submission.status === 'success' ? 'text-success' : 'text-danger'}`}>{submission.message}</p>}
-                            </form>
-                        )}
+                        {!challenge.is_locked && !challenge.is_solved ? (
+                            <SubmitFlagSection
+                                flagInput={flagInput}
+                                isSubmissionDisabled={isSubmissionDisabled}
+                                submission={submission}
+                                isAuthenticated={Boolean(auth.user)}
+                                onFlagInputChange={setFlagInput}
+                                onSubmit={() => void submitFlag()}
+                                t={t}
+                            />
+                        ) : null}
 
                         <VoteSection
                             challenge={challenge}
@@ -738,89 +813,21 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                         />
 
                         {!challenge.is_locked ? (
-                            <section className='mt-8'>
-                                <div className='flex flex-wrap items-center justify-between gap-2'>
-                                    <h3 className='text-lg font-semibold text-text'>
-                                        {t('writeup.sectionTitle')} <span className='text-accent'>{writeupPagination.total_count}</span>
-                                    </h3>
-                                    {challenge.is_solved && !hasMyWriteup ? (
-                                        <button
-                                            className='rounded-md border border-accent/40 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10'
-                                            onClick={() => {
-                                                if (!challengeId) return
-                                                navigate(`/challenges/${challengeId}/writeup`)
-                                            }}
-                                        >
-                                            {t('writeup.createTitle')}
-                                        </button>
-                                    ) : null}
-                                </div>
-
-                                <div className='mt-3 rounded-lg border border-accent/25 bg-accent/7 px-3 py-2 text-sm text-text-muted'>{t('writeup.hint')}</div>
-
-                                <div className='mt-4 space-y-2'>
-                                    {writeupLoading ? <p className='py-4 text-sm text-text-muted'>{t('common.loading')}</p> : null}
-                                    {!writeupLoading && writeupError ? <p className='py-4 text-sm text-danger'>{writeupError}</p> : null}
-                                    {!writeupLoading &&
-                                        !writeupError &&
-                                        writeups.map((item) => (
-                                            <button
-                                                key={item.id}
-                                                className='w-full rounded-none border-b border-border/60 text-left disabled:cursor-not-allowed disabled:opacity-60 pb-4'
-                                                onClick={() => navigate(`/writeups/${item.id}`)}
-                                                disabled={!canViewWriteupContent}
-                                            >
-                                                <div className='flex items-start justify-between gap-4 py-1'>
-                                                    <div className='min-w-0 flex flex-1 items-center gap-3.75'>
-                                                        <UserAvatar username={item.author.username} size='md' />
-                                                        <div className='min-w-0'>
-                                                            <div className='flex items-center gap-2'>
-                                                                <span className='block max-w-full truncate text-left text-base font-semibold text-text'>{item.author.username}</span>
-                                                            </div>
-                                                            <p className='mt-1 max-w-full truncate text-sm text-text-subtle'>
-                                                                {item.author.affiliation && item.author.affiliation.trim().length > 0 ? `${item.author.affiliation} · ` : ''}
-                                                                {item.author.bio && item.author.bio.trim().length > 0 ? item.author.bio : t('profile.noBio')}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-
-                                                    <span className='shrink-0 text-sm text-text-subtle'>{formatWriteupDate(item.created_at)}</span>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    {!writeupLoading && !writeupError && writeups.length === 0 ? <p className='py-4 text-sm text-text-muted'>{t('writeup.empty')}</p> : null}
-                                </div>
-
-                                {writeupPagination.total_pages > 0 ? (
-                                    <div className='mt-6 flex items-center justify-center gap-4 text-sm text-text-muted'>
-                                        <button
-                                            disabled={!writeupPagination.has_prev || writeupLoading}
-                                            className='rounded border border-border px-2 py-1 disabled:opacity-50'
-                                            onClick={() => {
-                                                const nextPage = Math.max(1, writeupPage - 1)
-                                                setWriteupPage(nextPage)
-                                                pushWriteupPageQuery(nextPage)
-                                            }}
-                                        >
-                                            {t('common.previous')}
-                                        </button>
-                                        <span>
-                                            {writeupPagination.page} / {writeupPagination.total_pages || 1}
-                                        </span>
-                                        <button
-                                            disabled={!writeupPagination.has_next || writeupLoading}
-                                            className='rounded border border-border px-2 py-1 disabled:opacity-50'
-                                            onClick={() => {
-                                                const nextPage = writeupPage + 1
-                                                setWriteupPage(nextPage)
-                                                pushWriteupPageQuery(nextPage)
-                                            }}
-                                        >
-                                            {t('common.next')}
-                                        </button>
-                                    </div>
-                                ) : null}
-                            </section>
+                            <WriteupsSection
+                                challengeId={challengeId}
+                                challengeSolved={challenge.is_solved}
+                                hasMyWriteup={hasMyWriteup}
+                                writeups={writeups}
+                                writeupLoading={writeupLoading}
+                                writeupError={writeupError}
+                                canViewWriteupContent={canViewWriteupContent}
+                                writeupPage={writeupPage}
+                                writeupPagination={writeupPagination}
+                                formatWriteupDate={formatWriteupDate}
+                                onSetWriteupPage={setWriteupPage}
+                                onPushWriteupPageQuery={pushWriteupPageQuery}
+                                t={t}
+                            />
                         ) : null}
                     </div>
                 </div>
@@ -838,6 +845,28 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                             formatTimestamp={formatTimestamp}
                             onSetSolverPage={setSolverPage}
                             onPushSolverPageQuery={pushSolverPageQuery}
+                            comments={comments}
+                            commentPagination={commentPagination}
+                            commentPage={commentPage}
+                            commentLoading={commentLoading}
+                            commentError={commentError}
+                            commentInput={commentInput}
+                            commentSubmitting={commentSubmitting}
+                            editingCommentID={editingCommentID}
+                            editingCommentContent={editingCommentContent}
+                            isAuthenticated={Boolean(auth.user)}
+                            currentUserID={auth.user?.id}
+                            onCommentInputChange={setCommentInput}
+                            onCreateComment={() => void submitComment()}
+                            onEditStart={(id, content) => {
+                                setEditingCommentID(id)
+                                setEditingCommentContent(content)
+                            }}
+                            onEditCancel={() => setEditingCommentID(null)}
+                            onEditContentChange={setEditingCommentContent}
+                            onUpdateComment={(id) => void updateComment(id)}
+                            onDeleteComment={(id) => void deleteComment(id)}
+                            onSetCommentPage={setCommentPage}
                             t={t}
                         />
                     </div>

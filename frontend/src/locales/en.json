@@ -391,5 +391,10 @@
     "categories.blockchain": "Blockchain",
     "notFound.title": "404",
     "notFound.message": "Page not found.",
-    "notFound.home": "Go Home"
+    "notFound.home": "Go Home",
+    "challengeComment.sectionTitle": "Comments",
+    "challengeComment.placeholder": "Write a comment",
+    "challengeComment.submit": "Post",
+    "challengeComment.empty": "No comments yet.",
+    "challengeComment.loginRequired": "Login is required to post comments."
 }

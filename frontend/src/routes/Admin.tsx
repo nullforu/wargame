@@ -62,7 +62,7 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
 
     return (
         <section className='animate space-y-3'>
-            <DismissibleNotice closeAriaLabel={t('admin.notice.closeAriaLabel')} storageKey={ADMIN_NOTICE_DISMISSED_KEY}>
+            <DismissibleNotice closeAriaLabel={t('common.close')} storageKey={ADMIN_NOTICE_DISMISSED_KEY}>
                 {t('admin.notice.reloginRequired')}
             </DismissibleNotice>
             {!auth.user ? (

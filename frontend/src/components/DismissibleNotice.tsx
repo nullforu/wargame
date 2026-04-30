@@ -5,10 +5,11 @@ interface DismissibleNoticeProps {
     storageKey: string
     children: ReactNode
     className?: string
+    size?: 'small' | 'medium'
     closeAriaLabel?: string
 }
 
-const DismissibleNotice = ({ storageKey, children, className = '', closeAriaLabel = '안내 메시지 닫기' }: DismissibleNoticeProps) => {
+const DismissibleNotice = ({ storageKey, children, className = '', size = 'medium', closeAriaLabel = 'Close' }: DismissibleNoticeProps) => {
     const [isVisible, setIsVisible] = useState<boolean>(() => {
         try {
             return window.localStorage.getItem(storageKey) !== 'true'
@@ -29,7 +30,7 @@ const DismissibleNotice = ({ storageKey, children, className = '', closeAriaLabe
     }
 
     return (
-        <div className={`flex items-start justify-between gap-3 border border-accent/40 bg-accent/10 p-4 text-sm text-text ${className}`}>
+        <div className={`flex items-start justify-between gap-3 border text-sm text-text-muted ${size === 'small' ? 'border-accent/25 bg-accent/7 p-3' : 'border-accent/40 bg-accent/10 p-4'} ${className}`}>
             <p>{children}</p>
             <button aria-label={closeAriaLabel} className='shrink-0 text-base leading-none text-text-muted hover:text-text' onClick={handleDismiss} type='button'>
                 &times;

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1858,6 +1859,195 @@ func TestHandlerWriteupHandlers(t *testing.T) {
 		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writeupID)))
 		ctx.Set("userID", writer.ID)
 		env.handler.GetWriteup(ctx)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected 404 after delete, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+func TestHandlerChallengeCommentHandlers(t *testing.T) {
+	env := setupHandlerTest(t)
+	owner := createHandlerUser(t, env, "comment-owner@example.com", "comment-owner", "pass", models.UserRole)
+	other := createHandlerUser(t, env, "comment-other@example.com", "comment-other", "pass", models.UserRole)
+	challenge := createHandlerChallenge(t, env, "Handler Comment", 150, "FLAG{HCMT}", true)
+
+	t.Run("challenge comments validation", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/bad/challenge-comments", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "bad"))
+		env.handler.ChallengeComments(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for bad challenge id, got %d", rec.Code)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(challenge.ID)+"/challenge-comments?page=bad", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		env.handler.ChallengeComments(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for bad pagination, got %d", rec.Code)
+		}
+	})
+
+	t.Run("create comment flow", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPost, "/api/challenges/"+toStringID(challenge.ID)+"/challenge-comments", []byte(`{"content":123}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		ctx.Set("userID", owner.ID)
+		env.handler.CreateChallengeCommentItem(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for invalid payload, got %d", rec.Code)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/challenges/"+toStringID(challenge.ID)+"/challenge-comments", []byte(`{"content":"   "}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		ctx.Set("userID", owner.ID)
+		env.handler.CreateChallengeCommentItem(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for blank content, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		tooLong := strings.Repeat("가", 501)
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/challenges/"+toStringID(challenge.ID)+"/challenge-comments", []byte(`{"content":"`+tooLong+`"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		ctx.Set("userID", owner.ID)
+		env.handler.CreateChallengeCommentItem(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for too long content, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/challenges/"+toStringID(challenge.ID)+"/challenge-comments", []byte(`{"content":"첫 댓글"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		ctx.Set("userID", owner.ID)
+		env.handler.CreateChallengeCommentItem(ctx)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 create first, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/challenges/"+toStringID(challenge.ID)+"/challenge-comments", []byte(`{"content":"둘째 댓글"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		ctx.Set("userID", other.ID)
+		env.handler.CreateChallengeCommentItem(ctx)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 create second, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	var latestCommentID int64
+	t.Run("list comments latest first", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(challenge.ID)+"/challenge-comments?page=1&page_size=10", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
+		env.handler.ChallengeComments(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 list, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp challengeCommentsListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode comments list: %v", err)
+		}
+
+		if len(resp.Comments) != 2 {
+			t.Fatalf("expected 2 comments, got %d", len(resp.Comments))
+		}
+
+		if resp.Comments[0].CreatedAt.Before(resp.Comments[1].CreatedAt) {
+			t.Fatalf("expected latest-first order, got first=%s second=%s", resp.Comments[0].CreatedAt, resp.Comments[1].CreatedAt)
+		}
+
+		if resp.Comments[0].Content != "둘째 댓글" || resp.Comments[1].Content != "첫 댓글" {
+			t.Fatalf("unexpected order/content: %+v", resp.Comments)
+		}
+
+		latestCommentID = resp.Comments[0].ID
+	})
+
+	t.Run("update comment validation and permission", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPatch, "/api/challenges/challenge-comments/"+toStringID(latestCommentID), []byte(`{"content":123}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(latestCommentID)))
+		ctx.Set("userID", other.ID)
+		env.handler.UpdateChallengeCommentItem(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for invalid patch payload, got %d", rec.Code)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPatch, "/api/challenges/challenge-comments/"+toStringID(latestCommentID), []byte(`{}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(latestCommentID)))
+		ctx.Set("userID", other.ID)
+		env.handler.UpdateChallengeCommentItem(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for empty patch payload, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPatch, "/api/challenges/challenge-comments/"+toStringID(latestCommentID), []byte(`{"content":"   "}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(latestCommentID)))
+		ctx.Set("userID", other.ID)
+		env.handler.UpdateChallengeCommentItem(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for blank content, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		tooLong := strings.Repeat("가", 501)
+		ctx, rec = newJSONContext(t, http.MethodPatch, "/api/challenges/challenge-comments/"+toStringID(latestCommentID), []byte(`{"content":"`+tooLong+`"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(latestCommentID)))
+		ctx.Set("userID", other.ID)
+		env.handler.UpdateChallengeCommentItem(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for too long patch content, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPatch, "/api/challenges/challenge-comments/"+toStringID(latestCommentID), []byte(`{"content":"권한 없는 수정 시도"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(latestCommentID)))
+		ctx.Set("userID", owner.ID)
+		env.handler.UpdateChallengeCommentItem(ctx)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("expected 403 forbidden update, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPatch, "/api/challenges/challenge-comments/"+toStringID(latestCommentID), []byte(`{"content":"수정 완료"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(latestCommentID)))
+		ctx.Set("userID", other.ID)
+		env.handler.UpdateChallengeCommentItem(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 owner update, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var updated challengeCommentResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &updated); err != nil {
+			t.Fatalf("decode updated comment: %v", err)
+		}
+
+		if updated.Content != "수정 완료" {
+			t.Fatalf("unexpected updated content: %+v", updated)
+		}
+	})
+
+	t.Run("delete comment validation and permission", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodDelete, "/api/challenges/challenge-comments/bad", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "bad"))
+		ctx.Set("userID", other.ID)
+		env.handler.DeleteChallengeCommentItem(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for bad delete id, got %d", rec.Code)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodDelete, "/api/challenges/challenge-comments/"+toStringID(latestCommentID), nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(latestCommentID)))
+		ctx.Set("userID", owner.ID)
+		env.handler.DeleteChallengeCommentItem(ctx)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("expected 403 forbidden delete, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodDelete, "/api/challenges/challenge-comments/"+toStringID(latestCommentID), nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(latestCommentID)))
+		ctx.Set("userID", other.ID)
+		env.handler.DeleteChallengeCommentItem(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 owner delete, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPatch, "/api/challenges/challenge-comments/"+toStringID(latestCommentID), []byte(`{"content":"삭제 후 수정"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(latestCommentID)))
+		ctx.Set("userID", other.ID)
+		env.handler.UpdateChallengeCommentItem(ctx)
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("expected 404 after delete, got %d body=%s", rec.Code, rec.Body.String())
 		}

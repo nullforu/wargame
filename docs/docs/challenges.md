@@ -384,3 +384,190 @@ Errors:
 - 403 `user blocked` or `challenge locked`
 - 404 `challenge not found` or `challenge file not found`
 - 503 `storage unavailable`
+
+---
+
+## List Challenge Comments
+
+`GET /api/challenges/{id}/challenge-comments`
+
+Query parameters:
+
+- `page` (optional, default `1`)
+- `page_size` (optional, default `20`, max `100`)
+
+Response 200
+
+```json
+{
+    "comments": [
+        {
+            "id": 10,
+            "content": "Nice challenge.",
+            "created_at": "2026-01-24T12:00:00Z",
+            "updated_at": "2026-01-24T12:00:00Z",
+            "author": {
+                "user_id": 7,
+                "username": "alice",
+                "affiliation_id": 3,
+                "affiliation": "Blue Team High",
+                "bio": "pwn lover"
+            },
+            "challenge": {
+                "id": 1,
+                "title": "Warmup"
+            }
+        }
+    ],
+    "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total_count": 1,
+        "total_pages": 1,
+        "has_prev": false,
+        "has_next": false
+    }
+}
+```
+
+Notes:
+
+- Comments are returned in latest-first order (`created_at DESC`, then `id DESC`).
+- This endpoint is publicly readable (no authentication required).
+
+Errors:
+
+- 400 `invalid input`
+- 404 `challenge not found`
+
+---
+
+## Create Challenge Comment
+
+`POST /api/challenges/{id}/challenge-comments`
+
+Headers
+
+```
+Authorization: Bearer <access_token>
+```
+
+Request
+
+```json
+{
+    "content": "Nice challenge."
+}
+```
+
+Validation:
+
+- `content` is required.
+- Maximum length is `500` characters.
+
+Response 201
+
+```json
+{
+    "id": 10,
+    "content": "Nice challenge.",
+    "created_at": "2026-01-24T12:00:00Z",
+    "updated_at": "2026-01-24T12:00:00Z",
+    "author": {
+        "user_id": 7,
+        "username": "alice",
+        "affiliation_id": 3,
+        "affiliation": "Blue Team High",
+        "bio": "pwn lover"
+    },
+    "challenge": {
+        "id": 1,
+        "title": "Warmup"
+    }
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 403 `user blocked`
+- 404 `challenge not found`
+
+---
+
+## Update Challenge Comment
+
+`PATCH /api/challenges/challenge-comments/{id}`
+
+Headers
+
+```
+Authorization: Bearer <access_token>
+```
+
+Request
+
+```json
+{
+    "content": "Updated comment."
+}
+```
+
+Validation:
+
+- `content` is required.
+- Maximum length is `500` characters.
+
+Response 200
+
+```json
+{
+    "id": 10,
+    "content": "Updated comment.",
+    "created_at": "2026-01-24T12:00:00Z",
+    "updated_at": "2026-01-24T12:30:00Z",
+    "author": {
+        "user_id": 7,
+        "username": "alice"
+    },
+    "challenge": {
+        "id": 1,
+        "title": "Warmup"
+    }
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 403 `user blocked` or `comment access forbidden`
+- 404 `comment not found`
+
+---
+
+## Delete Challenge Comment
+
+`DELETE /api/challenges/challenge-comments/{id}`
+
+Headers
+
+```
+Authorization: Bearer <access_token>
+```
+
+Response 200
+
+```json
+{
+    "status": "ok"
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 403 `user blocked` or `comment access forbidden`
+- 404 `comment not found`

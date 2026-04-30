@@ -3,6 +3,7 @@ package http_test
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -723,5 +724,97 @@ func TestChallengesLevelFilterIntegration(t *testing.T) {
 	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges?level=abc&page=1&page_size=20", nil, nil)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid level, got %d", rec.Code)
+	}
+}
+
+func TestChallengeCommentsIntegration(t *testing.T) {
+	env := setupTest(t, testCfg)
+	admin := createUser(t, env, "admin-cmt@example.com", "admincmt", "pass", models.AdminRole)
+	adminAccess, _, _ := loginUser(t, env.router, admin.Email, "pass")
+	user := createUser(t, env, "user-cmt@example.com", "usercmt", "pass", models.UserRole)
+	userAccess, _, _ := loginUser(t, env.router, user.Email, "pass")
+	other := createUser(t, env, "other-cmt@example.com", "othercmt", "pass", models.UserRole)
+	otherAccess, _, _ := loginUser(t, env.router, other.Email, "pass")
+
+	rec := doRequest(t, env.router, http.MethodPost, "/api/admin/challenges", map[string]any{"title": "Comment Int", "description": "d", "category": "Misc", "points": 100, "flag": "flag{CINT}", "is_active": true}, authHeader(adminAccess))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create challenge: %d %s", rec.Code, rec.Body.String())
+	}
+
+	var challenge struct {
+		ID int64 `json:"id"`
+	}
+	decodeJSON(t, rec, &challenge)
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges/"+itoa(challenge.ID)+"/challenge-comments?page=1&page_size=10", nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list comments: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/challenge-comments", map[string]any{"content": "first comment"}, authHeader(userAccess))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create comment: %d %s", rec.Code, rec.Body.String())
+	}
+
+	var created struct {
+		ID int64 `json:"id"`
+	}
+	decodeJSON(t, rec, &created)
+
+	rec = doRequest(t, env.router, http.MethodPatch, "/api/challenges/challenge-comments/"+itoa(created.ID), map[string]any{"content": "updated comment"}, authHeader(otherAccess))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected forbidden update, got %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPatch, "/api/challenges/challenge-comments/"+itoa(created.ID), map[string]any{"content": "updated comment"}, authHeader(userAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update comment: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodDelete, "/api/challenges/challenge-comments/"+itoa(created.ID), nil, authHeader(otherAccess))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected forbidden delete, got %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodDelete, "/api/challenges/challenge-comments/"+itoa(created.ID), nil, authHeader(userAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete comment: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestChallengeCommentsKoreanLengthLimit(t *testing.T) {
+	env := setupTest(t, testCfg)
+	admin := createUser(t, env, "admin-ko-comment@example.com", models.AdminRole, "adminpass", models.AdminRole)
+	adminAccess, _, _ := loginUser(t, env.router, admin.Email, "adminpass")
+	user := createUser(t, env, "user-ko-comment@example.com", "ko_comment_user", "pass", models.UserRole)
+	userAccess, _, _ := loginUser(t, env.router, user.Email, "pass")
+
+	rec := doRequest(t, env.router, http.MethodPost, "/api/admin/challenges", map[string]any{
+		"title":       "KO Comment Length",
+		"description": "desc",
+		"category":    "Misc",
+		"points":      100,
+		"flag":        "flag{KOC}",
+		"is_active":   true,
+	}, authHeader(adminAccess))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create challenge status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var challenge struct {
+		ID int64 `json:"id"`
+	}
+	decodeJSON(t, rec, &challenge)
+
+	ok500 := strings.Repeat("가", 500)
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/challenge-comments", map[string]any{"content": ok500}, authHeader(userAccess))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for 500 korean chars, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	tooLong501 := strings.Repeat("가", 501)
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/challenge-comments", map[string]any{"content": tooLong501}, authHeader(userAccess))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for 501 korean chars, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
