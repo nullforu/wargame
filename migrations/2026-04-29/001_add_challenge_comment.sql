@@ -1,3 +1,5 @@
+BEGIN;
+
 CREATE TABLE IF NOT EXISTS challenge_comments (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -12,3 +14,5 @@ CREATE INDEX IF NOT EXISTS idx_challenge_comments_challenge_created
 
 CREATE INDEX IF NOT EXISTS idx_challenge_comments_user_updated
     ON challenge_comments (user_id, updated_at DESC, id DESC);
+
+COMMIT;

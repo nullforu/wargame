@@ -157,7 +157,7 @@ const App = () => {
         <div className='min-h-screen bg-background flex flex-col overflow-x-hidden'>
             <Header user={auth.user} />
             {/* --- 임시 알림 --- */}
-            <DismissibleNotice storageKey='maintenance_notice_dismissed'>
+            <DismissibleNotice closeAriaLabel={t('common.close')} storageKey='maintenance_notice_dismissed'>
                 <p className='font-medium'>특정한 인물을 사칭/비방하는 닉네임을 허용하지 않습니다.</p>
             </DismissibleNotice>
 

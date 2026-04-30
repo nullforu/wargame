@@ -21,7 +21,7 @@ interface VoteSectionProps {
     t: (key: string, vars?: Record<string, string | number>) => string
 }
 
-const FIRST_BLOOD_NOTICE_DISMISSED_KEY = 'first_blood_notice_dismissed'
+const VOTE_NOTICE_DISMISSED_KEY = 'challenge_vote_notice_dismissed'
 
 const VoteSection = ({
     challenge,
@@ -53,7 +53,7 @@ const VoteSection = ({
                     </button>
                 ) : null}
             </div>
-            <DismissibleNotice className='mt-3 rounded-lg' storageKey={FIRST_BLOOD_NOTICE_DISMISSED_KEY} size='small'>
+            <DismissibleNotice className='mt-3 rounded-lg' closeAriaLabel={t('common.close')} storageKey={VOTE_NOTICE_DISMISSED_KEY} size='small'>
                 {challenge.is_solved ? t('challenge.voteEnabledHint') : t('challenge.voteDisabledHint')}
             </DismissibleNotice>
 

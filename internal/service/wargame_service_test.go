@@ -1056,7 +1056,7 @@ func TestWargameCommentCRUDAndPage(t *testing.T) {
 		t.Fatalf("unexpected pagination %+v rows=%d", pag, len(rows))
 	}
 
-	updated, err := env.wargameSvc.UpdateChallengeCommentItem(context.Background(), u1.ID, created.ID, ptrStringComment("updated"))
+	updated, err := env.wargameSvc.UpdateChallengeCommentItem(context.Background(), u1.ID, created.ID, ptrString("updated"))
 	if err != nil {
 		t.Fatalf("UpdateComment: %v", err)
 	}
@@ -1065,7 +1065,7 @@ func TestWargameCommentCRUDAndPage(t *testing.T) {
 		t.Fatalf("unexpected updated content %q", updated.Content)
 	}
 
-	if _, err := env.wargameSvc.UpdateChallengeCommentItem(context.Background(), u2.ID, created.ID, ptrStringComment("hijack")); !errors.Is(err, ErrChallengeCommentForbidden) {
+	if _, err := env.wargameSvc.UpdateChallengeCommentItem(context.Background(), u2.ID, created.ID, ptrString("hijack")); !errors.Is(err, ErrChallengeCommentForbidden) {
 		t.Fatalf("expected forbidden, got %v", err)
 	}
 
@@ -1085,8 +1085,6 @@ func TestWargameCommentCRUDAndPage(t *testing.T) {
 		t.Fatalf("expected challenge not found, got %v", err)
 	}
 }
-
-func ptrStringComment(v string) *string { return &v }
 
 func TestChallengeCommentKoreanLengthLimit(t *testing.T) {
 	env := setupServiceTest(t)

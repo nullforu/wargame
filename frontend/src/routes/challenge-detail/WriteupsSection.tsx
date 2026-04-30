@@ -54,7 +54,7 @@ const WriteupsSection = ({
                 ) : null}
             </div>
 
-            <DismissibleNotice className='mt-3 rounded-lg' storageKey={WRITEUP_NOTICE_DISMISSED_KEY} size='small'>
+            <DismissibleNotice className='mt-3 rounded-lg' closeAriaLabel={t('common.close')} storageKey={WRITEUP_NOTICE_DISMISSED_KEY} size='small'>
                 {t('writeup.hint')}
             </DismissibleNotice>
 

@@ -1063,7 +1063,7 @@ func (s *WargameService) CreateChallengeCommentItem(ctx context.Context, userID,
 			return nil, ErrChallengeNotFound
 		}
 
-		return nil, fmt.Errorf("wargame.CreateComment challenge lookup: %w", err)
+		return nil, fmt.Errorf("wargame.CreateChallengeCommentItem challenge lookup: %w", err)
 	}
 
 	now := time.Now().UTC()
@@ -1075,12 +1075,12 @@ func (s *WargameService) CreateChallengeCommentItem(ctx context.Context, userID,
 		UpdatedAt:   now,
 	}
 	if err := s.challengeCommentRepo.Create(ctx, row); err != nil {
-		return nil, fmt.Errorf("wargame.CreateComment create: %w", err)
+		return nil, fmt.Errorf("wargame.CreateChallengeCommentItem create: %w", err)
 	}
 
 	detail, err := s.challengeCommentRepo.GetDetailByID(ctx, row.ID)
 	if err != nil {
-		return nil, fmt.Errorf("wargame.CreateComment detail: %w", err)
+		return nil, fmt.Errorf("wargame.CreateChallengeCommentItem detail: %w", err)
 	}
 
 	return detail, nil
@@ -1112,7 +1112,7 @@ func (s *WargameService) UpdateChallengeCommentItem(ctx context.Context, userID,
 			return nil, ErrChallengeCommentNotFound
 		}
 
-		return nil, fmt.Errorf("wargame.UpdateComment lookup: %w", err)
+		return nil, fmt.Errorf("wargame.UpdateChallengeCommentItem lookup: %w", err)
 	}
 
 	if row.UserID != userID {
@@ -1122,12 +1122,12 @@ func (s *WargameService) UpdateChallengeCommentItem(ctx context.Context, userID,
 	row.Content = strings.TrimSpace(*content)
 	row.UpdatedAt = time.Now().UTC()
 	if err := s.challengeCommentRepo.Update(ctx, row); err != nil {
-		return nil, fmt.Errorf("wargame.UpdateComment update: %w", err)
+		return nil, fmt.Errorf("wargame.UpdateChallengeCommentItem update: %w", err)
 	}
 
 	detail, err := s.challengeCommentRepo.GetDetailByID(ctx, row.ID)
 	if err != nil {
-		return nil, fmt.Errorf("wargame.UpdateComment detail: %w", err)
+		return nil, fmt.Errorf("wargame.UpdateChallengeCommentItem detail: %w", err)
 	}
 
 	return detail, nil
@@ -1147,7 +1147,7 @@ func (s *WargameService) DeleteChallengeCommentItem(ctx context.Context, userID,
 			return ErrChallengeCommentNotFound
 		}
 
-		return fmt.Errorf("wargame.DeleteComment lookup: %w", err)
+		return fmt.Errorf("wargame.DeleteChallengeCommentItem lookup: %w", err)
 	}
 
 	if row.UserID != userID {
@@ -1155,7 +1155,7 @@ func (s *WargameService) DeleteChallengeCommentItem(ctx context.Context, userID,
 	}
 
 	if err := s.challengeCommentRepo.DeleteByID(ctx, commentID); err != nil {
-		return fmt.Errorf("wargame.DeleteComment delete: %w", err)
+		return fmt.Errorf("wargame.DeleteChallengeCommentItem delete: %w", err)
 	}
 
 	return nil
@@ -1176,12 +1176,12 @@ func (s *WargameService) ChallengeCommentPage(ctx context.Context, challengeID i
 			return nil, models.Pagination{}, ErrChallengeNotFound
 		}
 
-		return nil, models.Pagination{}, fmt.Errorf("wargame.ChallengeCommentsPage challenge lookup: %w", err)
+		return nil, models.Pagination{}, fmt.Errorf("wargame.ChallengeCommentPage challenge lookup: %w", err)
 	}
 
 	rows, totalCount, err := s.challengeCommentRepo.ChallengePage(ctx, challengeID, params.Page, params.PageSize)
 	if err != nil {
-		return nil, models.Pagination{}, fmt.Errorf("wargame.ChallengeCommentsPage list: %w", err)
+		return nil, models.Pagination{}, fmt.Errorf("wargame.ChallengeCommentPage list: %w", err)
 	}
 
 	return rows, BuildPagination(params.Page, params.PageSize, totalCount), nil
