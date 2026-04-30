@@ -3,6 +3,10 @@ title: Stacks
 nav_order: 8
 ---
 
+Notes:
+
+- For authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests, send both `csrf_token` cookie and matching `X-CSRF-Token` header.
+
 ## List My Stacks
 
 `GET /api/stacks`
@@ -43,7 +47,7 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 503 `stack feature disabled`
 
 Notes:
@@ -89,7 +93,7 @@ Response 201
 Errors:
 
 - 400 `invalid input` or `stack not enabled for challenge`
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `user blocked` or `challenge locked`
 - 404 `challenge not found`
 - 409 `stack limit reached` or `challenge already solved`
@@ -134,7 +138,7 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 404 `stack not found`
 - 503 `stack feature disabled` or `stack provisioner unavailable`
 
@@ -164,7 +168,6 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 404 `stack not found`
 - 503 `stack feature disabled` or `stack provisioner unavailable`
-

@@ -2,7 +2,10 @@
 title: Admin
 nav_order: 6
 ---
----
+
+Notes:
+
+- For authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests, send both `csrf_token` cookie and matching `X-CSRF-Token` header.
 
 ## Block User
 
@@ -38,7 +41,7 @@ Response 200
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `not found`
 
@@ -70,7 +73,7 @@ Response 200
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `not found`
 
@@ -131,7 +134,7 @@ Response 201
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 
 ---
@@ -195,7 +198,7 @@ Response 200
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `challenge not found`
 
@@ -239,7 +242,7 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `challenge not found`
 
@@ -265,7 +268,7 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `challenge not found`
 
@@ -347,7 +350,7 @@ Response 200
 
 Errors (all admin stack endpoints):
 
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `stack not found`
 - 503 `stack feature disabled` or `stack provisioner unavailable`
@@ -405,7 +408,7 @@ Response 200
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `challenge not found`
 - 503 `storage unavailable`
@@ -443,7 +446,7 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `challenge not found` or `challenge file not found`
 - 503 `storage unavailable`

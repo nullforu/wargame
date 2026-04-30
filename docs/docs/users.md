@@ -3,6 +3,10 @@ title: Users
 nav_order: 3
 ---
 
+Notes:
+
+- For authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests, send both `csrf_token` cookie and matching `X-CSRF-Token` header.
+
 ## Me
 
 `GET /api/me`
@@ -33,7 +37,7 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 
 ---
 
@@ -78,7 +82,7 @@ Response 200
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing access_token cookie` or `invalid token`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `user blocked`
 
 ---

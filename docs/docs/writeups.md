@@ -3,6 +3,10 @@ title: Writeups
 nav_order: 10
 ---
 
+Notes:
+
+- For authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests, send both `csrf_token` cookie and matching `X-CSRF-Token` header.
+
 ## List Challenge Writeups
 
 `GET /api/challenges/{id}/writeups`
