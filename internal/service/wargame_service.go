@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"wargame/internal/config"
 	"wargame/internal/db"
@@ -23,6 +24,7 @@ const (
 	redisSubmitPrefix = "submit:"
 	maxFlagLength     = 128
 	maxWriteupContent = 100000
+	maxCommentContent = 500
 )
 
 var challengeCategories = map[string]struct{}{
@@ -79,13 +81,14 @@ func normalizeStackTargetPorts(ports stack.TargetPortSpecs, validator *fieldVali
 }
 
 type WargameService struct {
-	cfg            config.Config
-	challengeRepo  *repo.ChallengeRepo
-	submissionRepo *repo.SubmissionRepo
-	voteRepo       *repo.ChallengeVoteRepo
-	writeupRepo    *repo.WriteupRepo
-	redis          *redis.Client
-	fileStore      storage.ChallengeFileStore
+	cfg                  config.Config
+	challengeRepo        *repo.ChallengeRepo
+	submissionRepo       *repo.SubmissionRepo
+	voteRepo             *repo.ChallengeVoteRepo
+	writeupRepo          *repo.WriteupRepo
+	challengeCommentRepo *repo.ChallengeCommentRepo
+	redis                *redis.Client
+	fileStore            storage.ChallengeFileStore
 }
 
 type ChallengeQueryFilter struct {
@@ -97,8 +100,17 @@ type ChallengeQueryFilter struct {
 	Sort     string
 }
 
-func NewWargameService(cfg config.Config, challengeRepo *repo.ChallengeRepo, submissionRepo *repo.SubmissionRepo, voteRepo *repo.ChallengeVoteRepo, writeupRepo *repo.WriteupRepo, redis *redis.Client, fileStore storage.ChallengeFileStore) *WargameService {
-	return &WargameService{cfg: cfg, challengeRepo: challengeRepo, submissionRepo: submissionRepo, voteRepo: voteRepo, writeupRepo: writeupRepo, redis: redis, fileStore: fileStore}
+func NewWargameService(cfg config.Config, challengeRepo *repo.ChallengeRepo, submissionRepo *repo.SubmissionRepo, voteRepo *repo.ChallengeVoteRepo, writeupRepo *repo.WriteupRepo, challengeCommentRepo *repo.ChallengeCommentRepo, redis *redis.Client, fileStore storage.ChallengeFileStore) *WargameService {
+	return &WargameService{
+		cfg:                  cfg,
+		challengeRepo:        challengeRepo,
+		submissionRepo:       submissionRepo,
+		voteRepo:             voteRepo,
+		writeupRepo:          writeupRepo,
+		challengeCommentRepo: challengeCommentRepo,
+		redis:                redis,
+		fileStore:            fileStore,
+	}
 }
 
 func (s *WargameService) ListChallenges(ctx context.Context, page, pageSize int, filter ChallengeQueryFilter) ([]models.Challenge, models.Pagination, error) {
@@ -1029,6 +1041,150 @@ func (s *WargameService) DeleteWriteup(ctx context.Context, userID, writeupID in
 	}
 
 	return nil
+}
+
+func (s *WargameService) CreateChallengeCommentItem(ctx context.Context, userID, challengeID int64, content string) (*models.ChallengeCommentDetail, error) {
+	content = strings.TrimSpace(content)
+
+	validator := newFieldValidator()
+	validator.PositiveID("user_id", userID)
+	validator.PositiveID("challenge_id", challengeID)
+	validator.Required("content", content)
+	if utf8.RuneCountInString(content) > maxCommentContent {
+		validator.fields = append(validator.fields, FieldError{Field: "content", Reason: "too_long"})
+	}
+
+	if err := validator.Error(); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.challengeRepo.GetByID(ctx, challengeID); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrChallengeNotFound
+		}
+
+		return nil, fmt.Errorf("wargame.CreateComment challenge lookup: %w", err)
+	}
+
+	now := time.Now().UTC()
+	row := &models.ChallengeCommentItem{
+		UserID:      userID,
+		ChallengeID: challengeID,
+		Content:     content,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := s.challengeCommentRepo.Create(ctx, row); err != nil {
+		return nil, fmt.Errorf("wargame.CreateComment create: %w", err)
+	}
+
+	detail, err := s.challengeCommentRepo.GetDetailByID(ctx, row.ID)
+	if err != nil {
+		return nil, fmt.Errorf("wargame.CreateComment detail: %w", err)
+	}
+
+	return detail, nil
+}
+
+func (s *WargameService) UpdateChallengeCommentItem(ctx context.Context, userID, commentID int64, content *string) (*models.ChallengeCommentDetail, error) {
+	validator := newFieldValidator()
+	validator.PositiveID("user_id", userID)
+	validator.PositiveID("id", commentID)
+	if content == nil {
+		validator.fields = append(validator.fields, FieldError{Field: "request", Reason: "empty"})
+	} else {
+		normalizedContent := strings.TrimSpace(*content)
+		if normalizedContent == "" {
+			validator.fields = append(validator.fields, FieldError{Field: "content", Reason: "required"})
+		}
+
+		if utf8.RuneCountInString(normalizedContent) > maxCommentContent {
+			validator.fields = append(validator.fields, FieldError{Field: "content", Reason: "too_long"})
+		}
+	}
+	if err := validator.Error(); err != nil {
+		return nil, err
+	}
+
+	row, err := s.challengeCommentRepo.GetByID(ctx, commentID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrChallengeCommentNotFound
+		}
+
+		return nil, fmt.Errorf("wargame.UpdateComment lookup: %w", err)
+	}
+
+	if row.UserID != userID {
+		return nil, ErrChallengeCommentForbidden
+	}
+
+	row.Content = strings.TrimSpace(*content)
+	row.UpdatedAt = time.Now().UTC()
+	if err := s.challengeCommentRepo.Update(ctx, row); err != nil {
+		return nil, fmt.Errorf("wargame.UpdateComment update: %w", err)
+	}
+
+	detail, err := s.challengeCommentRepo.GetDetailByID(ctx, row.ID)
+	if err != nil {
+		return nil, fmt.Errorf("wargame.UpdateComment detail: %w", err)
+	}
+
+	return detail, nil
+}
+
+func (s *WargameService) DeleteChallengeCommentItem(ctx context.Context, userID, commentID int64) error {
+	validator := newFieldValidator()
+	validator.PositiveID("user_id", userID)
+	validator.PositiveID("id", commentID)
+	if err := validator.Error(); err != nil {
+		return err
+	}
+
+	row, err := s.challengeCommentRepo.GetByID(ctx, commentID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return ErrChallengeCommentNotFound
+		}
+
+		return fmt.Errorf("wargame.DeleteComment lookup: %w", err)
+	}
+
+	if row.UserID != userID {
+		return ErrChallengeCommentForbidden
+	}
+
+	if err := s.challengeCommentRepo.DeleteByID(ctx, commentID); err != nil {
+		return fmt.Errorf("wargame.DeleteComment delete: %w", err)
+	}
+
+	return nil
+}
+
+func (s *WargameService) ChallengeCommentPage(ctx context.Context, challengeID int64, page, pageSize int) ([]models.ChallengeCommentDetail, models.Pagination, error) {
+	params, err := NormalizePagination(page, pageSize)
+	if err != nil {
+		return nil, models.Pagination{}, err
+	}
+
+	if challengeID <= 0 {
+		return nil, models.Pagination{}, ErrInvalidInput
+	}
+
+	if _, err := s.challengeRepo.GetByID(ctx, challengeID); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, models.Pagination{}, ErrChallengeNotFound
+		}
+
+		return nil, models.Pagination{}, fmt.Errorf("wargame.ChallengeCommentsPage challenge lookup: %w", err)
+	}
+
+	rows, totalCount, err := s.challengeCommentRepo.ChallengePage(ctx, challengeID, params.Page, params.PageSize)
+	if err != nil {
+		return nil, models.Pagination{}, fmt.Errorf("wargame.ChallengeCommentsPage list: %w", err)
+	}
+
+	return rows, BuildPagination(params.Page, params.PageSize, totalCount), nil
 }
 
 func (s *WargameService) ChallengeWriteupsPage(ctx context.Context, challengeID, viewerUserID int64, page, pageSize int) ([]models.WriteupDetail, models.Pagination, bool, error) {

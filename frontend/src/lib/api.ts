@@ -11,6 +11,8 @@ import type {
     ChallengeMyVoteResponse,
     ChallengeVotesResponse,
     ChallengeWriteupsResponse,
+    ChallengeCommentPageResponse,
+    ChallengeCommentItem,
     AdminChallengeDetail,
     AdminStackDeleteResponse,
     AdminStackListItem,
@@ -350,15 +352,39 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
             } as ChallengeVotesResponse
         },
         challengeWriteups: async (id: number, page?: number, pageSize?: number) => {
-            const data = await request<Partial<ChallengeWriteupsResponse>>(withPagination(`/api/challenges/${id}/writeups`, page, pageSize))
+            const data = await request<Partial<ChallengeWriteupsResponse>>(withPagination(`/api/challenges/${id}/writeups`, page, pageSize), { auth: true })
             return {
                 writeups: Array.isArray(data?.writeups) ? data.writeups : [],
                 can_view_content: Boolean(data?.can_view_content),
                 pagination: normalizePagination(data?.pagination),
             } as ChallengeWriteupsResponse
         },
+        challengeComments: async (id: number, page?: number, pageSize?: number) => {
+            const data = await request<Partial<ChallengeCommentPageResponse>>(withPagination(`/api/challenges/${id}/challenge-comments`, page, pageSize))
+            return {
+                comments: Array.isArray(data?.comments) ? data.comments : [],
+                pagination: normalizePagination(data?.pagination),
+            } as ChallengeCommentPageResponse
+        },
+        createChallengeComment: (challengeID: number, content: string) =>
+            request<ChallengeCommentItem>(`/api/challenges/${challengeID}/challenge-comments`, {
+                method: 'POST',
+                body: { content },
+                auth: true,
+            }),
+        updateChallengeComment: (commentID: number, payload: { content?: string }) =>
+            request<ChallengeCommentItem>(`/api/challenges/challenge-comments/${commentID}`, {
+                method: 'PATCH',
+                body: payload,
+                auth: true,
+            }),
+        deleteChallengeComment: (commentID: number) =>
+            request<{ status?: string }>(`/api/challenges/challenge-comments/${commentID}`, {
+                method: 'DELETE',
+                auth: true,
+            }),
         writeup: async (id: number) => {
-            const data = await request<Partial<WriteupDetailResponse>>(`/api/writeups/${id}`)
+            const data = await request<Partial<WriteupDetailResponse>>(`/api/writeups/${id}`, { auth: true })
             return {
                 writeup: data?.writeup as Writeup,
                 can_view_content: Boolean(data?.can_view_content),

@@ -2,6 +2,7 @@ import type { Challenge, ChallengeVote, PaginationMeta } from '../../lib/types'
 import { LEVEL_VOTE_OPTIONS, levelBarClass } from '../../lib/level'
 import UserAvatar from '../../components/UserAvatar'
 import { navigate } from '../../lib/router'
+import DismissibleNotice from '../../components/DismissibleNotice'
 
 interface VoteSectionProps {
     challenge: Challenge
@@ -19,6 +20,8 @@ interface VoteSectionProps {
     onNextVotePage: () => void
     t: (key: string, vars?: Record<string, string | number>) => string
 }
+
+const FIRST_BLOOD_NOTICE_DISMISSED_KEY = 'first_blood_notice_dismissed'
 
 const VoteSection = ({
     challenge,
@@ -50,7 +53,9 @@ const VoteSection = ({
                     </button>
                 ) : null}
             </div>
-            <div className='mt-3 rounded-lg border border-accent/25 bg-accent/7 px-3 py-2 text-sm text-text-muted'>{challenge.is_solved ? t('challenge.voteEnabledHint') : t('challenge.voteDisabledHint')}</div>
+            <DismissibleNotice className='mt-3 rounded-lg' storageKey={FIRST_BLOOD_NOTICE_DISMISSED_KEY} size='small'>
+                {challenge.is_solved ? t('challenge.voteEnabledHint') : t('challenge.voteDisabledHint')}
+            </DismissibleNotice>
 
             <div className='mt-4 grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]'>
                 <div className='flex min-h-105 flex-col'>

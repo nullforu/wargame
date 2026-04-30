@@ -280,6 +280,31 @@ export interface WriteupDetailResponse {
     can_view_content: boolean
 }
 
+export interface ChallengeCommentItemAuthor {
+    user_id: number
+    username: string
+    affiliation_id?: number | null
+    affiliation?: string | null
+    bio?: string | null
+}
+
+export interface ChallengeCommentItem {
+    id: number
+    content: string
+    created_at: string
+    updated_at: string
+    author: ChallengeCommentItemAuthor
+    challenge: {
+        id: number
+        title: string
+    }
+}
+
+export interface ChallengeCommentPageResponse {
+    comments: ChallengeCommentItem[]
+    pagination: PaginationMeta
+}
+
 export interface LeaderboardChallenge {
     id: number
     title: string

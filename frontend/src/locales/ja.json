@@ -391,5 +391,10 @@
     "categories.blockchain": "Blockchain",
     "notFound.title": "404",
     "notFound.message": "ページが見つかりません。",
-    "notFound.home": "ホームへ戻る"
+    "notFound.home": "ホームへ戻る",
+    "challengeComment.sectionTitle": "コメント",
+    "challengeComment.placeholder": "コメントを入力してください",
+    "challengeComment.submit": "投稿",
+    "challengeComment.empty": "まだコメントがありません。",
+    "challengeComment.loginRequired": "コメント投稿にはログインが必要です。"
 }

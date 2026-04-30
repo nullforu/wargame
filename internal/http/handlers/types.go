@@ -117,6 +117,14 @@ type updateWriteupRequest struct {
 	Content optionalString `json:"content"`
 }
 
+type createChallengeCommentRequest struct {
+	Content string `json:"content" binding:"required"`
+}
+
+type updateChallengeCommentRequest struct {
+	Content optionalString `json:"content"`
+}
+
 type adminBlockUserRequest struct {
 	Reason string `json:"reason" binding:"required"`
 }
@@ -297,6 +305,33 @@ type writeupsListResponse struct {
 type writeupDetailResponse struct {
 	Writeup        writeupResponse `json:"writeup"`
 	CanViewContent bool            `json:"can_view_content"`
+}
+
+type commentAuthorResponse struct {
+	UserID        int64   `json:"user_id"`
+	Username      string  `json:"username"`
+	AffiliationID *int64  `json:"affiliation_id,omitempty"`
+	Affiliation   *string `json:"affiliation,omitempty"`
+	Bio           *string `json:"bio,omitempty"`
+}
+
+type commentChallengeResponse struct {
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
+}
+
+type challengeCommentResponse struct {
+	ID        int64                    `json:"id"`
+	Content   string                   `json:"content"`
+	CreatedAt time.Time                `json:"created_at"`
+	UpdatedAt time.Time                `json:"updated_at"`
+	Author    commentAuthorResponse    `json:"author"`
+	Challenge commentChallengeResponse `json:"challenge"`
+}
+
+type challengeCommentsListResponse struct {
+	Comments   []challengeCommentResponse `json:"comments,omitempty"`
+	Pagination models.Pagination          `json:"pagination"`
 }
 
 type adminChallengeResponse struct {
@@ -556,6 +591,26 @@ func newWriteupResponse(row models.WriteupDetail, includeContent bool) writeupRe
 			Category: row.ChallengeCategory,
 			Points:   row.ChallengePoints,
 			Level:    row.ChallengeLevel,
+		},
+	}
+}
+
+func newChallengeCommentResponse(row models.ChallengeCommentDetail) challengeCommentResponse {
+	return challengeCommentResponse{
+		ID:        row.ID,
+		Content:   row.Content,
+		CreatedAt: row.CreatedAt.UTC(),
+		UpdatedAt: row.UpdatedAt.UTC(),
+		Author: commentAuthorResponse{
+			UserID:        row.UserID,
+			Username:      row.Username,
+			AffiliationID: row.AffiliationID,
+			Affiliation:   row.Affiliation,
+			Bio:           row.Bio,
+		},
+		Challenge: commentChallengeResponse{
+			ID:    row.ChallengeID,
+			Title: row.ChallengeTitle,
 		},
 	}
 }

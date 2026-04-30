@@ -44,6 +44,7 @@ func AutoMigrate(ctx context.Context, db *bun.DB) error {
 		(*models.Submission)(nil),
 		(*models.ChallengeVote)(nil),
 		(*models.Writeup)(nil),
+		(*models.ChallengeCommentItem)(nil),
 	}
 
 	if err := createTables(ctx, db, modelsToCreate); err != nil {
@@ -82,6 +83,8 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 		{name: "idx_writeups_challenge_created", query: "CREATE INDEX IF NOT EXISTS idx_writeups_challenge_created ON writeups (challenge_id, created_at DESC, id DESC)"},
 		{name: "idx_writeups_user_updated", query: "CREATE INDEX IF NOT EXISTS idx_writeups_user_updated ON writeups (user_id, updated_at DESC, id DESC)"},
 		{name: "idx_writeups_user_challenge", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_writeups_user_challenge ON writeups (user_id, challenge_id)"},
+		{name: "idx_challenge_comments_challenge_created", query: "CREATE INDEX IF NOT EXISTS idx_challenge_comments_challenge_created ON challenge_comments (challenge_id, created_at DESC, id DESC)"},
+		{name: "idx_challenge_comments_user_updated", query: "CREATE INDEX IF NOT EXISTS idx_challenge_comments_user_updated ON challenge_comments (user_id, updated_at DESC, id DESC)"},
 	}
 
 	for _, idx := range indexes {

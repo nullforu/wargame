@@ -1,6 +1,7 @@
 import UserAvatar from '../../components/UserAvatar'
 import { navigate } from '../../lib/router'
-import type { Challenge, ChallengeSolver, PaginationMeta } from '../../lib/types'
+import type { Challenge, ChallengeCommentItem, ChallengeSolver, PaginationMeta } from '../../lib/types'
+import ChallengeCommentsPanel from './ChallengeCommentsPanel'
 
 interface ChallengeInfoPanelsProps {
     challenge: Challenge
@@ -12,10 +13,59 @@ interface ChallengeInfoPanelsProps {
     formatTimestamp: (value: string) => string
     onSetSolverPage: (page: number) => void
     onPushSolverPageQuery: (page: number) => void
+    comments: ChallengeCommentItem[]
+    commentPagination: PaginationMeta
+    commentPage: number
+    commentLoading: boolean
+    commentError: string
+    commentInput: string
+    commentSubmitting: boolean
+    editingCommentID: number | null
+    editingCommentContent: string
+    isAuthenticated: boolean
+    currentUserID?: number
+    onCommentInputChange: (value: string) => void
+    onCreateComment: () => void
+    onEditStart: (id: number, content: string) => void
+    onEditCancel: () => void
+    onEditContentChange: (value: string) => void
+    onUpdateComment: (id: number) => void
+    onDeleteComment: (id: number) => void
+    onSetCommentPage: (page: number) => void
     t: (key: string, vars?: Record<string, string | number>) => string
 }
 
-const ChallengeInfoPanels = ({ challenge, firstBloodSolver, firstBloodSolvedAfterLabel, solvers, solverPagination, solverPage, formatTimestamp, onSetSolverPage, onPushSolverPageQuery, t }: ChallengeInfoPanelsProps) => {
+const ChallengeInfoPanels = ({
+    challenge,
+    firstBloodSolver,
+    firstBloodSolvedAfterLabel,
+    solvers,
+    solverPagination,
+    solverPage,
+    formatTimestamp,
+    onSetSolverPage,
+    onPushSolverPageQuery,
+    comments,
+    commentPagination,
+    commentPage,
+    commentLoading,
+    commentError,
+    commentInput,
+    commentSubmitting,
+    editingCommentID,
+    editingCommentContent,
+    isAuthenticated,
+    currentUserID,
+    onCommentInputChange,
+    onCreateComment,
+    onEditStart,
+    onEditCancel,
+    onEditContentChange,
+    onUpdateComment,
+    onDeleteComment,
+    onSetCommentPage,
+    t,
+}: ChallengeInfoPanelsProps) => {
     const creatorName = challenge.created_by?.username?.trim()
     const creatorAffiliation = challenge.created_by?.affiliation?.trim()
     const creatorBio = challenge.created_by?.bio?.trim()
@@ -152,6 +202,32 @@ const ChallengeInfoPanels = ({ challenge, firstBloodSolver, firstBloodSolvedAfte
                     </div>
                 </div>
             </section>
+
+            {!challenge.is_locked ? (
+                <ChallengeCommentsPanel
+                    comments={comments}
+                    commentPagination={commentPagination}
+                    commentPage={commentPage}
+                    commentLoading={commentLoading}
+                    commentError={commentError}
+                    commentInput={commentInput}
+                    commentSubmitting={commentSubmitting}
+                    editingCommentID={editingCommentID}
+                    editingCommentContent={editingCommentContent}
+                    isAuthenticated={isAuthenticated}
+                    currentUserID={currentUserID}
+                    formatTimestamp={formatTimestamp}
+                    onCommentInputChange={onCommentInputChange}
+                    onCreateComment={onCreateComment}
+                    onEditStart={onEditStart}
+                    onEditCancel={onEditCancel}
+                    onEditContentChange={onEditContentChange}
+                    onUpdateComment={onUpdateComment}
+                    onDeleteComment={onDeleteComment}
+                    onSetCommentPage={onSetCommentPage}
+                    t={t}
+                />
+            ) : null}
         </>
     )
 }

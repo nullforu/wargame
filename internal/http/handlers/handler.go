@@ -555,6 +555,31 @@ func (h *Handler) ChallengeWriteups(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, writeupsListResponse{Writeups: resp, CanViewContent: canViewContent, Pagination: pagination})
 }
 
+func (h *Handler) ChallengeComments(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	rows, pagination, err := h.wargame.ChallengeCommentPage(ctx.Request.Context(), challengeID, page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]challengeCommentResponse, 0, len(rows))
+	for _, row := range rows {
+		resp = append(resp, newChallengeCommentResponse(row))
+	}
+
+	ctx.JSON(http.StatusOK, challengeCommentsListResponse{Comments: resp, Pagination: pagination})
+}
+
 func (h *Handler) GetWriteup(ctx *gin.Context) {
 	writeupID, ok := parseIDParamOrError(ctx, "id")
 	if !ok {
@@ -641,6 +666,68 @@ func (h *Handler) DeleteWriteup(ctx *gin.Context) {
 	}
 
 	if err := h.wargame.DeleteWriteup(ctx.Request.Context(), middleware.UserID(ctx), writeupID); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *Handler) CreateChallengeCommentItem(ctx *gin.Context) {
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req createChallengeCommentRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	row, err := h.wargame.CreateChallengeCommentItem(ctx.Request.Context(), middleware.UserID(ctx), challengeID, req.Content)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, newChallengeCommentResponse(*row))
+}
+
+func (h *Handler) UpdateChallengeCommentItem(ctx *gin.Context) {
+	commentID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req updateChallengeCommentRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	content, err := requireNonNullOptionalString("content", req.Content)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	row, err := h.wargame.UpdateChallengeCommentItem(ctx.Request.Context(), middleware.UserID(ctx), commentID, content)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newChallengeCommentResponse(*row))
+}
+
+func (h *Handler) DeleteChallengeCommentItem(ctx *gin.Context) {
+	commentID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.wargame.DeleteChallengeCommentItem(ctx.Request.Context(), middleware.UserID(ctx), commentID); err != nil {
 		writeError(ctx, err)
 		return
 	}

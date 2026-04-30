@@ -44,7 +44,7 @@ const Header = ({ user }: HeaderProps) => {
         after?.()
     }
 
-    const navClass = (path: string) => `inline-flex h-10 items-center px-3 text-sm transition ${pathname.startsWith(path) ? 'text-accent font-semibold border-b-2 border-accent' : 'text-text-subtle hover:bg-surface-muted hover:text-text'}`
+    const navClass = (path: string) => `inline-flex h-10 items-center px-3 text-sm transition ${pathname.startsWith(path) ? 'text-accent font-semibold border-b-2 border-accent' : 'text-text-subtle hover:text-text'}`
 
     const handleLocaleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
         setLocale(event.target.value as Locale)
