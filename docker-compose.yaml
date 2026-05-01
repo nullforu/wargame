@@ -40,7 +40,7 @@ services:
     env_file:
       - .env
     environment:
-      APP_ENV: local # production
+      APP_ENV: production # production
       COOKIE_DOMAIN: .swua.kr
       GIN_MODE: release
       AWS_EC2_METADATA_DISABLED: "true"
