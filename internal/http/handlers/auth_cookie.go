@@ -102,7 +102,7 @@ func isHTTPSRequest(req *http.Request) bool {
 		return false
 	}
 
-	for _, p := range strings.Split(v, ",") {
+	for p := range strings.SplitSeq(v, ",") {
 		if strings.TrimSpace(p) == "https" {
 			return true
 		}

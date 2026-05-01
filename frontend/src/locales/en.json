@@ -375,6 +375,8 @@
     "errors.invalidCredentials": "invalid credentials",
     "errors.requestFailed": "request failed",
     "errors.required": "required",
+    "limits.maxBytes72": "Maximum 72 bytes allowed.",
+    "limits.byteCounter": "{current}/{max} bytes",
     "categories.web": "Web",
     "categories.web3": "Web3",
     "categories.pwnable": "Pwnable",

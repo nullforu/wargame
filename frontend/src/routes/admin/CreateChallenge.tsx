@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { uploadPresignedPost } from '../../lib/api'
 import { CHALLENGE_CATEGORIES } from '../../lib/constants'
-import { formatApiError, isZipFile, type FieldErrors } from '../../lib/utils'
+import { formatApiError, isZipFile, trimToMaxUtf8Bytes, utf8ByteLength, type FieldErrors } from '../../lib/utils'
 import MonacoEditor from '../../components/MonacoEditor'
 import FormMessage from '../../components/FormMessage'
 import { getCategoryKey, useT } from '../../lib/i18n'
@@ -39,6 +39,7 @@ const CreateChallenge = () => {
     const [availableChallenges, setAvailableChallenges] = useState<Challenge[]>([])
     const [challengeSearch, setChallengeSearch] = useState('')
     const fileInputRef = useRef<HTMLInputElement | null>(null)
+    const flagBytes = utf8ByteLength(flag)
     const sortedChallenges = [...availableChallenges].sort((a, b) => a.id - b.id)
     const formatChallengeOption = (challenge: Challenge) => {
         const categoryValue = 'category' in challenge && challenge.category ? challenge.category : t('common.na')
@@ -68,6 +69,10 @@ const CreateChallenge = () => {
         setChallengeFileError('')
 
         try {
+            if (flagBytes > 72) {
+                setFieldErrors({ flag: t('limits.maxBytes72') })
+                return
+            }
             if (challengeFile && !isZipFile(challengeFile)) {
                 setChallengeFileError(t('admin.create.onlyZip'))
                 return
@@ -218,9 +223,11 @@ const CreateChallenge = () => {
                                 id='admin-flag'
                                 className='mt-2 w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text focus:border-accent focus:outline-none'
                                 type='text'
+                                maxLength={72}
                                 value={flag}
-                                onChange={(event) => setFlag(event.target.value)}
+                                onChange={(event) => setFlag(trimToMaxUtf8Bytes(event.target.value, 72))}
                             />
+                            <p className='mt-2 text-xs text-text-subtle'>{t('limits.byteCounter', { current: flagBytes, max: 72 })}</p>
                             {fieldErrors.flag ? (
                                 <p className='mt-2 text-xs text-danger'>
                                     {t('common.flag')}: {fieldErrors.flag}

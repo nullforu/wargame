@@ -216,6 +216,7 @@ func (s *WargameService) CreateChallenge(ctx context.Context, title, description
 	validator.Required("category", category)
 	validator.Required("flag", flag)
 	validator.NonNegative("points", points)
+	validator.MaxBytes("flag", flag, bcryptInputMaxBytes)
 	if previousChallengeID != nil {
 		validator.PositiveID("previous_challenge_id", *previousChallengeID)
 	}
@@ -317,6 +318,7 @@ func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, d
 		if value == "" {
 			validator.fields = append(validator.fields, FieldError{Field: "flag", Reason: "required"})
 		} else {
+			validator.MaxBytes("flag", value, bcryptInputMaxBytes)
 			normalizedFlag = &value
 		}
 	}

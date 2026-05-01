@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { uploadPresignedPost } from '../../lib/api'
 import { CHALLENGE_CATEGORIES } from '../../lib/constants'
-import { formatApiError, isZipFile, type FieldErrors } from '../../lib/utils'
+import { formatApiError, isZipFile, trimToMaxUtf8Bytes, utf8ByteLength, type FieldErrors } from '../../lib/utils'
 import type { Challenge, ChallengeDetail, ChallengeUpdatePayload, TargetPortSpec } from '../../lib/types'
 
 type TargetPortRow = TargetPortSpec & { id: string }
@@ -48,6 +48,7 @@ const ChallengeManagement = () => {
     const [editFileError, setEditFileError] = useState('')
     const [editFileUploading, setEditFileUploading] = useState(false)
     const [editFileSuccess, setEditFileSuccess] = useState('')
+    const editFlagBytes = utf8ByteLength(editFlag)
     const readQueryState = (): { q: string; page: number; category: string; level: number; active: ActiveFilter; sort: SortFilter } => {
         if (typeof window === 'undefined') return { q: '', page: 1, category: 'all', level: ALL_LEVEL_FILTER, active: 'all' as ActiveFilter, sort: 'latest' as SortFilter }
         const params = new URLSearchParams(window.location.search)
@@ -283,6 +284,10 @@ const ChallengeManagement = () => {
             const trimmed = editFlag.trim()
             if (!trimmed) {
                 setManageFieldErrors({ flag: t('errors.required') })
+                return
+            }
+            if (utf8ByteLength(trimmed) > 72) {
+                setManageFieldErrors({ flag: t('limits.maxBytes72') })
                 return
             }
             payload.flag = trimmed
@@ -951,11 +956,13 @@ const ChallengeManagement = () => {
                                                                     id={`manage-flag-${challenge.id}`}
                                                                     className='w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text focus:border-accent focus:outline-none'
                                                                     type='password'
+                                                                    maxLength={72}
                                                                     value={editFlag}
-                                                                    onChange={(event) => setEditFlag(event.target.value)}
+                                                                    onChange={(event) => setEditFlag(trimToMaxUtf8Bytes(event.target.value, 72))}
                                                                     placeholder={t('admin.manage.flagPlaceholder')}
                                                                     disabled={manageLoading}
                                                                 />
+                                                                <p className='text-xs text-text-subtle'>{t('limits.byteCounter', { current: editFlagBytes, max: 72 })}</p>
                                                                 <div className='flex flex-wrap items-center gap-3'>
                                                                     <button
                                                                         className='rounded-lg bg-accent px-3 py-2 text-xs font-medium text-contrast-foreground transition hover:bg-accent-strong disabled:opacity-60 cursor-pointer'

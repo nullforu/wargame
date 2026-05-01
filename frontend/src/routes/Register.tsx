@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { formatApiError, type FieldErrors } from '../lib/utils'
+import { formatApiError, trimToMaxUtf8Bytes, utf8ByteLength, type FieldErrors } from '../lib/utils'
 import { navigate } from '../lib/router'
 import FormMessage from '../components/FormMessage'
 import { useT } from '../lib/i18n'
@@ -20,6 +20,7 @@ const Register = ({ routeParams = {} }: RouteProps) => {
     const [errorMessage, setErrorMessage] = useState('')
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
     const [success, setSuccess] = useState(false)
+    const passwordBytes = utf8ByteLength(password)
 
     const submit = async () => {
         setLoading(true)
@@ -28,6 +29,10 @@ const Register = ({ routeParams = {} }: RouteProps) => {
         setFieldErrors({})
 
         try {
+            if (passwordBytes > 72) {
+                setFieldErrors({ password: t('limits.maxBytes72') })
+                return
+            }
             await api.register({ email, username, password })
             setSuccess(true)
             setEmail('')
@@ -95,11 +100,13 @@ const Register = ({ routeParams = {} }: RouteProps) => {
                                 id='register-password'
                                 className='mt-1 w-full border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none'
                                 type='password'
+                                maxLength={72}
                                 value={password}
-                                onChange={(event) => setPassword(event.target.value)}
+                                onChange={(event) => setPassword(trimToMaxUtf8Bytes(event.target.value, 72))}
                                 placeholder={t('auth.passwordPlaceholder')}
                                 autoComplete='new-password'
                             />
+                            <p className='mt-1 text-xs text-text-subtle'>{t('limits.byteCounter', { current: passwordBytes, max: 72 })}</p>
                             {fieldErrors.password ? <p className='mt-1 text-xs text-danger'>{fieldErrors.password}</p> : null}
                         </div>
 

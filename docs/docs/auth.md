@@ -32,6 +32,10 @@ Errors:
 - 400 `invalid input`
 - 409 `user already exists`
 
+Validation notes:
+
+- `password` must be at most 72 bytes (bcrypt input limit).
+
 ---
 
 ## Login

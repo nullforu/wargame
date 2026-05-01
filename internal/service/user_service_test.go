@@ -185,3 +185,14 @@ func TestUserServiceUpdateProfileBio(t *testing.T) {
 		t.Fatalf("expected nil bio after clear, got %+v", cleared.Bio)
 	}
 }
+
+func TestUserServiceUpdateProfileDuplicateUsername(t *testing.T) {
+	env := setupServiceTest(t)
+	user1 := createUser(t, env, "dup1@example.com", "dup-user-1", "pass", models.UserRole)
+	_ = createUser(t, env, "dup2@example.com", "dup-user-2", "pass", models.UserRole)
+
+	dup := "dup-user-2"
+	if _, err := env.userSvc.UpdateProfile(context.Background(), user1.ID, &dup, nil, false, nil, false); !errors.Is(err, ErrUserExists) {
+		t.Fatalf("expected ErrUserExists, got %v", err)
+	}
+}

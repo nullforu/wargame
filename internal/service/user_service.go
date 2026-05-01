@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"wargame/internal/db"
 	"wargame/internal/models"
 	"wargame/internal/repo"
 )
@@ -88,7 +89,21 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID int64, username 
 	}
 
 	if username != nil {
-		user.Username = *username
+		normalizedUsername := normalizeTrim(*username)
+		if normalizedUsername == "" {
+			return nil, NewValidationError(FieldError{Field: "username", Reason: "required"})
+		}
+
+		exists, err := s.userRepo.ExistsByUsername(ctx, normalizedUsername, &userID)
+		if err != nil {
+			return nil, fmt.Errorf("user.UpdateProfile username exists: %w", err)
+		}
+
+		if exists {
+			return nil, ErrUserExists
+		}
+
+		user.Username = normalizedUsername
 	}
 
 	if affiliationSet {
@@ -117,6 +132,10 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID int64, username 
 	}
 
 	if err := s.userRepo.Update(ctx, user); err != nil {
+		if db.IsUniqueViolation(err) {
+			return nil, ErrUserExists
+		}
+
 		return nil, fmt.Errorf("user.UpdateProfile: %w", err)
 	}
 

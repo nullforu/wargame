@@ -2,6 +2,7 @@ package http_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"wargame/internal/models"
 	"wargame/internal/service"
@@ -79,6 +80,26 @@ func TestRegister(t *testing.T) {
 		if resp.Error != service.ErrUserExists.Error() {
 			t.Fatalf("unexpected error: %s", resp.Error)
 		}
+	})
+
+	t.Run("password too long", func(t *testing.T) {
+		env := setupTest(t, testCfg)
+		body := map[string]string{
+			"email":    "user@example.com",
+			"username": "user1",
+			"password": strings.Repeat("a", 73),
+		}
+
+		rec := doRequest(t, env.router, http.MethodPost, "/api/auth/register", body, nil)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var resp errorResp
+		decodeJSON(t, rec, &resp)
+		assertFieldErrors(t, resp.Details, map[string]string{
+			"password": "max bytes is 72",
+		})
 	})
 }
 
@@ -245,6 +266,12 @@ func TestUpdateMe(t *testing.T) {
 	decodeJSON(t, rec, &resp)
 	if resp.Bio != nil {
 		t.Fatalf("expected bio to be cleared, got %+v", resp.Bio)
+	}
+
+	_, _, _ = registerAndLogin(t, env, "user2@example.com", "user2", "strong-password")
+	rec = doRequest(t, env.router, http.MethodPut, "/api/me", map[string]string{"username": "user2"}, authHeader(access))
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
 }
 

@@ -70,6 +70,23 @@ func (r *UserRepo) GetByID(ctx context.Context, id int64) (*models.User, error) 
 	return user, nil
 }
 
+func (r *UserRepo) ExistsByUsername(ctx context.Context, username string, excludeUserID *int64) (bool, error) {
+	query := r.db.NewSelect().
+		TableExpr("users AS u").
+		Where("u.username = ?", strings.TrimSpace(username))
+
+	if excludeUserID != nil {
+		query = query.Where("u.id != ?", *excludeUserID)
+	}
+
+	count, err := query.Count(ctx)
+	if err != nil {
+		return false, wrapError("userRepo.ExistsByUsername", err)
+	}
+
+	return count > 0, nil
+}
+
 func (r *UserRepo) List(ctx context.Context, page, pageSize int) ([]models.User, int, error) {
 	return r.listWithQuery(ctx, "", page, pageSize)
 }

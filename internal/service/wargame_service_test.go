@@ -137,6 +137,20 @@ func TestWargameServiceUpdateAndDeleteChallenge(t *testing.T) {
 	}
 }
 
+func TestWargameServiceChallengeFlagTooLong(t *testing.T) {
+	env := setupServiceTest(t)
+	longFlag := strings.Repeat("a", 73)
+
+	if _, err := env.wargameSvc.CreateChallenge(context.Background(), "Title", "Desc", "Misc", 100, longFlag, true, false, nil, nil, nil); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for create long flag, got %v", err)
+	}
+
+	challenge := createChallenge(t, env, "Old", 50, "FLAG{2}", true)
+	if _, err := env.wargameSvc.UpdateChallenge(context.Background(), challenge.ID, nil, nil, nil, nil, &longFlag, nil, nil, nil, nil, nil, false); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for update long flag, got %v", err)
+	}
+}
+
 func TestWargameServiceSubmitFlagAndSolvedQueries(t *testing.T) {
 	env := setupServiceTest(t)
 	user := createUser(t, env, "u1@example.com", "u1", "pass", models.UserRole)

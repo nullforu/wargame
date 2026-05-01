@@ -39,6 +39,7 @@ func (s *AuthService) Register(ctx context.Context, email, username, password st
 	validator.Required("username", username)
 	validator.Required("password", password)
 	validator.Email("email", email)
+	validator.MaxBytes("password", password, bcryptInputMaxBytes)
 	if err := validator.Error(); err != nil {
 		return nil, err
 	}

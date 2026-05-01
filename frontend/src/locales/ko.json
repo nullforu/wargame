@@ -375,6 +375,8 @@
     "errors.invalidCredentials": "자격 증명이 올바르지 않습니다.",
     "errors.requestFailed": "요청에 실패했습니다.",
     "errors.required": "필수 항목입니다.",
+    "limits.maxBytes72": "최대 72바이트까지 입력할 수 있습니다.",
+    "limits.byteCounter": "{current}/{max} 바이트",
     "categories.web": "Web",
     "categories.web3": "Web3",
     "categories.pwnable": "Pwnable",

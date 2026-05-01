@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +34,20 @@ func TestAuthServiceRegisterValidation(t *testing.T) {
 	var ve *ValidationError
 	if !errors.As(err, &ve) {
 		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestAuthServiceRegisterPasswordTooLong(t *testing.T) {
+	env := setupServiceTest(t)
+
+	_, err := env.authSvc.Register(context.Background(), "user@example.com", "user1", strings.Repeat("a", 73))
+	var ve *ValidationError
+	if !errors.As(err, &ve) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+
+	if len(ve.Fields) == 0 || ve.Fields[0].Field != "password" || ve.Fields[0].Reason != "max bytes is 72" {
+		t.Fatalf("unexpected validation details: %+v", ve.Fields)
 	}
 }
 

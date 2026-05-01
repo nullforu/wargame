@@ -43,6 +43,10 @@ Errors:
 - 400 `invalid input`
 - 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
+
+Validation notes:
+
+- `flag` must be at most 72 bytes (bcrypt input limit).
 - 404 `not found`
 
 ---
@@ -201,6 +205,10 @@ Errors:
 - 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `challenge not found`
+
+Validation notes:
+
+- When provided, `flag` must be at most 72 bytes (bcrypt input limit).
 
 ---
 
