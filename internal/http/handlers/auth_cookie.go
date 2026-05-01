@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"strings"
 
 	"wargame/internal/config"
 
@@ -74,12 +75,40 @@ func setCookie(ctx *gin.Context, cfg config.Config, name, value string, maxAge i
 	secure := cfg.AppEnv == "production"
 	sameSite := http.SameSiteLaxMode
 	if cfg.AppEnv == "local" {
-		sameSite = http.SameSiteNoneMode
-		secure = true
+		if isHTTPSRequest(ctx.Request) {
+			sameSite = http.SameSiteNoneMode
+			secure = true
+		} else {
+			sameSite = http.SameSiteLaxMode
+			secure = false
+		}
 	}
 
 	ctx.SetSameSite(sameSite)
 	ctx.SetCookie(name, value, maxAge, "/", cfg.CookieDomain, secure, httpOnly)
+}
+
+func isHTTPSRequest(req *http.Request) bool {
+	if req == nil {
+		return false
+	}
+
+	if req.TLS != nil {
+		return true
+	}
+
+	v := strings.ToLower(strings.TrimSpace(req.Header.Get("X-Forwarded-Proto")))
+	if v == "" {
+		return false
+	}
+
+	for _, p := range strings.Split(v, ",") {
+		if strings.TrimSpace(p) == "https" {
+			return true
+		}
+	}
+
+	return false
 }
 
 func randomTokenHex(bytesLen int) (string, error) {

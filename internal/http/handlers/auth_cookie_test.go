@@ -195,19 +195,36 @@ func TestSetCookieLocalHTTPSUsesSameSiteNoneAndSecure(t *testing.T) {
 	}
 }
 
-func TestSetCookieLocalHTTPUsesSameSiteNoneWithSecure(t *testing.T) {
+func TestSetCookieLocalHTTPUsesSameSiteLaxWithoutSecure(t *testing.T) {
 	ctx, rec := newCookieTestContext(t)
 	cfg := testConfig("local", time.Hour, time.Hour)
 
 	setCookie(ctx, cfg, "x", "y", 10, true)
 
 	cookie := cookieHeaderByPrefix(rec.Header().Values("Set-Cookie"), "x=")
+	if strings.Contains(cookie, "Secure") {
+		t.Fatalf("expected non-secure cookie for local http, got %q", cookie)
+	}
+
+	if !strings.Contains(cookie, "SameSite=Lax") {
+		t.Fatalf("expected SameSite=Lax for local http, got %q", cookie)
+	}
+}
+
+func TestSetCookieLocalForwardedHTTPSUsesSameSiteNoneAndSecure(t *testing.T) {
+	ctx, rec := newCookieTestContext(t)
+	cfg := testConfig("local", time.Hour, time.Hour)
+	ctx.Request.Header.Set("X-Forwarded-Proto", "https")
+
+	setCookie(ctx, cfg, "x", "y", 10, true)
+
+	cookie := cookieHeaderByPrefix(rec.Header().Values("Set-Cookie"), "x=")
 	if !strings.Contains(cookie, "Secure") {
-		t.Fatalf("expected secure cookie for local mode, got %q", cookie)
+		t.Fatalf("expected secure cookie for forwarded https, got %q", cookie)
 	}
 
 	if !strings.Contains(cookie, "SameSite=None") {
-		t.Fatalf("expected SameSite=None for local http, got %q", cookie)
+		t.Fatalf("expected SameSite=None for forwarded https, got %q", cookie)
 	}
 }
 
