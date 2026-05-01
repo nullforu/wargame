@@ -73,6 +73,11 @@ func currentCSRFToken(ctx *gin.Context) (string, bool) {
 func setCookie(ctx *gin.Context, cfg config.Config, name, value string, maxAge int, httpOnly bool) {
 	secure := cfg.AppEnv == "production"
 	sameSite := http.SameSiteLaxMode
+	if cfg.AppEnv == "local" {
+		sameSite = http.SameSiteNoneMode
+		secure = true
+	}
+
 	ctx.SetSameSite(sameSite)
 	ctx.SetCookie(name, value, maxAge, "/", "", secure, httpOnly)
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"crypto/tls"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -174,6 +175,39 @@ func TestSetCookieProductionSecureFlag(t *testing.T) {
 
 	if !strings.Contains(cookie, "HttpOnly") {
 		t.Fatalf("expected httponly cookie, got %q", cookie)
+	}
+}
+
+func TestSetCookieLocalHTTPSUsesSameSiteNoneAndSecure(t *testing.T) {
+	ctx, rec := newCookieTestContext(t)
+	cfg := testConfig("local", time.Hour, time.Hour)
+	ctx.Request.TLS = &tls.ConnectionState{}
+
+	setCookie(ctx, cfg, "x", "y", 10, true)
+
+	cookie := cookieHeaderByPrefix(rec.Header().Values("Set-Cookie"), "x=")
+	if !strings.Contains(cookie, "Secure") {
+		t.Fatalf("expected secure cookie for local https, got %q", cookie)
+	}
+
+	if !strings.Contains(cookie, "SameSite=None") {
+		t.Fatalf("expected SameSite=None for local https, got %q", cookie)
+	}
+}
+
+func TestSetCookieLocalHTTPUsesSameSiteNoneWithSecure(t *testing.T) {
+	ctx, rec := newCookieTestContext(t)
+	cfg := testConfig("local", time.Hour, time.Hour)
+
+	setCookie(ctx, cfg, "x", "y", 10, true)
+
+	cookie := cookieHeaderByPrefix(rec.Header().Values("Set-Cookie"), "x=")
+	if !strings.Contains(cookie, "Secure") {
+		t.Fatalf("expected secure cookie for local mode, got %q", cookie)
+	}
+
+	if !strings.Contains(cookie, "SameSite=None") {
+		t.Fatalf("expected SameSite=None for local http, got %q", cookie)
 	}
 }
 
