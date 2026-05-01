@@ -1091,7 +1091,7 @@ func TestHandlerListChallengesAndUsers(t *testing.T) {
 		}
 
 		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges?page=1&page_size=10", nil)
-		ctx.Request.Header.Set("Authorization", "Bearer "+accessToken)
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: accessToken})
 		env.handler.ListChallenges(ctx)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
@@ -1157,29 +1157,29 @@ func TestParseIDParamOrError(t *testing.T) {
 func TestOptionalUserID(t *testing.T) {
 	env := setupHandlerTest(t)
 
-	t.Run("no authorization header", func(t *testing.T) {
+	t.Run("no access token cookie", func(t *testing.T) {
 		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
 		if got := env.handler.optionalUserID(ctx); got != 0 {
 			t.Fatalf("expected 0, got %d", got)
 		}
 	})
 
-	t.Run("invalid bearer format", func(t *testing.T) {
+	t.Run("invalid access token cookie", func(t *testing.T) {
 		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
-		ctx.Request.Header.Set("Authorization", "Bad token")
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: "not-a-jwt"})
 		if got := env.handler.optionalUserID(ctx); got != 0 {
 			t.Fatalf("expected 0, got %d", got)
 		}
 	})
 
-	t.Run("valid access token", func(t *testing.T) {
+	t.Run("valid access token cookie", func(t *testing.T) {
 		token, err := auth.GenerateAccessToken(env.cfg.JWT, 777, models.UserRole)
 		if err != nil {
 			t.Fatalf("GenerateAccessToken: %v", err)
 		}
 
 		ctx, _ := newJSONContext(t, http.MethodGet, "/api/challenges", nil)
-		ctx.Request.Header.Set("Authorization", "Bearer "+token)
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: token})
 		if got := env.handler.optionalUserID(ctx); got != 777 {
 			t.Fatalf("expected 777, got %d", got)
 		}
@@ -1213,7 +1213,7 @@ func TestHandlerGetChallengeAndSolvers(t *testing.T) {
 
 	t.Run("get challenge locked response", func(t *testing.T) {
 		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(locked.ID), nil)
-		ctx.Request.Header.Set("Authorization", "Bearer "+token)
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: token})
 		ctx.Params = append(ctx.Params, ginParam("id", toStringID(locked.ID)))
 		env.handler.GetChallenge(ctx)
 		if rec.Code != http.StatusOK {
@@ -1243,7 +1243,7 @@ func TestHandlerGetChallengeAndSolvers(t *testing.T) {
 		}
 
 		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(prev.ID), nil)
-		ctx.Request.Header.Set("Authorization", "Bearer "+token)
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: token})
 		ctx.Params = append(ctx.Params, ginParam("id", toStringID(prev.ID)))
 		env.handler.GetChallenge(ctx)
 		if rec.Code != http.StatusOK {
@@ -1512,18 +1512,40 @@ func TestHandlerAuthMeUpdateFlow(t *testing.T) {
 			t.Fatalf("decode login: %v", err)
 		}
 
-		if loginResp.AccessToken == "" || loginResp.RefreshToken == "" {
-			t.Fatalf("expected tokens in login response: %+v", loginResp)
+		setCookies := rec.Header().Values("Set-Cookie")
+		if len(setCookies) == 0 {
+			t.Fatalf("expected auth cookies on login")
 		}
 
-		refreshBody := []byte(`{"refresh_token":"` + loginResp.RefreshToken + `"}`)
-		ctx, rec = newJSONContext(t, http.MethodPost, "/api/refresh", refreshBody)
+		refreshToken := ""
+		csrfToken := ""
+		for _, c := range setCookies {
+			if after, ok := strings.CutPrefix(c, "refresh_token="); ok {
+				refreshToken = strings.SplitN(after, ";", 2)[0]
+			}
+
+			if after, ok := strings.CutPrefix(c, "csrf_token="); ok {
+				csrfToken = strings.SplitN(after, ";", 2)[0]
+			}
+		}
+
+		if refreshToken == "" || csrfToken == "" {
+			t.Fatalf("expected refresh/csrf cookies on login")
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/refresh", nil)
+		ctx.Request.AddCookie(&http.Cookie{Name: "refresh_token", Value: refreshToken})
+		ctx.Request.AddCookie(&http.Cookie{Name: "csrf_token", Value: csrfToken})
+		ctx.Request.Header.Set("X-CSRF-Token", csrfToken)
 		env.handler.Refresh(ctx)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("refresh status %d: %s", rec.Code, rec.Body.String())
 		}
 
-		ctx, rec = newJSONContext(t, http.MethodPost, "/api/logout", refreshBody)
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/logout", nil)
+		ctx.Request.AddCookie(&http.Cookie{Name: "refresh_token", Value: refreshToken})
+		ctx.Request.AddCookie(&http.Cookie{Name: "csrf_token", Value: csrfToken})
+		ctx.Request.Header.Set("X-CSRF-Token", csrfToken)
 		env.handler.Logout(ctx)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("logout status %d: %s", rec.Code, rec.Body.String())
@@ -1678,7 +1700,7 @@ func TestHandlerWriteupHandlers(t *testing.T) {
 	t.Run("challenge writeups visibility", func(t *testing.T) {
 		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(challenge.ID)+"/writeups?page=1&page_size=10", nil)
 		ctx.Params = append(ctx.Params, ginParam("id", toStringID(challenge.ID)))
-		ctx.Request.Header.Set("Authorization", "Bearer "+viewerAccess)
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: viewerAccess})
 		env.handler.ChallengeWriteups(ctx)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected 200 list unsolved viewer, got %d body=%s", rec.Code, rec.Body.String())
@@ -1711,7 +1733,7 @@ func TestHandlerWriteupHandlers(t *testing.T) {
 
 		ctx, rec = newJSONContext(t, http.MethodGet, "/api/writeups/"+toStringID(writeupID), nil)
 		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writeupID)))
-		ctx.Request.Header.Set("Authorization", "Bearer "+viewerAccess)
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: viewerAccess})
 		env.handler.GetWriteup(ctx)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected 200 get unsolved viewer, got %d body=%s", rec.Code, rec.Body.String())
@@ -1730,7 +1752,7 @@ func TestHandlerWriteupHandlers(t *testing.T) {
 
 		ctx, rec = newJSONContext(t, http.MethodGet, "/api/writeups/"+toStringID(writeupID), nil)
 		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writeupID)))
-		ctx.Request.Header.Set("Authorization", "Bearer "+viewerAccess)
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: viewerAccess})
 		env.handler.GetWriteup(ctx)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected 200 get solved viewer, got %d body=%s", rec.Code, rec.Body.String())
@@ -1816,7 +1838,7 @@ func TestHandlerWriteupHandlers(t *testing.T) {
 
 		ctx, rec = newJSONContext(t, http.MethodGet, "/api/users/"+toStringID(writer.ID)+"/writeups?page=1&page_size=10", nil)
 		ctx.Params = append(ctx.Params, ginParam("id", toStringID(writer.ID)))
-		ctx.Request.Header.Set("Authorization", "Bearer "+viewerAccess)
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: viewerAccess})
 		env.handler.GetUserWriteups(ctx)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected 200 user writeups, got %d body=%s", rec.Code, rec.Body.String())

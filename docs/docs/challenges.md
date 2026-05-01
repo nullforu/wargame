@@ -3,6 +3,10 @@ title: Challenges
 nav_order: 4
 ---
 
+Notes:
+
+- For authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests, send both `csrf_token` cookie and matching `X-CSRF-Token` header.
+
 ## List Challenges
 
 `GET /api/challenges`
@@ -218,7 +222,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Request
@@ -240,7 +244,7 @@ Response 200
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `user blocked` or `challenge locked`
 - 404 `challenge not found`
 - 409 `challenge already solved`
@@ -255,7 +259,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Request
@@ -280,7 +284,7 @@ Response 200
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `user blocked` or `challenge not solved by user`
 - 404 `challenge not found`
 
@@ -332,7 +336,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Response 200
@@ -354,7 +358,7 @@ When the caller has not voted on this challenge yet:
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 404 `challenge not found`
 
 ---
@@ -366,7 +370,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Response 200
@@ -380,7 +384,7 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `user blocked` or `challenge locked`
 - 404 `challenge not found` or `challenge file not found`
 - 503 `storage unavailable`
@@ -449,7 +453,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Request
@@ -490,7 +494,7 @@ Response 201
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `user blocked`
 - 404 `challenge not found`
 
@@ -503,7 +507,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Request
@@ -541,7 +545,7 @@ Response 200
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `user blocked` or `comment access forbidden`
 - 404 `comment not found`
 
@@ -554,7 +558,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Response 200
@@ -568,6 +572,6 @@ Response 200
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `user blocked` or `comment access forbidden`
 - 404 `comment not found`

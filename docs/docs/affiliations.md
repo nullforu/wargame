@@ -3,6 +3,10 @@ title: Affiliations
 nav_order: 9
 ---
 
+Notes:
+
+- For authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests, send both `csrf_token` cookie and matching `X-CSRF-Token` header.
+
 ## Create Affiliation (Admin)
 
 `POST /api/admin/affiliations`
@@ -10,7 +14,7 @@ nav_order: 9
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Request
@@ -33,7 +37,7 @@ Response 201
 Errors:
 
 - 400 `invalid input` (required/duplicate name)
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 
 ---
@@ -156,7 +160,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Request examples

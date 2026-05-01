@@ -38,9 +38,9 @@ import type {
     Writeup,
     WriteupDetailResponse,
 } from './types'
-import type { AuthState } from './auth'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8080'
+const CSRF_TOKEN_HEADER = 'X-CSRF-Token'
 
 export interface ApiErrorDetail {
     field: string
@@ -67,8 +67,6 @@ export class ApiError extends Error {
 }
 
 interface ApiDeps {
-    getAuth: () => AuthState
-    setAuthTokens: (accessToken: string, refreshToken: string) => void
     setAuthUser: (user: AuthUser | null) => void
     clearAuth: () => void
     translate: (key: string, vars?: Record<string, string | number>) => string
@@ -95,7 +93,7 @@ const extractRateLimit = (response: Response, data: any): RateLimitInfo | undefi
     return undefined
 }
 
-export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, translate }: ApiDeps) => {
+export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
     const defaultPagination = (): PaginationMeta => ({
         page: 1,
         page_size: 20,
@@ -165,28 +163,33 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
         return query ? `${path}?${query}` : path
     }
 
-    const buildHeaders = (withAuth: boolean, tokenOverride?: string) => {
+    const getCookie = (name: string) => {
+        const encoded = `${name}=`
+        return document.cookie
+            .split(';')
+            .map((part) => part.trim())
+            .find((part) => part.startsWith(encoded))
+            ?.slice(encoded.length)
+    }
+
+    const buildHeaders = (method: string) => {
         const headers: Record<string, string> = { Accept: 'application/json' }
 
-        if (withAuth) {
-            const token = tokenOverride ?? getAuth().accessToken
-            if (token) headers.Authorization = `Bearer ${token}`
+        const upper = method.toUpperCase()
+        const needsCSRF = upper === 'POST' || upper === 'PUT' || upper === 'PATCH' || upper === 'DELETE'
+        if (needsCSRF) {
+            const csrfToken = getCookie('csrf_token')
+            if (csrfToken) headers[CSRF_TOKEN_HEADER] = csrfToken
         }
 
         return headers
     }
 
     const refreshToken = async () => {
-        const refreshTokenValue = getAuth().refreshToken
-        if (!refreshTokenValue) throw new ApiError(translate('errors.missingRefreshToken'), 401)
-
         const response = await fetch(`${API_BASE}/api/auth/refresh`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-            },
-            body: JSON.stringify({ refresh_token: refreshTokenValue }),
+            headers: buildHeaders('POST'),
+            credentials: 'include',
         })
 
         if (!response.ok) {
@@ -196,10 +199,7 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
             throw new ApiError(data?.error ?? translate('errors.invalidCredentials'), response.status, data?.details, extractRateLimit(response, data))
         }
 
-        const data = await response.json()
-        setAuthTokens(data.access_token, data.refresh_token)
-
-        return data.access_token as string
+        return 'ok'
     }
 
     let refreshInFlight: Promise<string> | null = null
@@ -232,7 +232,7 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
             noCache?: boolean
         } = {},
     ): Promise<T> => {
-        const headers = buildHeaders(auth)
+        const headers = buildHeaders(method)
         if (body !== undefined) headers['Content-Type'] = 'application/json'
         if (noCache) {
             headers['Cache-Control'] = 'no-cache'
@@ -243,6 +243,7 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
             method,
             headers,
             body: body !== undefined ? JSON.stringify(body) : undefined,
+            credentials: 'include',
             cache: noCache ? 'no-store' : 'default',
         })
 
@@ -254,8 +255,8 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
 
         if (response.status === 401 && auth && retryOnAuth) {
             try {
-                const newToken = await getFreshToken()
-                const retryHeaders = buildHeaders(true, newToken)
+                await getFreshToken()
+                const retryHeaders = buildHeaders(method)
                 if (body !== undefined) retryHeaders['Content-Type'] = 'application/json'
                 if (noCache) {
                     retryHeaders['Cache-Control'] = 'no-cache'
@@ -266,6 +267,7 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
                     method,
                     headers: retryHeaders,
                     body: body !== undefined ? JSON.stringify(body) : undefined,
+                    credentials: 'include',
                     cache: noCache ? 'no-store' : 'default',
                 })
 
@@ -292,17 +294,11 @@ export const createApi = ({ getAuth, setAuthTokens, setAuthUser, clearAuth, tran
         register: (payload: RegisterPayload) => request<RegisterResponse>(`/api/auth/register`, { method: 'POST', body: payload }),
         login: async (payload: LoginPayload) => {
             const data = await request<AuthResponse>(`/api/auth/login`, { method: 'POST', body: payload })
-            setAuthTokens(data.access_token, data.refresh_token)
             setAuthUser(data.user)
             return data
         },
         logout: async () => {
-            const refreshTokenValue = getAuth().refreshToken
-            if (!refreshTokenValue) {
-                clearAuth()
-                return
-            }
-            await request(`/api/auth/logout`, { method: 'POST', body: { refresh_token: refreshTokenValue } })
+            await request(`/api/auth/logout`, { method: 'POST' })
             clearAuth()
         },
         me: () => request<AuthUser>(`/api/me`, { auth: true }),

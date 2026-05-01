@@ -56,7 +56,7 @@ const WriteupEditor = ({ routeParams = {} }: RouteProps) => {
 
     useEffect(() => {
         void loadWriteup()
-    }, [challengeId])
+    }, [challengeId, auth.user?.id])
 
     const saveWriteup = async () => {
         if (!challengeId || !auth.user || saving) return

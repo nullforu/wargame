@@ -3,6 +3,10 @@ title: Writeups
 nav_order: 10
 ---
 
+Notes:
+
+- For authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests, send both `csrf_token` cookie and matching `X-CSRF-Token` header.
+
 ## List Challenge Writeups
 
 `GET /api/challenges/{id}/writeups`
@@ -113,7 +117,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Request
@@ -170,7 +174,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Request
@@ -221,7 +225,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Response 200
@@ -249,7 +253,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Query parameters:

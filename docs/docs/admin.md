@@ -2,7 +2,10 @@
 title: Admin
 nav_order: 6
 ---
----
+
+Notes:
+
+- For authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests, send both `csrf_token` cookie and matching `X-CSRF-Token` header.
 
 ## Block User
 
@@ -11,7 +14,7 @@ nav_order: 6
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Request
@@ -38,7 +41,7 @@ Response 200
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `not found`
 
@@ -51,7 +54,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Response 200
@@ -70,7 +73,7 @@ Response 200
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `not found`
 
@@ -83,7 +86,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Request
@@ -131,7 +134,7 @@ Response 201
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 
 ---
@@ -143,7 +146,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Request
@@ -195,7 +198,7 @@ Response 200
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `challenge not found`
 
@@ -208,7 +211,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Response 200
@@ -239,7 +242,7 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `challenge not found`
 
@@ -252,7 +255,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Response 200
@@ -265,7 +268,7 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `challenge not found`
 
@@ -276,7 +279,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 ### List All Stacks
@@ -347,7 +350,7 @@ Response 200
 
 Errors (all admin stack endpoints):
 
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `stack not found`
 - 503 `stack feature disabled` or `stack provisioner unavailable`
@@ -361,7 +364,7 @@ Errors (all admin stack endpoints):
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Request
@@ -405,7 +408,7 @@ Response 200
 Errors:
 
 - 400 `invalid input`
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `challenge not found`
 - 503 `storage unavailable`
@@ -419,7 +422,7 @@ Errors:
 Headers
 
 ```
-Authorization: Bearer <access_token>
+Cookie: access_token=<jwt>
 ```
 
 Response 200
@@ -443,7 +446,7 @@ Response 200
 
 Errors:
 
-- 401 `invalid token` or `missing authorization` or `invalid authorization`
+- 401 `invalid token` or `missing access_token cookie`
 - 403 `forbidden`
 - 404 `challenge not found` or `challenge file not found`
 - 503 `storage unavailable`
