@@ -40,6 +40,7 @@ import type {
 } from './types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8080'
+const CSRF_TOKEN_HEADER = 'X-CSRF-Token'
 
 export interface ApiErrorDetail {
     field: string
@@ -178,7 +179,7 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
         const needsCSRF = upper === 'POST' || upper === 'PUT' || upper === 'PATCH' || upper === 'DELETE'
         if (needsCSRF) {
             const csrfToken = getCookie('csrf_token')
-            if (csrfToken) headers['X-CSRF-Token'] = csrfToken
+            if (csrfToken) headers[CSRF_TOKEN_HEADER] = csrfToken
         }
 
         return headers

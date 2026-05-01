@@ -79,7 +79,7 @@ func setCookie(ctx *gin.Context, cfg config.Config, name, value string, maxAge i
 	}
 
 	ctx.SetSameSite(sameSite)
-	ctx.SetCookie(name, value, maxAge, "/", "", secure, httpOnly)
+	ctx.SetCookie(name, value, maxAge, "/", cfg.CookieDomain, secure, httpOnly)
 }
 
 func randomTokenHex(bytesLen int) (string, error) {

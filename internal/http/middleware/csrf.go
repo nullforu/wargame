@@ -57,5 +57,8 @@ func requiresCSRF(method string) bool {
 }
 
 func isCSRFIgnoredPath(path string) bool {
-	return path == "/api/auth/login" || path == "/api/auth/register"
+	return path == "/api/auth/login" ||
+		path == "/api/auth/register" ||
+		path == "/api/auth/refresh" ||
+		path == "/api/auth/logout"
 }

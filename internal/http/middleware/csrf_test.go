@@ -15,6 +15,8 @@ func setupCSRFRouter(handler gin.HandlerFunc) *gin.Engine {
 	r.POST("/test", handler)
 	r.GET("/test", handler)
 	r.POST("/api/auth/login", handler)
+	r.POST("/api/auth/refresh", handler)
+	r.POST("/api/auth/logout", handler)
 
 	return r
 }
@@ -36,6 +38,14 @@ func TestCSRFIgnoredPath(t *testing.T) {
 
 	if !isCSRFIgnoredPath("/api/auth/register") {
 		t.Fatal("expected register path ignored")
+	}
+
+	if !isCSRFIgnoredPath("/api/auth/refresh") {
+		t.Fatal("expected refresh path ignored")
+	}
+
+	if !isCSRFIgnoredPath("/api/auth/logout") {
+		t.Fatal("expected logout path ignored")
 	}
 
 	if isCSRFIgnoredPath("/api/challenges/1/submit") {
