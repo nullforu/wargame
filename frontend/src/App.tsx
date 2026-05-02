@@ -170,7 +170,7 @@ const App = () => {
                 <p className='font-medium'>특정한 인물을 사칭/비방하는 닉네임을 허용하지 않습니다.</p>
             </DismissibleNotice>
 
-            <main className='mx-auto w-full max-w-7xl flex-1 overflow-x-hidden px-4 py-5 md:px-6 md:py-6'>{content}</main>
+            <main className='mx-auto w-full max-w-7xl flex-1 px-4 py-5 md:px-6 md:py-6'>{content}</main>
             <footer className='border-t border-border bg-surface-muted py-5 text-center text-xs text-text-subtle dark:border-border dark:bg-surface dark:text-text-muted'>
                 <p className='mx-auto max-w-7xl px-4 md:px-6'>{t('footer.copyright')}</p>
             </footer>

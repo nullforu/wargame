@@ -3,6 +3,8 @@ export interface SiteConfig {
     description: string
     headerTitle: string
     headerDescription: string
+    homeBannerImage?: string
+    homeBannerImageFit?: 'cover' | 'contain'
 }
 
 export const SITE_CONFIG: SiteConfig = {
@@ -10,4 +12,6 @@ export const SITE_CONFIG: SiteConfig = {
     description: 'Null4U Wargame is a community-driven security playground where you can practice and enhance your cybersecurity skills through various challenges and competitions.',
     headerTitle: 'N4U Wargame',
     headerDescription: 'N4U Wargame',
+    homeBannerImage: 'https://velog.velcdn.com/images/yulmwu/post/0889296a-2fde-4569-a0ee-57a9ee428709/image.png',
+    homeBannerImageFit: 'cover',
 }
