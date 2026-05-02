@@ -320,7 +320,7 @@ const Home = ({ routeParams = {} }: RouteProps) => {
                             </a>
                         </div>
                         <div className='relative pb-5'>
-                            <div className='hidden md:grid grid-cols-[70px_minmax(0,1.2fr)_100px_110px_70px] items-center gap-3 px-4 py-3 text-xs font-medium text-text-muted'>
+                            <div className='hidden md:grid grid-cols-[70px_minmax(0,1.2fr)_100px_110px_70px] items-center gap-3 py-3 text-xs font-medium text-text-muted'>
                                 <p>{t('common.category')}</p>
                                 <p>{t('common.title')}</p>
                                 <p>{t('common.username')}</p>
@@ -331,7 +331,7 @@ const Home = ({ routeParams = {} }: RouteProps) => {
                                 <div className='divide-y divide-border/60'>
                                     {Array.from({ length: 8 }, (_, idx) => (
                                         <div key={`community-skeleton-${idx}`}>
-                                            <div className='hidden md:grid grid-cols-[70px_minmax(0,1.2fr)_100px_110px_70px] items-center gap-3 px-4 py-3'>
+                                            <div className='hidden md:grid grid-cols-[70px_minmax(0,1.2fr)_100px_110px_70px] items-center gap-3 py-3'>
                                                 <div className='h-7 w-14 animate-pulse rounded-full bg-surface-muted' />
                                                 <div className='h-4 w-full animate-pulse rounded bg-surface-muted' />
                                                 <div className='h-4 w-16 animate-pulse rounded bg-surface-muted' />
@@ -351,7 +351,7 @@ const Home = ({ routeParams = {} }: RouteProps) => {
                                     {communityRows.map((post) => (
                                         <div key={post.id}>
                                             <button
-                                                className={`rounded-none hidden w-full md:grid grid-cols-[70px_minmax(0,1.2fr)_100px_110px_70px] items-center gap-3 px-4 py-3 text-left transition hover:bg-surface-muted/40 ${post.category === 0 ? 'bg-warning/10 hover:bg-warning/20' : ''}`}
+                                                className={`rounded-none hidden w-full md:grid grid-cols-[70px_minmax(0,1.2fr)_100px_110px_70px] items-center gap-3 py-3 text-left transition hover:bg-surface-muted/40 ${post.category === 0 ? 'bg-warning/10 hover:bg-warning/20' : ''}`}
                                                 onClick={() => navigate(`/community/${post.id}${window.location.search}`)}
                                             >
                                                 <p>
@@ -372,7 +372,7 @@ const Home = ({ routeParams = {} }: RouteProps) => {
                                             </button>
 
                                             <button
-                                                className={`rounded-none w-full px-4 py-3 text-left md:hidden ${post.category === 0 ? 'bg-warning/10 hover:bg-warning/20' : ''}`}
+                                                className={`rounded-none w-full py-3 text-left md:hidden ${post.category === 0 ? 'bg-warning/10 hover:bg-warning/20' : ''}`}
                                                 onClick={() => navigate(`/community/${post.id}${window.location.search}`)}
                                             >
                                                 <div className='flex items-center justify-between gap-2'>
