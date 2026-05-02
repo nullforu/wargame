@@ -191,7 +191,7 @@ const WriteupDetail = ({ routeParams = {} }: RouteProps) => {
                                             <button className='block max-w-full truncate text-left text-base font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${writeup.author.user_id}`)}>
                                                 {authorName}
                                             </button>
-                                            <p className='mt-1 text-sm text-text-subtle'>{authorAffiliation || t('common.na')}</p>
+                                            {authorAffiliation ? <p className='mt-1 text-sm text-text-subtle'>{authorAffiliation}</p> : null}
                                             <p className='mt-1 max-w-full truncate text-sm text-text-subtle'>{authorBio || t('profile.noBio')}</p>
                                         </div>
                                     </div>

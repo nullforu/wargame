@@ -45,6 +45,9 @@ func AutoMigrate(ctx context.Context, db *bun.DB) error {
 		(*models.ChallengeVote)(nil),
 		(*models.Writeup)(nil),
 		(*models.ChallengeCommentItem)(nil),
+		(*models.CommunityPost)(nil),
+		(*models.CommunityPostLike)(nil),
+		(*models.CommunityComment)(nil),
 	}
 
 	if err := createTables(ctx, db, modelsToCreate); err != nil {
@@ -85,6 +88,13 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 		{name: "idx_writeups_user_challenge", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_writeups_user_challenge ON writeups (user_id, challenge_id)"},
 		{name: "idx_challenge_comments_challenge_created", query: "CREATE INDEX IF NOT EXISTS idx_challenge_comments_challenge_created ON challenge_comments (challenge_id, created_at DESC, id DESC)"},
 		{name: "idx_challenge_comments_user_updated", query: "CREATE INDEX IF NOT EXISTS idx_challenge_comments_user_updated ON challenge_comments (user_id, updated_at DESC, id DESC)"},
+		{name: "idx_community_posts_category_created", query: "CREATE INDEX IF NOT EXISTS idx_community_posts_category_created ON community_posts (category, created_at DESC, id DESC)"},
+		{name: "idx_community_posts_views_created", query: "CREATE INDEX IF NOT EXISTS idx_community_posts_views_created ON community_posts (view_count DESC, created_at DESC, id DESC)"},
+		{name: "idx_community_posts_user_updated", query: "CREATE INDEX IF NOT EXISTS idx_community_posts_user_updated ON community_posts (user_id, updated_at DESC, id DESC)"},
+		{name: "idx_community_post_likes_post_created", query: "CREATE INDEX IF NOT EXISTS idx_community_post_likes_post_created ON community_post_likes (post_id, created_at DESC, user_id DESC)"},
+		{name: "idx_community_post_likes_user_created", query: "CREATE INDEX IF NOT EXISTS idx_community_post_likes_user_created ON community_post_likes (user_id, created_at DESC, post_id DESC)"},
+		{name: "idx_community_comments_post_created", query: "CREATE INDEX IF NOT EXISTS idx_community_comments_post_created ON community_comments (post_id, created_at DESC, id DESC)"},
+		{name: "idx_community_comments_user_updated", query: "CREATE INDEX IF NOT EXISTS idx_community_comments_user_updated ON community_comments (user_id, updated_at DESC, id DESC)"},
 	}
 
 	for _, idx := range indexes {

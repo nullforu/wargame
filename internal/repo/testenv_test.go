@@ -155,7 +155,7 @@ func setupRepoTest(t *testing.T) repoEnv {
 
 func resetRepoState(t *testing.T) {
 	t.Helper()
-	if _, err := repoDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_comments, challenge_votes, writeups, submissions, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := repoDB.ExecContext(context.Background(), "TRUNCATE TABLE community_comments, challenge_comments, challenge_votes, writeups, community_post_likes, community_posts, submissions, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 }

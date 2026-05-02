@@ -163,8 +163,6 @@ const ChallengeInfoPanels = ({
                                         <p className='mt-1 text-sm text-text-subtle'>{formatTimestamp(solver.solved_at)}</p>
                                     </div>
                                 </div>
-
-                                <span className='shrink-0 text-sm text-text-subtle'>{index + 1}</span>
                             </div>
                         ))
                     )}

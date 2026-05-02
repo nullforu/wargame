@@ -46,6 +46,26 @@ func Auth(cfg config.JWTConfig) gin.HandlerFunc {
 	}
 }
 
+func OptionalAuth(cfg config.JWTConfig) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		token, err := ctx.Cookie("access_token")
+		if err != nil || token == "" {
+			ctx.Next()
+			return
+		}
+
+		claims, err := auth.ParseToken(cfg, token)
+		if err != nil || claims.Type != auth.TokenTypeAccess {
+			ctx.Next()
+			return
+		}
+
+		ctx.Set(ctxUserIDKey, claims.UserID)
+		ctx.Set(ctxRoleKey, claims.Role)
+		ctx.Next()
+	}
+}
+
 func RequireRole(role string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		if Role(ctx) != role {
