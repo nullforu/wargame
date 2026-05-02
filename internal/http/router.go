@@ -62,6 +62,7 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		api.GET("/community", middleware.OptionalAuth(cfg.JWT), h.ListCommunityPosts)
 		api.GET("/community/:id", middleware.OptionalAuth(cfg.JWT), h.GetCommunityPost)
 		api.GET("/community/:id/likes", h.CommunityPostLikes)
+		api.GET("/community/:id/comments", h.CommunityComments)
 
 		auth := api.Group("")
 		auth.Use(middleware.Auth(cfg.JWT))
@@ -86,6 +87,9 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		unblocked.PATCH("/community/:id", h.UpdateCommunityPost)
 		unblocked.DELETE("/community/:id", h.DeleteCommunityPost)
 		unblocked.POST("/community/:id/likes", h.ToggleCommunityPostLike)
+		unblocked.POST("/community/:id/comments", h.CreateCommunityComment)
+		unblocked.PATCH("/community/comments/:id", h.UpdateCommunityComment)
+		unblocked.DELETE("/community/comments/:id", h.DeleteCommunityComment)
 		unblocked.POST("/challenges/:id/vote", h.VoteChallengeLevel)
 		unblocked.POST("/challenges/:id/file/download", h.RequestChallengeFileDownload)
 		unblocked.POST("/challenges/:id/stack", h.CreateStack)

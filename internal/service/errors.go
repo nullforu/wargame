@@ -15,6 +15,8 @@ var (
 	ErrChallengeCommentForbidden = errors.New("comment access forbidden")
 	ErrCommunityPostNotFound     = errors.New("community post not found")
 	ErrCommunityForbidden        = errors.New("community access forbidden")
+	ErrCommunityCommentNotFound  = errors.New("community comment not found")
+	ErrCommunityCommentForbidden = errors.New("community comment access forbidden")
 	ErrChallengeFileNotFound     = errors.New("challenge file not found")
 	ErrChallengeLocked           = errors.New("challenge locked")
 	ErrChallengeNotSolvedByUser  = errors.New("challenge not solved by user")

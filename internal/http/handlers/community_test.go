@@ -93,6 +93,45 @@ func TestHandlerCommunityHandlers(t *testing.T) {
 		t.Fatalf("expected 200 for likes list, got %d body=%s", rec.Code, rec.Body.String())
 	}
 
+	ctx, rec = newJSONContext(t, http.MethodPost, "/api/community/"+toStringID(notice.ID)+"/comments", []byte(`{"content":"first comment"}`))
+	ctx.Params = append(ctx.Params, ginParam("id", toStringID(notice.ID)))
+	ctx.Set("userID", user.ID)
+	ctx.Set("role", models.UserRole)
+	env.handler.CreateCommunityComment(ctx)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for comment create, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var createdComment communityCommentResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &createdComment); err != nil {
+		t.Fatalf("decode created comment: %v", err)
+	}
+
+	ctx, rec = newJSONContext(t, http.MethodGet, "/api/community/"+toStringID(notice.ID)+"/comments?page=1&page_size=20", nil)
+	ctx.Params = append(ctx.Params, ginParam("id", toStringID(notice.ID)))
+	env.handler.CommunityComments(ctx)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for comments list, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	ctx, rec = newJSONContext(t, http.MethodPatch, "/api/community/comments/"+toStringID(createdComment.ID), []byte(`{"content":"updated comment"}`))
+	ctx.Params = append(ctx.Params, ginParam("id", toStringID(createdComment.ID)))
+	ctx.Set("userID", user.ID)
+	ctx.Set("role", models.UserRole)
+	env.handler.UpdateCommunityComment(ctx)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for comment update, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	ctx, rec = newJSONContext(t, http.MethodDelete, "/api/community/comments/"+toStringID(createdComment.ID), nil)
+	ctx.Params = append(ctx.Params, ginParam("id", toStringID(createdComment.ID)))
+	ctx.Set("userID", user.ID)
+	ctx.Set("role", models.UserRole)
+	env.handler.DeleteCommunityComment(ctx)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for comment delete, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
 	ctx, rec = newJSONContext(t, http.MethodDelete, "/api/community/"+toStringID(notice.ID), nil)
 	ctx.Params = append(ctx.Params, ginParam("id", toStringID(notice.ID)))
 	ctx.Set("userID", user.ID)
@@ -166,5 +205,30 @@ func TestHandlerCommunityValidationCases(t *testing.T) {
 	env.handler.CommunityPostLikes(ctx)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 invalid likes pagination, got %d", rec.Code)
+	}
+
+	ctx, rec = newJSONContext(t, http.MethodGet, "/api/community/1/comments?page=bad", nil)
+	ctx.Params = append(ctx.Params, ginParam("id", "1"))
+	env.handler.CommunityComments(ctx)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 invalid comments pagination, got %d", rec.Code)
+	}
+
+	ctx, rec = newJSONContext(t, http.MethodPost, "/api/community/1/comments", []byte(`{"content":123}`))
+	ctx.Params = append(ctx.Params, ginParam("id", "1"))
+	ctx.Set("userID", user.ID)
+	ctx.Set("role", models.UserRole)
+	env.handler.CreateCommunityComment(ctx)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 create comment bind error, got %d", rec.Code)
+	}
+
+	ctx, rec = newJSONContext(t, http.MethodPatch, "/api/community/comments/1", []byte(`{"content":null}`))
+	ctx.Params = append(ctx.Params, ginParam("id", "1"))
+	ctx.Set("userID", user.ID)
+	ctx.Set("role", models.UserRole)
+	env.handler.UpdateCommunityComment(ctx)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 update comment null field, got %d", rec.Code)
 	}
 }

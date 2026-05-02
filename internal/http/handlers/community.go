@@ -164,3 +164,90 @@ func (h *Handler) CommunityPostLikes(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, communityPostLikesListResponse{Likes: resp, Pagination: pagination})
 }
+
+func (h *Handler) CommunityComments(ctx *gin.Context) {
+	postID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	rows, pagination, err := h.wargame.CommunityCommentsPage(ctx.Request.Context(), postID, page, pageSize)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]communityCommentResponse, 0, len(rows))
+	for i := range rows {
+		resp = append(resp, newCommunityCommentResponse(rows[i]))
+	}
+
+	ctx.JSON(http.StatusOK, communityCommentsListResponse{Comments: resp, Pagination: pagination})
+}
+
+func (h *Handler) CreateCommunityComment(ctx *gin.Context) {
+	postID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req createCommunityCommentRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	row, err := h.wargame.CreateCommunityComment(ctx.Request.Context(), middleware.UserID(ctx), postID, req.Content)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, newCommunityCommentResponse(*row))
+}
+
+func (h *Handler) UpdateCommunityComment(ctx *gin.Context) {
+	commentID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req updateCommunityCommentRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	content, err := requireNonNullOptionalString("content", req.Content)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	row, svcErr := h.wargame.UpdateCommunityComment(ctx.Request.Context(), middleware.UserID(ctx), commentID, content)
+	if svcErr != nil {
+		writeError(ctx, svcErr)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newCommunityCommentResponse(*row))
+}
+
+func (h *Handler) DeleteCommunityComment(ctx *gin.Context) {
+	commentID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.wargame.DeleteCommunityComment(ctx.Request.Context(), middleware.UserID(ctx), commentID); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+}

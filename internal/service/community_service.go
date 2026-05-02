@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"wargame/internal/models"
 	"wargame/internal/repo"
@@ -14,6 +15,7 @@ import (
 const (
 	maxCommunityTitle   = 200
 	maxCommunityContent = 100000
+	maxCommunityComment = 500
 )
 
 func isValidCommunityCategory(category int) bool {
@@ -310,6 +312,149 @@ func (s *WargameService) CommunityPostLikesPage(ctx context.Context, postID int6
 	rows, totalCount, err := s.communityRepo.LikesByPostPage(ctx, postID, params.Page, params.PageSize)
 	if err != nil {
 		return nil, models.Pagination{}, fmt.Errorf("wargame.CommunityPostLikesPage: %w", err)
+	}
+
+	return rows, BuildPagination(params.Page, params.PageSize, totalCount), nil
+}
+
+func (s *WargameService) CreateCommunityComment(ctx context.Context, userID, postID int64, content string) (*models.CommunityCommentDetail, error) {
+	content = strings.TrimSpace(content)
+	validator := newFieldValidator()
+	validator.PositiveID("user_id", userID)
+	validator.PositiveID("id", postID)
+	validator.Required("content", content)
+	if utf8.RuneCountInString(content) > maxCommunityComment {
+		validator.fields = append(validator.fields, FieldError{Field: "content", Reason: "too_long"})
+	}
+
+	if err := validator.Error(); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.communityRepo.GetByID(ctx, postID); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrCommunityPostNotFound
+		}
+		return nil, fmt.Errorf("wargame.CreateCommunityComment post lookup: %w", err)
+	}
+
+	now := time.Now().UTC()
+	row := &models.CommunityComment{
+		PostID:    postID,
+		UserID:    userID,
+		Content:   content,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := s.communityRepo.CreateComment(ctx, row); err != nil {
+		return nil, fmt.Errorf("wargame.CreateCommunityComment create: %w", err)
+	}
+
+	detail, err := s.communityRepo.GetCommentDetailByID(ctx, row.ID)
+	if err != nil {
+		return nil, fmt.Errorf("wargame.CreateCommunityComment detail: %w", err)
+	}
+
+	return detail, nil
+}
+
+func (s *WargameService) UpdateCommunityComment(ctx context.Context, userID, commentID int64, content *string) (*models.CommunityCommentDetail, error) {
+	validator := newFieldValidator()
+	validator.PositiveID("user_id", userID)
+	validator.PositiveID("id", commentID)
+	if content == nil {
+		validator.fields = append(validator.fields, FieldError{Field: "request", Reason: "empty"})
+	} else {
+		trimmed := strings.TrimSpace(*content)
+		if trimmed == "" {
+			validator.fields = append(validator.fields, FieldError{Field: "content", Reason: "required"})
+		}
+
+		if utf8.RuneCountInString(trimmed) > maxCommunityComment {
+			validator.fields = append(validator.fields, FieldError{Field: "content", Reason: "too_long"})
+		}
+	}
+
+	if err := validator.Error(); err != nil {
+		return nil, err
+	}
+
+	row, err := s.communityRepo.GetCommentByID(ctx, commentID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrCommunityCommentNotFound
+		}
+
+		return nil, fmt.Errorf("wargame.UpdateCommunityComment lookup: %w", err)
+	}
+
+	if row.UserID != userID {
+		return nil, ErrCommunityCommentForbidden
+	}
+
+	row.Content = strings.TrimSpace(*content)
+	row.UpdatedAt = time.Now().UTC()
+	if err := s.communityRepo.UpdateComment(ctx, row); err != nil {
+		return nil, fmt.Errorf("wargame.UpdateCommunityComment update: %w", err)
+	}
+
+	detail, err := s.communityRepo.GetCommentDetailByID(ctx, commentID)
+	if err != nil {
+		return nil, fmt.Errorf("wargame.UpdateCommunityComment detail: %w", err)
+	}
+
+	return detail, nil
+}
+
+func (s *WargameService) DeleteCommunityComment(ctx context.Context, userID, commentID int64) error {
+	validator := newFieldValidator()
+	validator.PositiveID("user_id", userID)
+	validator.PositiveID("id", commentID)
+	if err := validator.Error(); err != nil {
+		return err
+	}
+
+	row, err := s.communityRepo.GetCommentByID(ctx, commentID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return ErrCommunityCommentNotFound
+		}
+
+		return fmt.Errorf("wargame.DeleteCommunityComment lookup: %w", err)
+	}
+
+	if row.UserID != userID {
+		return ErrCommunityCommentForbidden
+	}
+
+	if err := s.communityRepo.DeleteCommentByID(ctx, commentID); err != nil {
+		return fmt.Errorf("wargame.DeleteCommunityComment delete: %w", err)
+	}
+
+	return nil
+}
+
+func (s *WargameService) CommunityCommentsPage(ctx context.Context, postID int64, page, pageSize int) ([]models.CommunityCommentDetail, models.Pagination, error) {
+	if postID <= 0 {
+		return nil, models.Pagination{}, ErrInvalidInput
+	}
+
+	params, err := NormalizePagination(page, pageSize)
+	if err != nil {
+		return nil, models.Pagination{}, err
+	}
+
+	if _, err := s.communityRepo.GetByID(ctx, postID); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, models.Pagination{}, ErrCommunityPostNotFound
+		}
+
+		return nil, models.Pagination{}, fmt.Errorf("wargame.CommunityCommentsPage post lookup: %w", err)
+	}
+
+	rows, totalCount, err := s.communityRepo.CommentsByPostPage(ctx, postID, params.Page, params.PageSize)
+	if err != nil {
+		return nil, models.Pagination{}, fmt.Errorf("wargame.CommunityCommentsPage list: %w", err)
 	}
 
 	return rows, BuildPagination(params.Page, params.PageSize, totalCount), nil

@@ -5,7 +5,7 @@ import { useApi } from '../lib/useApi'
 import { useAuth } from '../lib/auth'
 import { getLocaleTag, useLocale, useT } from '../lib/i18n'
 import { navigate } from '../lib/router'
-import type { CommunityPost, CommunityPostLike, PaginationMeta } from '../lib/types'
+import type { CommunityComment, CommunityPost, CommunityPostLike, PaginationMeta } from '../lib/types'
 import { formatApiError, formatDateTime, parseRouteId } from '../lib/utils'
 import { categoryTextKey, categoryBadgeClass } from './Community'
 
@@ -13,6 +13,8 @@ interface RouteProps {
     routeParams?: Record<string, string>
 }
 const EMPTY_LIKE_PAGINATION: PaginationMeta = { page: 1, page_size: 20, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
+const EMPTY_COMMENT_PAGINATION: PaginationMeta = { page: 1, page_size: 10, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
+const COMMENT_PAGE_SIZE = 10
 
 const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
     const t = useT()
@@ -34,6 +36,15 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
     const [likePage, setLikePage] = useState(1)
     const [likePagination, setLikePagination] = useState<PaginationMeta>(EMPTY_LIKE_PAGINATION)
     const [likeSubmitting, setLikeSubmitting] = useState(false)
+    const [comments, setComments] = useState<CommunityComment[]>([])
+    const [commentPage, setCommentPage] = useState(1)
+    const [commentPagination, setCommentPagination] = useState<PaginationMeta>(EMPTY_COMMENT_PAGINATION)
+    const [commentInput, setCommentInput] = useState('')
+    const [commentInputExpanded, setCommentInputExpanded] = useState(false)
+    const [commentLoading, setCommentLoading] = useState(true)
+    const [commentSubmitting, setCommentSubmitting] = useState(false)
+    const [editingCommentID, setEditingCommentID] = useState<number | null>(null)
+    const [editingCommentContent, setEditingCommentContent] = useState('')
 
     const listQuery = useMemo(() => {
         if (typeof window === 'undefined') return ''
@@ -75,6 +86,24 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
         }
         void loadLikes()
     }, [api, postID, likePage])
+
+    useEffect(() => {
+        if (!postID) return
+        const loadComments = async () => {
+            setCommentLoading(true)
+            try {
+                const data = await api.communityComments(postID, commentPage, COMMENT_PAGE_SIZE)
+                setComments(data.comments)
+                setCommentPagination(data.pagination)
+            } catch {
+                setComments([])
+                setCommentPagination(EMPTY_COMMENT_PAGINATION)
+            } finally {
+                setCommentLoading(false)
+            }
+        }
+        void loadComments()
+    }, [api, postID, commentPage])
 
     if (!postID) return <p className='text-sm text-danger'>{t('errors.invalid')}</p>
     if (loading) return <p className='text-sm text-text-muted'>{t('common.loading')}</p>
@@ -155,6 +184,8 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
                             <span className='text-xs text-text-subtle'>{t('community.views', { count: post.view_count })}</span>
                             <span className='text-xs text-text-subtle'>·</span>
                             <span className='text-xs text-text-subtle'>{t('community.likes', { count: post.like_count })}</span>
+                            <span className='text-xs text-text-subtle'>·</span>
+                            <span className='text-xs text-text-subtle'>{t('community.comments', { count: post.comment_count })}</span>
                         </div>
                         {editing ? (
                             <div className='mt-3 space-y-2'>
@@ -191,6 +222,25 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
                                 {t('common.updatedAt')}: {formatDateTime(post.updated_at, localeTag)}
                             </p>
                         ) : null}
+                    </section>
+
+                    <section className='space-y-3 px-1 lg:hidden'>
+                        <h2 className='text-xl font-semibold text-text'>{t('community.authorTitle')}</h2>
+
+                        <div className='rounded-2xl bg-surface/70'>
+                            <div className='flex items-start justify-between gap-4 py-2'>
+                                <div className='min-w-0 flex flex-1 items-center gap-3.75'>
+                                    <UserAvatar username={post.author.username} size='md' />
+                                    <div className='min-w-0'>
+                                        <button className='block max-w-full truncate text-left text-lg font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${post.author.user_id}`)}>
+                                            {post.author.username}
+                                        </button>
+                                        {post.author.affiliation ? <p className='mt-1 text-sm text-text-subtle'>{post.author.affiliation.trim()}</p> : null}
+                                        <p className='mt-1 max-w-full truncate text-sm text-text-subtle'>{post.author.bio?.trim() || t('profile.noBio')}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </section>
 
                     <section className='flex flex-col items-center gap-2 pt-5'>
@@ -234,14 +284,200 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
                         </div>
                     ) : null}
 
+                    <section className='space-y-3 pt-4 lg:pt-10'>
+                        <h2 className='text-xl font-semibold text-text'>
+                            {t('community.commentsTitle')} <span className='text-accent'>{post.comment_count}</span>
+                        </h2>
+
+                        <div className='rounded-lg border border-border/70 bg-surface'>
+                            <textarea
+                                className={`w-full resize-none border-0 bg-transparent p-3 text-sm text-text outline-none placeholder:text-text-subtle/80 ${commentInputExpanded ? 'h-24 rounded-t-lg' : 'h-12 rounded-lg'}`}
+                                placeholder={t('community.commentPlaceholder')}
+                                maxLength={500}
+                                value={commentInput}
+                                id='comment-input'
+                                onChange={(e) => setCommentInput(e.target.value)}
+                                onFocus={() => setCommentInputExpanded(true)}
+                                onClick={() => setCommentInputExpanded(true)}
+                                disabled={!auth.user || commentSubmitting}
+                            />
+                            {commentInputExpanded ? (
+                                <div className='flex items-center justify-between border-t border-border/70 px-3 py-2'>
+                                    <span className='text-xs text-text-subtle'>{commentInput.length}/500</span>
+                                    <div className='flex items-center gap-2'>
+                                        <button
+                                            className='rounded border border-border px-2 py-1 text-xs'
+                                            onClick={() => {
+                                                setCommentInput('')
+                                                setCommentInputExpanded(false)
+                                            }}
+                                            disabled={commentSubmitting}
+                                        >
+                                            {t('common.cancel')}
+                                        </button>
+                                        <button
+                                            className='rounded border border-border px-2 py-1 text-xs disabled:opacity-40'
+                                            disabled={!auth.user || commentSubmitting || commentInput.trim().length === 0}
+                                            onClick={async () => {
+                                                if (!postID) return
+                                                setCommentSubmitting(true)
+                                                try {
+                                                    await api.createCommunityComment(postID, commentInput)
+                                                    setCommentInput('')
+                                                    setCommentInputExpanded(false)
+                                                    const data = await api.communityComments(postID, 1, COMMENT_PAGE_SIZE)
+                                                    setCommentPage(1)
+                                                    setComments(data.comments)
+                                                    setCommentPagination(data.pagination)
+                                                    setPost((prev) => (prev ? { ...prev, comment_count: data.pagination.total_count } : prev))
+                                                } catch (e) {
+                                                    setError(formatApiError(e, t).message)
+                                                } finally {
+                                                    setCommentSubmitting(false)
+                                                }
+                                            }}
+                                        >
+                                            {t('community.commentSubmit')}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
+                        {!auth.user ? <p className='text-xs text-warning'>{t('community.commentLoginRequired')}</p> : null}
+
+                        <div className='space-y-3'>
+                            {commentLoading ? (
+                                <div className='space-y-3'>
+                                    {[0, 1].map((idx) => (
+                                        <div key={idx} className='rounded-lg bg-surface/50 animate-pulse'>
+                                            <div className='flex items-center justify-between'>
+                                                <div className='h-4 w-24 rounded bg-surface-muted' />
+                                                <div className='h-3 w-28 rounded bg-surface-muted' />
+                                            </div>
+                                            <div className='mt-3 h-3 w-full rounded bg-surface-muted' />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : null}
+                            {!commentLoading &&
+                                comments.map((item) => {
+                                    const isMine = auth.user?.id === item.author.user_id
+                                    const isEditing = editingCommentID === item.id
+                                    return (
+                                        <div key={item.id} className='rounded-lg bg-surface/50 px-2 py-3'>
+                                            <div className='flex items-start justify-between gap-2'>
+                                                <div className='flex min-w-0 items-center gap-2'>
+                                                    <UserAvatar username={item.author.username} size='sm' />
+                                                    <span className='truncate text-sm font-semibold text-text'>{item.author.username}</span>
+                                                </div>
+                                                <span className='shrink-0 text-xs text-text-subtle'>{formatDateTime(item.created_at, localeTag)}</span>
+                                            </div>
+                                            {isEditing ? (
+                                                <div className='mt-2 space-y-2'>
+                                                    <textarea
+                                                        className='w-full rounded border border-border bg-surface px-2 py-1 text-sm'
+                                                        value={editingCommentContent}
+                                                        onChange={(e) => setEditingCommentContent(e.target.value)}
+                                                        maxLength={500}
+                                                    />
+                                                    <div className='flex gap-2'>
+                                                        <button className='rounded border border-border px-2 py-1 text-xs' onClick={() => setEditingCommentID(null)}>
+                                                            {t('common.cancel')}
+                                                        </button>
+                                                        <button
+                                                            className='rounded bg-accent px-2 py-1 text-xs text-white'
+                                                            onClick={async () => {
+                                                                setCommentSubmitting(true)
+                                                                try {
+                                                                    await api.updateCommunityComment(item.id, { content: editingCommentContent })
+                                                                    setEditingCommentID(null)
+                                                                    const data = await api.communityComments(post.id, commentPage, COMMENT_PAGE_SIZE)
+                                                                    setComments(data.comments)
+                                                                } catch (e) {
+                                                                    setError(formatApiError(e, t).message)
+                                                                } finally {
+                                                                    setCommentSubmitting(false)
+                                                                }
+                                                            }}
+                                                        >
+                                                            {t('common.save')}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <p className='mt-2 whitespace-pre-wrap wrap-break-word text-sm text-text'>{item.content}</p>
+                                            )}
+                                            {isMine && !isEditing ? (
+                                                <div className='mt-2 flex gap-3 text-xs'>
+                                                    <button
+                                                        className='text-accent'
+                                                        onClick={() => {
+                                                            setEditingCommentID(item.id)
+                                                            setEditingCommentContent(item.content)
+                                                        }}
+                                                    >
+                                                        {t('common.edit')}
+                                                    </button>
+                                                    <button
+                                                        className='text-danger'
+                                                        onClick={async () => {
+                                                            setCommentSubmitting(true)
+                                                            try {
+                                                                await api.deleteCommunityComment(item.id)
+                                                                const targetPage = comments.length === 1 && commentPage > 1 ? commentPage - 1 : commentPage
+                                                                const data = await api.communityComments(post.id, targetPage, COMMENT_PAGE_SIZE)
+                                                                setCommentPage(targetPage)
+                                                                setComments(data.comments)
+                                                                setCommentPagination(data.pagination)
+                                                                setPost((prev) => (prev ? { ...prev, comment_count: data.pagination.total_count } : prev))
+                                                            } catch (e) {
+                                                                setError(formatApiError(e, t).message)
+                                                            } finally {
+                                                                setCommentSubmitting(false)
+                                                            }
+                                                        }}
+                                                    >
+                                                        {t('common.delete')}
+                                                    </button>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    )
+                                })}
+                            {!commentLoading && comments.length === 0 ? <p className='text-sm text-text-muted'>{t('community.commentEmpty')}</p> : null}
+                        </div>
+
+                        <div className='flex items-center justify-between pt-1 text-sm text-text-muted'>
+                            <span>
+                                {commentPagination.page} / {commentPagination.total_pages || 1}
+                            </span>
+                            <div className='flex gap-2'>
+                                <button
+                                    className='rounded-lg bg-surface-muted px-3 py-1.5 hover:bg-surface-subtle disabled:opacity-50'
+                                    disabled={!commentPagination.has_prev || commentLoading}
+                                    onClick={() => setCommentPage((prev) => Math.max(1, prev - 1))}
+                                >
+                                    {t('common.previous')}
+                                </button>
+                                <button
+                                    className='rounded-lg bg-surface-muted px-3 py-1.5 hover:bg-surface-subtle disabled:opacity-50'
+                                    disabled={!commentPagination.has_next || commentLoading}
+                                    onClick={() => setCommentPage((prev) => prev + 1)}
+                                >
+                                    {t('common.next')}
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
                     {error ? <p className='text-xs text-danger'>{error}</p> : null}
                 </article>
 
                 <aside className='space-y-6'>
                     <section className='space-y-3 px-1'>
-                        <h2 className='text-xl font-semibold text-text'>{t('community.authorTitle')}</h2>
+                        <h2 className='hidden lg:block text-xl font-semibold text-text'>{t('community.authorTitle')}</h2>
 
-                        <div className='rounded-2xl bg-surface/70'>
+                        <div className='hidden lg:block rounded-2xl bg-surface/70'>
                             <div className='flex items-start justify-between gap-4 py-2'>
                                 <div className='min-w-0 flex flex-1 items-center gap-3.75'>
                                     <UserAvatar username={post.author.username} size='md' />

@@ -318,10 +318,28 @@ export interface CommunityPost {
     content: string
     view_count: number
     like_count: number
+    comment_count: number
     liked_by_me: boolean
     created_at: string
     updated_at: string
     author: CommunityPostAuthor
+}
+
+export interface CommunityComment {
+    id: number
+    content: string
+    created_at: string
+    updated_at: string
+    author: ChallengeCommentItemAuthor
+    post: {
+        id: number
+        title: string
+    }
+}
+
+export interface CommunityCommentPageResponse {
+    comments: CommunityComment[]
+    pagination: PaginationMeta
 }
 
 export interface CommunityPostLike {

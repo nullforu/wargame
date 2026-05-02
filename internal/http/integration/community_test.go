@@ -119,6 +119,40 @@ func TestCommunityIntegrationFlow(t *testing.T) {
 		t.Fatalf("unexpected likes list %+v", likesList)
 	}
 
+	rec = doRequest(t, env.router, http.MethodPost, "/api/community/"+itoa(notice.ID)+"/comments", map[string]any{"content": "first comment"}, authHeader(userAccess))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create comment status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var createdComment struct {
+		ID int64 `json:"id"`
+	}
+	decodeJSON(t, rec, &createdComment)
+
+	rec = doRequest(t, env.router, http.MethodPatch, "/api/community/comments/"+itoa(createdComment.ID), map[string]any{"content": "updated comment"}, authHeader(userAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update comment status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/community/"+itoa(notice.ID)+"/comments?page=1&page_size=10", nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("comments list status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var commentsListed struct {
+		Comments []struct {
+			ID      int64  `json:"id"`
+			Content string `json:"content"`
+		} `json:"comments"`
+		Pagination struct {
+			TotalCount int `json:"total_count"`
+		} `json:"pagination"`
+	}
+	decodeJSON(t, rec, &commentsListed)
+	if len(commentsListed.Comments) != 1 || commentsListed.Comments[0].ID != createdComment.ID || commentsListed.Pagination.TotalCount != 1 {
+		t.Fatalf("unexpected comments list %+v", commentsListed)
+	}
+
 	rec = doRequest(t, env.router, http.MethodGet, "/api/community/"+itoa(notice.ID), nil, authHeader(userAccess))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("detail with auth status %d: %s", rec.Code, rec.Body.String())
@@ -126,13 +160,18 @@ func TestCommunityIntegrationFlow(t *testing.T) {
 
 	var authedDetail struct {
 		Post struct {
-			LikedByMe bool `json:"liked_by_me"`
-			LikeCount int  `json:"like_count"`
+			LikedByMe    bool `json:"liked_by_me"`
+			LikeCount    int  `json:"like_count"`
+			CommentCount int  `json:"comment_count"`
 		} `json:"post"`
 	}
 	decodeJSON(t, rec, &authedDetail)
 	if !authedDetail.Post.LikedByMe || authedDetail.Post.LikeCount != 1 {
 		t.Fatalf("unexpected authed detail %+v", authedDetail)
+	}
+
+	if authedDetail.Post.CommentCount != 1 {
+		t.Fatalf("expected comment_count 1, got %+v", authedDetail)
 	}
 
 	for i := 0; i < models.PopularPostLikeThreshold-1; i += 1 {
@@ -168,5 +207,10 @@ func TestCommunityIntegrationFlow(t *testing.T) {
 	rec = doRequest(t, env.router, http.MethodDelete, "/api/community/"+itoa(notice.ID), nil, authHeader(userAccess))
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("expected forbidden delete notice by user, got %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodDelete, "/api/community/comments/"+itoa(createdComment.ID), nil, authHeader(userAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete comment status %d: %s", rec.Code, rec.Body.String())
 	}
 }

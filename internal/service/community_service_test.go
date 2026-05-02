@@ -160,6 +160,80 @@ func TestWargameServiceCommunityValidationAndNotFound(t *testing.T) {
 	}
 }
 
+func TestWargameServiceCommunityComments(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "community-comment-user@example.com", "community-comment-user", "pass", models.UserRole)
+	other := createUser(t, env, "community-comment-other@example.com", "community-comment-other", "pass", models.UserRole)
+	post, err := env.wargameSvc.CreateCommunityPost(context.Background(), user.ID, models.UserRole, models.CommunityCategoryFree, "free", "body")
+	if err != nil {
+		t.Fatalf("create post: %v", err)
+	}
+
+	if _, err := env.wargameSvc.CreateCommunityComment(context.Background(), 0, post.ID, "x"); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid user id, got %v", err)
+	}
+
+	if _, err := env.wargameSvc.CreateCommunityComment(context.Background(), user.ID, post.ID, "  "); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid empty content, got %v", err)
+	}
+
+	if _, err := env.wargameSvc.CreateCommunityComment(context.Background(), user.ID, 999999, "x"); !errors.Is(err, ErrCommunityPostNotFound) {
+		t.Fatalf("expected missing post, got %v", err)
+	}
+
+	c1, err := env.wargameSvc.CreateCommunityComment(context.Background(), user.ID, post.ID, " first ")
+	if err != nil || c1.Content != "first" {
+		t.Fatalf("create comment failed row=%+v err=%v", c1, err)
+	}
+
+	if _, err := env.wargameSvc.UpdateCommunityComment(context.Background(), user.ID, c1.ID, nil); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected empty update request, got %v", err)
+	}
+
+	if _, err := env.wargameSvc.UpdateCommunityComment(context.Background(), other.ID, c1.ID, strPtr("hack")); !errors.Is(err, ErrCommunityCommentForbidden) {
+		t.Fatalf("expected forbidden update, got %v", err)
+	}
+
+	updated, err := env.wargameSvc.UpdateCommunityComment(context.Background(), user.ID, c1.ID, strPtr(" updated "))
+	if err != nil || updated.Content != "updated" {
+		t.Fatalf("update comment failed row=%+v err=%v", updated, err)
+	}
+
+	if err := env.wargameSvc.DeleteCommunityComment(context.Background(), other.ID, c1.ID); !errors.Is(err, ErrCommunityCommentForbidden) {
+		t.Fatalf("expected forbidden delete, got %v", err)
+	}
+
+	if _, err := env.wargameSvc.CreateCommunityComment(context.Background(), other.ID, post.ID, "second"); err != nil {
+		t.Fatalf("create second: %v", err)
+	}
+
+	rows, pag, err := env.wargameSvc.CommunityCommentsPage(context.Background(), post.ID, 1, 1)
+	if err != nil || len(rows) != 1 || pag.TotalCount != 2 {
+		t.Fatalf("comments page mismatch rows=%d pag=%+v err=%v", len(rows), pag, err)
+	}
+
+	postDetail, err := env.wargameSvc.CommunityPostByID(context.Background(), post.ID, user.ID, false)
+	if err != nil || postDetail.CommentCount != 2 {
+		t.Fatalf("expected post comment_count=2 row=%+v err=%v", postDetail, err)
+	}
+
+	if err := env.wargameSvc.DeleteCommunityComment(context.Background(), user.ID, c1.ID); err != nil {
+		t.Fatalf("delete own comment: %v", err)
+	}
+
+	if err := env.wargameSvc.DeleteCommunityComment(context.Background(), user.ID, c1.ID); !errors.Is(err, ErrCommunityCommentNotFound) {
+		t.Fatalf("expected not found after delete, got %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.CommunityCommentsPage(context.Background(), 0, 1, 20); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid id page, got %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.CommunityCommentsPage(context.Background(), 999999, 1, 20); !errors.Is(err, ErrCommunityPostNotFound) {
+		t.Fatalf("expected missing post page, got %v", err)
+	}
+}
+
 func strPtr(v string) *string { return &v }
 func intPtr(v int) *int       { return &v }
 func toString(v int) string {

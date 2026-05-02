@@ -185,4 +185,56 @@ func TestCommunityRepoAdditionalBranches(t *testing.T) {
 	}
 }
 
+func TestCommunityRepoComments(t *testing.T) {
+	env := setupRepoTest(t)
+	u1 := createUser(t, env, "cc1@example.com", "cc1", "pass", models.UserRole)
+	u2 := createUser(t, env, "cc2@example.com", "cc2", "pass", models.UserRole)
+	r := NewCommunityRepo(env.db)
+	post := &models.CommunityPost{UserID: u1.ID, Category: models.CommunityCategoryFree, Title: "post", Content: "body", ViewCount: 0, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	if err := r.Create(context.Background(), post); err != nil {
+		t.Fatalf("create post: %v", err)
+	}
+
+	c1 := &models.CommunityComment{PostID: post.ID, UserID: u1.ID, Content: "first", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	c2 := &models.CommunityComment{PostID: post.ID, UserID: u2.ID, Content: "second", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	if err := r.CreateComment(context.Background(), c1); err != nil {
+		t.Fatalf("create c1: %v", err)
+	}
+	if err := r.CreateComment(context.Background(), c2); err != nil {
+		t.Fatalf("create c2: %v", err)
+	}
+
+	got, err := r.GetCommentByID(context.Background(), c1.ID)
+	if err != nil || got.Content != "first" {
+		t.Fatalf("get c1: row=%+v err=%v", got, err)
+	}
+	got.Content = "first-updated"
+	got.UpdatedAt = time.Now().UTC()
+	if err := r.UpdateComment(context.Background(), got); err != nil {
+		t.Fatalf("update comment: %v", err)
+	}
+
+	detail, err := r.GetCommentDetailByID(context.Background(), c1.ID)
+	if err != nil || detail.PostID != post.ID || detail.PostTitle != post.Title || detail.Content != "first-updated" {
+		t.Fatalf("detail mismatch row=%+v err=%v", detail, err)
+	}
+
+	rows, total, err := r.CommentsByPostPage(context.Background(), post.ID, 1, 20)
+	if err != nil || total != 2 || len(rows) != 2 {
+		t.Fatalf("comments page mismatch total=%d len=%d err=%v", total, len(rows), err)
+	}
+
+	postDetail, err := r.GetDetailByID(context.Background(), post.ID, u1.ID)
+	if err != nil || postDetail.CommentCount != 2 {
+		t.Fatalf("expected comment_count=2 detail=%+v err=%v", postDetail, err)
+	}
+
+	if err := r.DeleteCommentByID(context.Background(), c1.ID); err != nil {
+		t.Fatalf("delete comment: %v", err)
+	}
+	if _, err := r.GetCommentByID(context.Background(), c1.ID); err == nil {
+		t.Fatalf("expected deleted comment not found")
+	}
+}
+
 func itoa(v int) string { return fmt.Sprintf("%d", v) }

@@ -122,6 +122,12 @@ func mapError(err error) (int, errorResponse, map[string]string) {
 	case errors.Is(err, service.ErrCommunityForbidden):
 		status = http.StatusForbidden
 		resp.Error = service.ErrCommunityForbidden.Error()
+	case errors.Is(err, service.ErrCommunityCommentNotFound):
+		status = http.StatusNotFound
+		resp.Error = service.ErrCommunityCommentNotFound.Error()
+	case errors.Is(err, service.ErrCommunityCommentForbidden):
+		status = http.StatusForbidden
+		resp.Error = service.ErrCommunityCommentForbidden.Error()
 	case errors.Is(err, service.ErrChallengeFileNotFound):
 		status = http.StatusNotFound
 		resp.Error = service.ErrChallengeFileNotFound.Error()

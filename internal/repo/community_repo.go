@@ -90,6 +90,7 @@ func (r *CommunityRepo) baseDetailQuery() *bun.SelectQuery {
 		ColumnExpr("cp.content").
 		ColumnExpr("cp.view_count").
 		ColumnExpr("(SELECT COUNT(*) FROM community_post_likes AS cpl WHERE cpl.post_id = cp.id) AS like_count").
+		ColumnExpr("(SELECT COUNT(*) FROM community_comments AS cpc WHERE cpc.post_id = cp.id) AS comment_count").
 		ColumnExpr("cp.created_at").
 		ColumnExpr("cp.updated_at").
 		ColumnExpr("u.username").
@@ -235,6 +236,94 @@ func (r *CommunityRepo) LikesByPostPage(ctx context.Context, postID int64, page,
 		}
 
 		return nil, 0, wrapError("communityRepo.LikesByPostPage list", err)
+	}
+
+	return rows, totalCount, nil
+}
+
+func (r *CommunityRepo) CreateComment(ctx context.Context, comment *models.CommunityComment) error {
+	if _, err := r.db.NewInsert().Model(comment).Exec(ctx); err != nil {
+		return wrapError("communityRepo.CreateComment", err)
+	}
+
+	return nil
+}
+
+func (r *CommunityRepo) UpdateComment(ctx context.Context, comment *models.CommunityComment) error {
+	if _, err := r.db.NewUpdate().
+		Model(comment).
+		Column("content", "updated_at").
+		WherePK().
+		Exec(ctx); err != nil {
+		return wrapError("communityRepo.UpdateComment", err)
+	}
+
+	return nil
+}
+
+func (r *CommunityRepo) DeleteCommentByID(ctx context.Context, commentID int64) error {
+	if _, err := r.db.NewDelete().
+		Model((*models.CommunityComment)(nil)).
+		Where("id = ?", commentID).
+		Exec(ctx); err != nil {
+		return wrapError("communityRepo.DeleteCommentByID", err)
+	}
+
+	return nil
+}
+
+func (r *CommunityRepo) GetCommentByID(ctx context.Context, commentID int64) (*models.CommunityComment, error) {
+	row := new(models.CommunityComment)
+	if err := r.db.NewSelect().Model(row).Where("id = ?", commentID).Limit(1).Scan(ctx); err != nil {
+		return nil, wrapNotFound("communityRepo.GetCommentByID", err)
+	}
+
+	return row, nil
+}
+
+func (r *CommunityRepo) commentDetailBaseQuery() *bun.SelectQuery {
+	return r.db.NewSelect().
+		TableExpr("community_comments AS cc").
+		ColumnExpr("cc.id").
+		ColumnExpr("cc.post_id").
+		ColumnExpr("cc.user_id").
+		ColumnExpr("cc.content").
+		ColumnExpr("cc.created_at").
+		ColumnExpr("cc.updated_at").
+		ColumnExpr("u.username").
+		ColumnExpr("u.affiliation_id").
+		ColumnExpr("aff.name AS affiliation").
+		ColumnExpr("u.bio").
+		ColumnExpr("cp.title AS post_title").
+		Join("JOIN users AS u ON u.id = cc.user_id").
+		Join("JOIN community_posts AS cp ON cp.id = cc.post_id").
+		Join("LEFT JOIN affiliations AS aff ON aff.id = u.affiliation_id")
+}
+
+func (r *CommunityRepo) GetCommentDetailByID(ctx context.Context, commentID int64) (*models.CommunityCommentDetail, error) {
+	row := new(models.CommunityCommentDetail)
+	if err := r.commentDetailBaseQuery().Where("cc.id = ?", commentID).Limit(1).Scan(ctx, row); err != nil {
+		return nil, wrapNotFound("communityRepo.GetCommentDetailByID", err)
+	}
+
+	return row, nil
+}
+
+func (r *CommunityRepo) CommentsByPostPage(ctx context.Context, postID int64, page, pageSize int) ([]models.CommunityCommentDetail, int, error) {
+	rows := make([]models.CommunityCommentDetail, 0, pageSize)
+	base := r.commentDetailBaseQuery().Where("cc.post_id = ?", postID)
+
+	totalCount, err := r.db.NewSelect().TableExpr("(?) AS comments", base).ColumnExpr("comments.id").Count(ctx)
+	if err != nil {
+		return nil, 0, wrapError("communityRepo.CommentsByPostPage count", err)
+	}
+
+	if err := base.OrderExpr("cc.created_at DESC, cc.id DESC").Limit(pageSize).Offset((page-1)*pageSize).Scan(ctx, &rows); err != nil {
+		if err == sql.ErrNoRows {
+			return rows, totalCount, nil
+		}
+
+		return nil, 0, wrapError("communityRepo.CommentsByPostPage list", err)
 	}
 
 	return rows, totalCount, nil

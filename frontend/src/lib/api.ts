@@ -13,6 +13,8 @@ import type {
     ChallengeWriteupsResponse,
     ChallengeCommentPageResponse,
     ChallengeCommentItem,
+    CommunityComment,
+    CommunityCommentPageResponse,
     CommunityPost,
     CommunityPostLike,
     CommunityPostLikesResponse,
@@ -430,6 +432,30 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
                 pagination: normalizePagination(data?.pagination),
             } as CommunityPostLikesResponse
         },
+        communityComments: async (id: number, page?: number, pageSize?: number) => {
+            const data = await request<Partial<CommunityCommentPageResponse>>(withPagination(`/api/community/${id}/comments`, page, pageSize))
+            return {
+                comments: Array.isArray(data?.comments) ? (data.comments as CommunityComment[]) : [],
+                pagination: normalizePagination(data?.pagination),
+            } as CommunityCommentPageResponse
+        },
+        createCommunityComment: (postID: number, content: string) =>
+            request<CommunityComment>(`/api/community/${postID}/comments`, {
+                method: 'POST',
+                body: { content },
+                auth: true,
+            }),
+        updateCommunityComment: (commentID: number, payload: { content?: string }) =>
+            request<CommunityComment>(`/api/community/comments/${commentID}`, {
+                method: 'PATCH',
+                body: payload,
+                auth: true,
+            }),
+        deleteCommunityComment: (commentID: number) =>
+            request<{ status?: string }>(`/api/community/comments/${commentID}`, {
+                method: 'DELETE',
+                auth: true,
+            }),
         writeup: async (id: number) => {
             const data = await request<Partial<WriteupDetailResponse>>(`/api/writeups/${id}`, { auth: true })
             return {

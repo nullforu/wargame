@@ -133,6 +133,14 @@ type updateCommunityPostRequest struct {
 	Content  optionalString `json:"content"`
 }
 
+type createCommunityCommentRequest struct {
+	Content string `json:"content" binding:"required"`
+}
+
+type updateCommunityCommentRequest struct {
+	Content optionalString `json:"content"`
+}
+
 type adminBlockUserRequest struct {
 	Reason string `json:"reason" binding:"required"`
 }
@@ -348,16 +356,17 @@ type communityPostAuthorResponse struct {
 }
 
 type communityPostResponse struct {
-	ID        int64                       `json:"id"`
-	Category  int                         `json:"category"`
-	Title     string                      `json:"title"`
-	Content   string                      `json:"content"`
-	ViewCount int                         `json:"view_count"`
-	LikeCount int                         `json:"like_count"`
-	LikedByMe bool                        `json:"liked_by_me"`
-	CreatedAt time.Time                   `json:"created_at"`
-	UpdatedAt time.Time                   `json:"updated_at"`
-	Author    communityPostAuthorResponse `json:"author"`
+	ID           int64                       `json:"id"`
+	Category     int                         `json:"category"`
+	Title        string                      `json:"title"`
+	Content      string                      `json:"content"`
+	ViewCount    int                         `json:"view_count"`
+	LikeCount    int                         `json:"like_count"`
+	CommentCount int                         `json:"comment_count"`
+	LikedByMe    bool                        `json:"liked_by_me"`
+	CreatedAt    time.Time                   `json:"created_at"`
+	UpdatedAt    time.Time                   `json:"updated_at"`
+	Author       communityPostAuthorResponse `json:"author"`
 }
 
 type communityPostsListResponse struct {
@@ -381,6 +390,23 @@ type communityPostLikeResponse struct {
 type communityPostLikesListResponse struct {
 	Likes      []communityPostLikeResponse `json:"likes,omitempty"`
 	Pagination models.Pagination           `json:"pagination"`
+}
+
+type communityCommentResponse struct {
+	ID        int64                 `json:"id"`
+	Content   string                `json:"content"`
+	CreatedAt time.Time             `json:"created_at"`
+	UpdatedAt time.Time             `json:"updated_at"`
+	Author    commentAuthorResponse `json:"author"`
+	Post      struct {
+		ID    int64  `json:"id"`
+		Title string `json:"title"`
+	} `json:"post"`
+}
+
+type communityCommentsListResponse struct {
+	Comments   []communityCommentResponse `json:"comments,omitempty"`
+	Pagination models.Pagination          `json:"pagination"`
 }
 
 type communityLikeToggleResponse struct {
@@ -672,15 +698,16 @@ func newChallengeCommentResponse(row models.ChallengeCommentDetail) challengeCom
 
 func newCommunityPostResponse(row models.CommunityPostDetail) communityPostResponse {
 	return communityPostResponse{
-		ID:        row.ID,
-		Category:  row.Category,
-		Title:     row.Title,
-		Content:   row.Content,
-		ViewCount: row.ViewCount,
-		LikeCount: row.LikeCount,
-		LikedByMe: row.LikedByMe,
-		CreatedAt: row.CreatedAt.UTC(),
-		UpdatedAt: row.UpdatedAt.UTC(),
+		ID:           row.ID,
+		Category:     row.Category,
+		Title:        row.Title,
+		Content:      row.Content,
+		ViewCount:    row.ViewCount,
+		LikeCount:    row.LikeCount,
+		CommentCount: row.CommentCount,
+		LikedByMe:    row.LikedByMe,
+		CreatedAt:    row.CreatedAt.UTC(),
+		UpdatedAt:    row.UpdatedAt.UTC(),
 		Author: communityPostAuthorResponse{
 			UserID:        row.UserID,
 			Username:      row.Username,
@@ -689,6 +716,25 @@ func newCommunityPostResponse(row models.CommunityPostDetail) communityPostRespo
 			Bio:           row.Bio,
 		},
 	}
+}
+
+func newCommunityCommentResponse(row models.CommunityCommentDetail) communityCommentResponse {
+	resp := communityCommentResponse{
+		ID:        row.ID,
+		Content:   row.Content,
+		CreatedAt: row.CreatedAt.UTC(),
+		UpdatedAt: row.UpdatedAt.UTC(),
+		Author: commentAuthorResponse{
+			UserID:        row.UserID,
+			Username:      row.Username,
+			AffiliationID: row.AffiliationID,
+			Affiliation:   row.Affiliation,
+			Bio:           row.Bio,
+		},
+	}
+	resp.Post.ID = row.PostID
+	resp.Post.Title = row.PostTitle
+	return resp
 }
 
 func newCommunityPostLikeResponse(row models.CommunityPostLikeDetail) communityPostLikeResponse {

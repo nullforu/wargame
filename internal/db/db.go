@@ -47,6 +47,7 @@ func AutoMigrate(ctx context.Context, db *bun.DB) error {
 		(*models.ChallengeCommentItem)(nil),
 		(*models.CommunityPost)(nil),
 		(*models.CommunityPostLike)(nil),
+		(*models.CommunityComment)(nil),
 	}
 
 	if err := createTables(ctx, db, modelsToCreate); err != nil {
@@ -92,6 +93,8 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 		{name: "idx_community_posts_user_updated", query: "CREATE INDEX IF NOT EXISTS idx_community_posts_user_updated ON community_posts (user_id, updated_at DESC, id DESC)"},
 		{name: "idx_community_post_likes_post_created", query: "CREATE INDEX IF NOT EXISTS idx_community_post_likes_post_created ON community_post_likes (post_id, created_at DESC, user_id DESC)"},
 		{name: "idx_community_post_likes_user_created", query: "CREATE INDEX IF NOT EXISTS idx_community_post_likes_user_created ON community_post_likes (user_id, created_at DESC, post_id DESC)"},
+		{name: "idx_community_comments_post_created", query: "CREATE INDEX IF NOT EXISTS idx_community_comments_post_created ON community_comments (post_id, created_at DESC, id DESC)"},
+		{name: "idx_community_comments_user_updated", query: "CREATE INDEX IF NOT EXISTS idx_community_comments_user_updated ON community_comments (user_id, updated_at DESC, id DESC)"},
 	}
 
 	for _, idx := range indexes {

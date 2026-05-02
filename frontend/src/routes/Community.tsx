@@ -10,7 +10,7 @@ const PAGE_SIZE = 20
 const NOTICE_SIZE = 3
 const POPULAR_POST_LIKE_THRESHOLD = 5
 const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: PAGE_SIZE, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
-const COMMUNITY_SKELETON_ROWS = 5
+const COMMUNITY_SKELETON_ROWS = NOTICE_SIZE + PAGE_SIZE
 
 const parsePositiveInt = (value: string | null, fallback: number) => {
     const parsed = Number(value)
@@ -186,7 +186,7 @@ const Community = () => {
 
     return (
         <section className='animate space-y-4'>
-            <div className='space-y-3'>
+            <div className='space-y-3 md:p-3'>
                 <div className='space-y-2 shadow-none'>
                     <div className='flex items-center gap-2 mb-4'>
                         <div className='relative flex-1'>
@@ -308,7 +308,7 @@ const Community = () => {
             <div className='-mx-4 md:mx-0 overflow-x-auto'>
                 {loading ? (
                     <>
-                        <div className='hidden md:grid grid-cols-[90px_60px_minmax(0,1fr)_100px_110px_90px_80px] items-center gap-3 px-4 py-3 text-xs font-medium text-text-muted'>
+                        <div className='hidden md:grid grid-cols-[90px_60px_minmax(0,1fr)_100px_110px_70px_70px] items-center gap-3 px-4 py-3 text-xs font-medium text-text-muted'>
                             <p>{t('community.table.number')}</p>
                             <p>{t('common.category')}</p>
                             <p>{t('common.title')}</p>
@@ -318,7 +318,7 @@ const Community = () => {
                             <p>{t('community.table.likes')}</p>
                         </div>
                         {Array.from({ length: COMMUNITY_SKELETON_ROWS }, (_, idx) => (
-                            <div key={`community-skeleton-${idx}`} className='hidden md:grid grid-cols-[90px_60px_minmax(0,1fr)_100px_110px_90px_80px] items-center gap-3 px-4 py-3 border-b border-border/60'>
+                            <div key={`community-skeleton-${idx}`} className='hidden md:grid grid-cols-[90px_60px_minmax(0,1fr)_100px_110px_70px_70px] items-center gap-3 px-4 py-3 border-b border-border/60'>
                                 <div className='h-4 w-10 rounded bg-surface-muted animate-pulse' />
                                 <div className='h-5 w-18 rounded bg-surface-muted animate-pulse' />
                                 <div className='h-4 w-3/4 rounded bg-surface-muted animate-pulse' />
@@ -344,7 +344,7 @@ const Community = () => {
 
                 {!loading ? (
                     <>
-                        <div className='hidden md:grid grid-cols-[90px_60px_minmax(0,1fr)_100px_110px_90px_80px] items-center gap-3 px-4 py-3 text-xs font-medium text-text-muted'>
+                        <div className='hidden md:grid grid-cols-[90px_60px_minmax(0,1fr)_100px_110px_70px_70px] items-center gap-3 px-4 py-3 text-xs font-medium text-text-muted'>
                             <p>{t('community.table.number')}</p>
                             <p>{t('common.category')}</p>
                             <p>{t('common.title')}</p>
@@ -358,7 +358,7 @@ const Community = () => {
                             {posts.map((post) => (
                                 <div key={post.id}>
                                     <button
-                                        className={`rounded-none hidden w-full md:grid grid-cols-[90px_60px_minmax(0,1fr)_100px_110px_90px_80px] items-center gap-3 px-4 py-3 text-left transition hover:bg-surface-muted/40 ${post.category === 0 ? 'bg-warning/10 hover:bg-warning/20' : ''}`}
+                                        className={`rounded-none hidden w-full md:grid grid-cols-[90px_60px_minmax(0,1fr)_100px_110px_70px_70px] items-center gap-3 px-4 py-3 text-left transition hover:bg-surface-muted/40 ${post.category === 0 ? 'bg-warning/10 hover:bg-warning/20' : ''}`}
                                         onClick={() => navigate(`/community/${post.id}${window.location.search}`)}
                                     >
                                         <p className='text-sm text-text-muted'>{post.id}</p>
@@ -372,6 +372,7 @@ const Community = () => {
                                                 </svg>
                                             ) : null}
                                             <span className='truncate'>{post.title}</span>
+                                            {post.comment_count > 0 ? <span className='shrink-0 text-xs font-semibold text-text-subtle'>({post.comment_count})</span> : null}
                                         </p>
                                         <p className='truncate text-sm text-text-muted'>{post.author.username}</p>
                                         <p className='text-sm text-text-muted'>{formatDateTime(post.created_at, localeTag).slice(0, 11)}</p>
@@ -394,11 +395,14 @@ const Community = () => {
                                                 </svg>
                                             ) : null}
                                             <span className='line-clamp-1'>{post.title}</span>
+                                            {post.comment_count > 0 ? <span className='shrink-0 text-xs font-semibold text-text-subtle'>({post.comment_count})</span> : null}
                                         </p>
                                         <div className='mt-1 flex items-center gap-2 text-xs text-text-muted'>
                                             <span>{post.author.username}</span>
                                             <span>·</span>
                                             <span>{t('community.views', { count: post.view_count })}</span>
+                                            <span>·</span>
+                                            <span>{t('community.likes', { count: post.like_count })}</span>
                                         </div>
                                     </button>
                                 </div>
