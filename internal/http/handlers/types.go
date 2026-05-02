@@ -121,6 +121,18 @@ type updateChallengeCommentRequest struct {
 	Content optionalString `json:"content"`
 }
 
+type createCommunityPostRequest struct {
+	Category int    `json:"category"`
+	Title    string `json:"title" binding:"required"`
+	Content  string `json:"content" binding:"required"`
+}
+
+type updateCommunityPostRequest struct {
+	Category *int           `json:"category"`
+	Title    optionalString `json:"title"`
+	Content  optionalString `json:"content"`
+}
+
 type adminBlockUserRequest struct {
 	Reason string `json:"reason" binding:"required"`
 }
@@ -325,6 +337,56 @@ type challengeCommentResponse struct {
 type challengeCommentsListResponse struct {
 	Comments   []challengeCommentResponse `json:"comments,omitempty"`
 	Pagination models.Pagination          `json:"pagination"`
+}
+
+type communityPostAuthorResponse struct {
+	UserID        int64   `json:"user_id"`
+	Username      string  `json:"username"`
+	AffiliationID *int64  `json:"affiliation_id,omitempty"`
+	Affiliation   *string `json:"affiliation,omitempty"`
+	Bio           *string `json:"bio,omitempty"`
+}
+
+type communityPostResponse struct {
+	ID        int64                       `json:"id"`
+	Category  int                         `json:"category"`
+	Title     string                      `json:"title"`
+	Content   string                      `json:"content"`
+	ViewCount int                         `json:"view_count"`
+	LikeCount int                         `json:"like_count"`
+	LikedByMe bool                        `json:"liked_by_me"`
+	CreatedAt time.Time                   `json:"created_at"`
+	UpdatedAt time.Time                   `json:"updated_at"`
+	Author    communityPostAuthorResponse `json:"author"`
+}
+
+type communityPostsListResponse struct {
+	Posts      []communityPostResponse `json:"posts,omitempty"`
+	Pagination models.Pagination       `json:"pagination"`
+}
+
+type communityPostDetailResponse struct {
+	Post communityPostResponse `json:"post"`
+}
+
+type communityPostLikeResponse struct {
+	UserID        int64     `json:"user_id"`
+	Username      string    `json:"username"`
+	AffiliationID *int64    `json:"affiliation_id,omitempty"`
+	Affiliation   *string   `json:"affiliation,omitempty"`
+	Bio           *string   `json:"bio,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type communityPostLikesListResponse struct {
+	Likes      []communityPostLikeResponse `json:"likes,omitempty"`
+	Pagination models.Pagination           `json:"pagination"`
+}
+
+type communityLikeToggleResponse struct {
+	Status    string `json:"status"`
+	Liked     bool   `json:"liked"`
+	LikeCount int    `json:"like_count"`
 }
 
 type adminChallengeResponse struct {
@@ -605,5 +667,37 @@ func newChallengeCommentResponse(row models.ChallengeCommentDetail) challengeCom
 			ID:    row.ChallengeID,
 			Title: row.ChallengeTitle,
 		},
+	}
+}
+
+func newCommunityPostResponse(row models.CommunityPostDetail) communityPostResponse {
+	return communityPostResponse{
+		ID:        row.ID,
+		Category:  row.Category,
+		Title:     row.Title,
+		Content:   row.Content,
+		ViewCount: row.ViewCount,
+		LikeCount: row.LikeCount,
+		LikedByMe: row.LikedByMe,
+		CreatedAt: row.CreatedAt.UTC(),
+		UpdatedAt: row.UpdatedAt.UTC(),
+		Author: communityPostAuthorResponse{
+			UserID:        row.UserID,
+			Username:      row.Username,
+			AffiliationID: row.AffiliationID,
+			Affiliation:   row.Affiliation,
+			Bio:           row.Bio,
+		},
+	}
+}
+
+func newCommunityPostLikeResponse(row models.CommunityPostLikeDetail) communityPostLikeResponse {
+	return communityPostLikeResponse{
+		UserID:        row.UserID,
+		Username:      row.Username,
+		AffiliationID: row.AffiliationID,
+		Affiliation:   row.Affiliation,
+		Bio:           row.Bio,
+		CreatedAt:     row.CreatedAt.UTC(),
 	}
 }

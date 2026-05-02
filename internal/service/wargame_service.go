@@ -87,6 +87,7 @@ type WargameService struct {
 	voteRepo             *repo.ChallengeVoteRepo
 	writeupRepo          *repo.WriteupRepo
 	challengeCommentRepo *repo.ChallengeCommentRepo
+	communityRepo        *repo.CommunityRepo
 	redis                *redis.Client
 	fileStore            storage.ChallengeFileStore
 }
@@ -100,7 +101,7 @@ type ChallengeQueryFilter struct {
 	Sort     string
 }
 
-func NewWargameService(cfg config.Config, challengeRepo *repo.ChallengeRepo, submissionRepo *repo.SubmissionRepo, voteRepo *repo.ChallengeVoteRepo, writeupRepo *repo.WriteupRepo, challengeCommentRepo *repo.ChallengeCommentRepo, redis *redis.Client, fileStore storage.ChallengeFileStore) *WargameService {
+func NewWargameService(cfg config.Config, challengeRepo *repo.ChallengeRepo, submissionRepo *repo.SubmissionRepo, voteRepo *repo.ChallengeVoteRepo, writeupRepo *repo.WriteupRepo, challengeCommentRepo *repo.ChallengeCommentRepo, communityRepo *repo.CommunityRepo, redis *redis.Client, fileStore storage.ChallengeFileStore) *WargameService {
 	return &WargameService{
 		cfg:                  cfg,
 		challengeRepo:        challengeRepo,
@@ -108,6 +109,7 @@ func NewWargameService(cfg config.Config, challengeRepo *repo.ChallengeRepo, sub
 		voteRepo:             voteRepo,
 		writeupRepo:          writeupRepo,
 		challengeCommentRepo: challengeCommentRepo,
+		communityRepo:        communityRepo,
 		redis:                redis,
 		fileStore:            fileStore,
 	}

@@ -53,7 +53,7 @@ export default function Markdown({ content, className }: { content: string; clas
                         </a>
                     ),
                     a: ({ href, children }) => (
-                        <a href={href} className='text-accent hover:underline' target='_blank' rel='noopener noreferrer'>
+                        <a href={href} className='text-accent hover:underline break-all' target='_blank' rel='noopener noreferrer'>
                             {children}
                         </a>
                     ),

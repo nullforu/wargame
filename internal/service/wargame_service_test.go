@@ -576,11 +576,11 @@ func TestWargameServiceFileErrorPaths(t *testing.T) {
 	}
 
 	voteRepo := repo.NewChallengeVoteRepo(serviceDB)
-	if _, _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), env.redis, nil).RequestChallengeFileUpload(context.Background(), challenge.ID, "bundle.zip"); !errors.Is(err, ErrStorageUnavailable) {
+	if _, _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), repo.NewCommunityRepo(env.db), env.redis, nil).RequestChallengeFileUpload(context.Background(), challenge.ID, "bundle.zip"); !errors.Is(err, ErrStorageUnavailable) {
 		t.Fatalf("expected ErrStorageUnavailable, got %v", err)
 	}
 
-	if _, _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), env.redis, errorFileStore{uploadErr: errors.New("presign fail")}).RequestChallengeFileUpload(context.Background(), challenge.ID, "bundle.zip"); err == nil || !strings.Contains(err.Error(), "presign") {
+	if _, _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), repo.NewCommunityRepo(env.db), env.redis, errorFileStore{uploadErr: errors.New("presign fail")}).RequestChallengeFileUpload(context.Background(), challenge.ID, "bundle.zip"); err == nil || !strings.Contains(err.Error(), "presign") {
 		t.Fatalf("expected presign error, got %v", err)
 	}
 
@@ -593,15 +593,15 @@ func TestWargameServiceFileErrorPaths(t *testing.T) {
 		t.Fatalf("upload seed: %v", err)
 	}
 
-	if _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), env.redis, errorFileStore{downloadErr: errors.New("download fail")}).RequestChallengeFileDownload(context.Background(), 0, challenge.ID); err == nil || !strings.Contains(err.Error(), "presign") {
+	if _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), repo.NewCommunityRepo(env.db), env.redis, errorFileStore{downloadErr: errors.New("download fail")}).RequestChallengeFileDownload(context.Background(), 0, challenge.ID); err == nil || !strings.Contains(err.Error(), "presign") {
 		t.Fatalf("expected download presign error, got %v", err)
 	}
 
-	if _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), env.redis, nil).RequestChallengeFileDownload(context.Background(), 0, challenge.ID); !errors.Is(err, ErrStorageUnavailable) {
+	if _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), repo.NewCommunityRepo(env.db), env.redis, nil).RequestChallengeFileDownload(context.Background(), 0, challenge.ID); !errors.Is(err, ErrStorageUnavailable) {
 		t.Fatalf("expected ErrStorageUnavailable, got %v", err)
 	}
 
-	if _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), env.redis, errorFileStore{deleteErr: errors.New("delete fail")}).DeleteChallengeFile(context.Background(), challenge.ID); err == nil || !strings.Contains(err.Error(), "delete") {
+	if _, err := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), repo.NewCommunityRepo(env.db), env.redis, errorFileStore{deleteErr: errors.New("delete fail")}).DeleteChallengeFile(context.Background(), challenge.ID); err == nil || !strings.Contains(err.Error(), "delete") {
 		t.Fatalf("expected delete error, got %v", err)
 	}
 }
@@ -625,7 +625,7 @@ func TestWargameServiceStackValidationAndSolvedIDsEdge(t *testing.T) {
 	}
 
 	voteRepo := repo.NewChallengeVoteRepo(serviceDB)
-	nilRepoSvc := NewWargameService(env.cfg, env.challengeRepo, nil, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), env.redis, storage.NewMemoryChallengeFileStore(10*time.Minute))
+	nilRepoSvc := NewWargameService(env.cfg, env.challengeRepo, nil, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), repo.NewCommunityRepo(env.db), env.redis, storage.NewMemoryChallengeFileStore(10*time.Minute))
 	ids, err = nilRepoSvc.SolvedChallengeIDs(context.Background(), 1)
 	if err != nil || len(ids) != 0 {
 		t.Fatalf("expected empty solved ids with nil repo, ids=%v err=%v", ids, err)
@@ -643,7 +643,7 @@ func TestWargameServiceErrorPathsWithClosedDB(t *testing.T) {
 	voteRepo := repo.NewChallengeVoteRepo(closedDB)
 	writeupRepo := repo.NewWriteupRepo(closedDB)
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
-	wargameSvc := NewWargameService(serviceCfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(serviceDB), serviceRedis, fileStore)
+	wargameSvc := NewWargameService(serviceCfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(serviceDB), repo.NewCommunityRepo(serviceDB), serviceRedis, fileStore)
 
 	if _, _, err := wargameSvc.ListChallenges(context.Background(), 1, 20, ChallengeQueryFilter{}); err == nil {
 		t.Fatalf("expected ListChallenges error")
@@ -696,7 +696,7 @@ func TestWargameServiceUploadReplacesOldFileBestEffort(t *testing.T) {
 	}
 
 	voteRepo := repo.NewChallengeVoteRepo(serviceDB)
-	svc := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), env.redis, errorFileStore{deleteErr: errors.New("best effort")})
+	svc := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), repo.NewCommunityRepo(env.db), env.redis, errorFileStore{deleteErr: errors.New("best effort")})
 	updated, _, err := svc.RequestChallengeFileUpload(context.Background(), challenge.ID, "new.zip")
 	if err != nil {
 		t.Fatalf("expected upload success despite delete failure, got %v", err)
@@ -832,7 +832,7 @@ func TestWargameServiceVoteChallengeLevelRepoFailures(t *testing.T) {
 	closedDB := newClosedServiceDB(t)
 	voteRepo := repo.NewChallengeVoteRepo(closedDB)
 	origSvc := env.wargameSvc
-	env.wargameSvc = NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), env.redis, origSvc.fileStore)
+	env.wargameSvc = NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, voteRepo, repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), repo.NewCommunityRepo(env.db), env.redis, origSvc.fileStore)
 
 	if err := env.wargameSvc.VoteChallengeLevel(context.Background(), user.ID, challenge.ID, 5); err == nil {
 		t.Fatalf("expected vote repo failure")

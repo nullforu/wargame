@@ -86,6 +86,43 @@ func TestAuthMiddleware(t *testing.T) {
 	}
 }
 
+func TestOptionalAuthMiddleware(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cfg := config.JWTConfig{
+		Secret:     "secret",
+		Issuer:     "issuer",
+		AccessTTL:  time.Hour,
+		RefreshTTL: time.Hour,
+	}
+
+	router := gin.New()
+	router.GET("/optional", OptionalAuth(cfg), func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{
+			"user_id": UserID(ctx),
+			"role":    Role(ctx),
+		})
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/optional", nil)
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	access, err := auth.GenerateAccessToken(cfg, 42, models.AdminRole)
+	if err != nil {
+		t.Fatalf("access token: %v", err)
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/optional", nil)
+	req.AddCookie(&http.Cookie{Name: "access_token", Value: access})
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
 func TestRequireRole(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	cfg := config.JWTConfig{

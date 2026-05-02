@@ -8,6 +8,9 @@ import ChallengeDetail from './routes/ChallengeDetail'
 import Scoreboard from './routes/Scoreboard'
 import Ranking from './routes/Ranking'
 import Users from './routes/Users'
+import Community from './routes/Community'
+import CommunityDetail from './routes/CommunityDetail'
+import CommunityEditor from './routes/CommunityEditor'
 import UserProfile from './routes/UserProfile'
 import Admin from './routes/Admin'
 import NotFound from './routes/NotFound'
@@ -35,6 +38,8 @@ const routes: Record<string, RouteComponent> = {
     '/scoreboard': Scoreboard,
     '/profile': UserProfile,
     '/users': Users,
+    '/community': Community,
+    '/community/write': CommunityEditor,
     '/admin': Admin,
 }
 
@@ -56,6 +61,14 @@ const dynamicRoutes: Array<{
         component: ChallengeDetail,
         extractParams: (path) => {
             const match = path.match(/^\/challenges\/(\d+)$/)
+            return match ? { id: match[1] } : { id: '' }
+        },
+    },
+    {
+        pattern: /^\/community\/(\d+)$/,
+        component: CommunityDetail,
+        extractParams: (path) => {
+            const match = path.match(/^\/community\/(\d+)$/)
             return match ? { id: match[1] } : { id: '' }
         },
     },

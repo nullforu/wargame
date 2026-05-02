@@ -303,6 +303,50 @@ export interface ChallengeCommentPageResponse {
     pagination: PaginationMeta
 }
 
+export interface CommunityPostAuthor {
+    user_id: number
+    username: string
+    affiliation_id?: number | null
+    affiliation?: string | null
+    bio?: string | null
+}
+
+export interface CommunityPost {
+    id: number
+    category: number
+    title: string
+    content: string
+    view_count: number
+    like_count: number
+    liked_by_me: boolean
+    created_at: string
+    updated_at: string
+    author: CommunityPostAuthor
+}
+
+export interface CommunityPostLike {
+    user_id: number
+    username: string
+    affiliation_id?: number | null
+    affiliation?: string | null
+    bio?: string | null
+    created_at: string
+}
+
+export interface CommunityPostLikesResponse {
+    likes: CommunityPostLike[]
+    pagination: PaginationMeta
+}
+
+export interface CommunityPostsResponse {
+    posts: CommunityPost[]
+    pagination: PaginationMeta
+}
+
+export interface CommunityPostDetailResponse {
+    post: CommunityPost
+}
+
 export interface LeaderboardChallenge {
     id: number
     title: string

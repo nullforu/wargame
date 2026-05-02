@@ -13,6 +13,11 @@ import type {
     ChallengeWriteupsResponse,
     ChallengeCommentPageResponse,
     ChallengeCommentItem,
+    CommunityPost,
+    CommunityPostLike,
+    CommunityPostLikesResponse,
+    CommunityPostsResponse,
+    CommunityPostDetailResponse,
     AdminChallengeDetail,
     AdminStackDeleteResponse,
     AdminStackListItem,
@@ -379,6 +384,52 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
                 method: 'DELETE',
                 auth: true,
             }),
+        communityPosts: async ({ page, pageSize, q, category, sort, excludeNotice, popularOnly }: { page?: number; pageSize?: number; q?: string; category?: number; sort?: string; excludeNotice?: boolean; popularOnly?: boolean }) => {
+            const params = new URLSearchParams()
+            if (typeof page === 'number') params.set('page', String(page))
+            if (typeof pageSize === 'number') params.set('page_size', String(pageSize))
+            if (typeof q === 'string' && q.trim() !== '') params.set('q', q.trim())
+            if (typeof category === 'number') params.set('category', String(category))
+            if (typeof sort === 'string' && sort.trim() !== '') params.set('sort', sort.trim())
+            if (excludeNotice === true) params.set('exclude_notice', 'true')
+            if (popularOnly === true) params.set('popular_only', 'true')
+            const query = params.toString()
+            const data = await request<Partial<CommunityPostsResponse>>(`/api/community${query ? `?${query}` : ''}`)
+            return {
+                posts: Array.isArray(data?.posts) ? data.posts : [],
+                pagination: normalizePagination(data?.pagination),
+            } as CommunityPostsResponse
+        },
+        communityPost: (id: number) => request<CommunityPostDetailResponse>(`/api/community/${id}`),
+        createCommunityPost: (payload: { category: number; title: string; content: string }) =>
+            request<CommunityPost>(`/api/community`, {
+                method: 'POST',
+                body: payload,
+                auth: true,
+            }),
+        updateCommunityPost: (id: number, payload: { category?: number; title?: string; content?: string }) =>
+            request<CommunityPost>(`/api/community/${id}`, {
+                method: 'PATCH',
+                body: payload,
+                auth: true,
+            }),
+        deleteCommunityPost: (id: number) =>
+            request<{ status?: string }>(`/api/community/${id}`, {
+                method: 'DELETE',
+                auth: true,
+            }),
+        toggleCommunityPostLike: (id: number) =>
+            request<{ status: string; liked: boolean; like_count: number }>(`/api/community/${id}/likes`, {
+                method: 'POST',
+                auth: true,
+            }),
+        communityPostLikes: async (id: number, page?: number, pageSize?: number) => {
+            const data = await request<Partial<CommunityPostLikesResponse>>(withPagination(`/api/community/${id}/likes`, page, pageSize))
+            return {
+                likes: Array.isArray(data?.likes) ? (data.likes as CommunityPostLike[]) : [],
+                pagination: normalizePagination(data?.pagination),
+            } as CommunityPostLikesResponse
+        },
         writeup: async (id: number) => {
             const data = await request<Partial<WriteupDetailResponse>>(`/api/writeups/${id}`, { auth: true })
             return {
