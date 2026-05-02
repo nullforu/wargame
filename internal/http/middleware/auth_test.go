@@ -121,6 +121,27 @@ func TestOptionalAuthMiddleware(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/optional", nil)
+	req.AddCookie(&http.Cookie{Name: "access_token", Value: "bad.token"})
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 with invalid token ignored, got %d", rec.Code)
+	}
+
+	refresh, err := auth.GenerateRefreshToken(cfg, 42, models.UserRole, "jti-opt")
+	if err != nil {
+		t.Fatalf("refresh token: %v", err)
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/optional", nil)
+	req.AddCookie(&http.Cookie{Name: "access_token", Value: refresh})
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 with refresh token ignored, got %d", rec.Code)
+	}
 }
 
 func TestRequireRole(t *testing.T) {

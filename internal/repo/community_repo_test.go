@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -135,3 +136,53 @@ func TestCommunityRepoLikes(t *testing.T) {
 		t.Fatalf("count likes expected 1, got %d err=%v", count, err)
 	}
 }
+
+func TestCommunityRepoAdditionalBranches(t *testing.T) {
+	env := setupRepoTest(t)
+	u1 := createUser(t, env, "extra1@example.com", "extra1", "pass", models.UserRole)
+	u2 := createUser(t, env, "extra2@example.com", "extra2", "pass", models.UserRole)
+	repo := NewCommunityRepo(env.db)
+	now := time.Now().UTC()
+	oldPost := &models.CommunityPost{UserID: u1.ID, Category: models.CommunityCategoryFree, Title: "old", Content: "a", ViewCount: 0, CreatedAt: now.Add(-time.Hour), UpdatedAt: now.Add(-time.Hour)}
+	newPost := &models.CommunityPost{UserID: u2.ID, Category: models.CommunityCategoryFree, Title: "new", Content: "b", ViewCount: 0, CreatedAt: now, UpdatedAt: now}
+	if err := repo.Create(context.Background(), oldPost); err != nil {
+		t.Fatalf("create old: %v", err)
+	}
+
+	if err := repo.Create(context.Background(), newPost); err != nil {
+		t.Fatalf("create new: %v", err)
+	}
+
+	for i := 0; i < models.PopularPostLikeThreshold; i += 1 {
+		u := createUser(t, env, "extra-like-"+itoa(i)+"@example.com", "extra-like-"+itoa(i), "pass", models.UserRole)
+		if err := repo.CreateLike(context.Background(), newPost.ID, u.ID); err != nil {
+			t.Fatalf("seed like: %v", err)
+		}
+	}
+
+	oldestRows, _, err := repo.Page(context.Background(), CommunityListFilter{Sort: "oldest"}, 1, 10, u1.ID)
+	if err != nil || len(oldestRows) < 2 || oldestRows[0].ID != oldPost.ID {
+		t.Fatalf("oldest sort unexpected rows=%+v err=%v", oldestRows, err)
+	}
+
+	popularRows, _, err := repo.Page(context.Background(), CommunityListFilter{PopularOnly: true}, 1, 10, u1.ID)
+	if err != nil || len(popularRows) != 1 || popularRows[0].ID != newPost.ID {
+		t.Fatalf("popular only unexpected rows=%+v err=%v", popularRows, err)
+	}
+
+	exists, err := repo.HasLikeByPostAndUser(context.Background(), oldPost.ID, u1.ID)
+	if err != nil || exists {
+		t.Fatalf("expected no like exists=%v err=%v", exists, err)
+	}
+
+	if _, err := repo.GetDetailByID(context.Background(), 999999, u1.ID); err == nil {
+		t.Fatalf("expected detail not found")
+	}
+
+	emptyLikes, emptyTotal, err := repo.LikesByPostPage(context.Background(), oldPost.ID, 1, 10)
+	if err != nil || emptyTotal != 0 || len(emptyLikes) != 0 {
+		t.Fatalf("expected empty likes page, rows=%+v total=%d err=%v", emptyLikes, emptyTotal, err)
+	}
+}
+
+func itoa(v int) string { return fmt.Sprintf("%d", v) }

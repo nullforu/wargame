@@ -111,3 +111,60 @@ func TestHandlerCommunityHandlers(t *testing.T) {
 		t.Fatalf("expected 200 for admin notice delete, got %d", rec.Code)
 	}
 }
+
+func TestHandlerCommunityValidationCases(t *testing.T) {
+	env := setupHandlerTest(t)
+	user := createHandlerUser(t, env, "user-community-validation-handler@example.com", "user-community-validation-handler", "pass", models.UserRole)
+
+	ctx, rec := newJSONContext(t, http.MethodGet, "/api/community?category=bad", nil)
+	env.handler.ListCommunityPosts(ctx)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 invalid category, got %d", rec.Code)
+	}
+
+	ctx, rec = newJSONContext(t, http.MethodGet, "/api/community?page=abc", nil)
+	env.handler.ListCommunityPosts(ctx)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 invalid page, got %d", rec.Code)
+	}
+
+	ctx, rec = newJSONContext(t, http.MethodPost, "/api/community", []byte(`{"category":"x"}`))
+	ctx.Set("userID", user.ID)
+	ctx.Set("role", models.UserRole)
+	env.handler.CreateCommunityPost(ctx)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 create bind error, got %d", rec.Code)
+	}
+
+	ctx, rec = newJSONContext(t, http.MethodPatch, "/api/community/1", []byte(`{"title":null}`))
+	ctx.Params = append(ctx.Params, ginParam("id", "1"))
+	ctx.Set("userID", user.ID)
+	ctx.Set("role", models.UserRole)
+	env.handler.UpdateCommunityPost(ctx)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 update null field, got %d", rec.Code)
+	}
+
+	ctx, rec = newJSONContext(t, http.MethodGet, "/api/community/bad", nil)
+	ctx.Params = append(ctx.Params, ginParam("id", "bad"))
+	env.handler.GetCommunityPost(ctx)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 invalid id, got %d", rec.Code)
+	}
+
+	ctx, rec = newJSONContext(t, http.MethodPost, "/api/community/999999/likes", nil)
+	ctx.Params = append(ctx.Params, ginParam("id", "999999"))
+	ctx.Set("userID", user.ID)
+	ctx.Set("role", models.UserRole)
+	env.handler.ToggleCommunityPostLike(ctx)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 missing post like toggle, got %d", rec.Code)
+	}
+
+	ctx, rec = newJSONContext(t, http.MethodGet, "/api/community/1/likes?page=bad", nil)
+	ctx.Params = append(ctx.Params, ginParam("id", "1"))
+	env.handler.CommunityPostLikes(ctx)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 invalid likes pagination, got %d", rec.Code)
+	}
+}

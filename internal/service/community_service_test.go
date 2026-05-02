@@ -107,6 +107,59 @@ func TestWargameServiceCommunityCRUDAndPolicies(t *testing.T) {
 	}
 }
 
+func TestWargameServiceCommunityValidationAndNotFound(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "community-validation@example.com", "community-validation", "pass", models.UserRole)
+
+	if _, err := env.wargameSvc.CreateCommunityPost(context.Background(), user.ID, models.UserRole, 99, "", ""); err == nil {
+		t.Fatalf("expected create validation error")
+	}
+
+	if _, err := env.wargameSvc.UpdateCommunityPost(context.Background(), user.ID, models.UserRole, 1, nil, nil, nil); err == nil {
+		t.Fatalf("expected update empty-request validation error")
+	}
+
+	if _, err := env.wargameSvc.UpdateCommunityPost(context.Background(), user.ID, models.UserRole, 999999, nil, strPtr("x"), nil); !errors.Is(err, ErrCommunityPostNotFound) {
+		t.Fatalf("expected update not found, got %v", err)
+	}
+
+	if err := env.wargameSvc.DeleteCommunityPost(context.Background(), user.ID, models.UserRole, 999999); !errors.Is(err, ErrCommunityPostNotFound) {
+		t.Fatalf("expected delete not found, got %v", err)
+	}
+
+	if _, err := env.wargameSvc.CommunityPostByID(context.Background(), 0, user.ID, false); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for post by id, got %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.CommunityPostsPage(context.Background(), 1, 101, "", nil, false, false, "latest", user.ID); err == nil {
+		t.Fatalf("expected invalid pagination")
+	}
+
+	if _, _, err := env.wargameSvc.CommunityPostsPage(context.Background(), 1, 10, "", nil, false, false, "bad-sort", user.ID); err == nil {
+		t.Fatalf("expected invalid sort")
+	}
+
+	if _, _, err := env.wargameSvc.CommunityPostsPage(context.Background(), 1, 10, "", intPtr(99), false, false, "latest", user.ID); err == nil {
+		t.Fatalf("expected invalid category")
+	}
+
+	if _, _, err := env.wargameSvc.ToggleCommunityPostLike(context.Background(), 0, 1); err == nil {
+		t.Fatalf("expected toggle like validation error")
+	}
+
+	if _, _, err := env.wargameSvc.ToggleCommunityPostLike(context.Background(), user.ID, 999999); !errors.Is(err, ErrCommunityPostNotFound) {
+		t.Fatalf("expected toggle like not found, got %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.CommunityPostLikesPage(context.Background(), 0, 1, 20); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected likes invalid input, got %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.CommunityPostLikesPage(context.Background(), 999999, 1, 20); !errors.Is(err, ErrCommunityPostNotFound) {
+		t.Fatalf("expected likes not found, got %v", err)
+	}
+}
+
 func strPtr(v string) *string { return &v }
 func intPtr(v int) *int       { return &v }
 func toString(v int) string {
