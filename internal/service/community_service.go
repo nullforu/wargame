@@ -266,21 +266,16 @@ func (s *WargameService) ToggleCommunityPostLike(ctx context.Context, userID, po
 		return false, 0, fmt.Errorf("wargame.ToggleCommunityPostLike lookup: %w", err)
 	}
 
-	exists, err := s.communityRepo.HasLikeByPostAndUser(ctx, postID, userID)
+	inserted, err := s.communityRepo.CreateLikeIfNotExists(ctx, postID, userID)
 	if err != nil {
-		return false, 0, fmt.Errorf("wargame.ToggleCommunityPostLike exists: %w", err)
+		return false, 0, fmt.Errorf("wargame.ToggleCommunityPostLike create-if-not-exists: %w", err)
 	}
 
-	liked := false
-	if exists {
-		if err := s.communityRepo.DeleteLike(ctx, postID, userID); err != nil {
-			return false, 0, fmt.Errorf("wargame.ToggleCommunityPostLike delete: %w", err)
+	liked := inserted
+	if !inserted {
+		if _, err := s.communityRepo.DeleteLikeIfExists(ctx, postID, userID); err != nil {
+			return false, 0, fmt.Errorf("wargame.ToggleCommunityPostLike delete-if-exists: %w", err)
 		}
-	} else {
-		if err := s.communityRepo.CreateLike(ctx, postID, userID); err != nil {
-			return false, 0, fmt.Errorf("wargame.ToggleCommunityPostLike create: %w", err)
-		}
-		liked = true
 	}
 
 	likeCount, err := s.communityRepo.CountLikesByPostID(ctx, postID)

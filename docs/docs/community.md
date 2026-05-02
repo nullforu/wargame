@@ -12,9 +12,16 @@ Query parameters:
 - `q` (optional, title/content keyword)
 - `category` (optional, `0..3`: notice/free/qna/humor)
 - `sort` (optional, one of `latest`, `oldest`, `popular`)
+- `exclude_notice` (optional, `true|1`, excludes notice category posts)
 - `popular_only` (optional, `true|1`, `like_count >= 5`)
 - `page` (optional, default `1`)
 - `page_size` (optional, default `20`, max `100`)
+
+Notes:
+
+- If `category` is set, it is applied first.
+- `exclude_notice=true` removes notice posts from the result.
+- `popular_only=true` returns only posts with `like_count >= 5` after other filters.
 
 Response 200
 
@@ -194,6 +201,7 @@ Headers
 
 ```text
 Cookie: access_token=<jwt>
+X-CSRF-Token: <csrf_token cookie value>
 ```
 
 Response 200
@@ -223,6 +231,7 @@ Headers
 
 ```text
 Cookie: access_token=<jwt>
+X-CSRF-Token: <csrf_token cookie value>
 ```
 
 Request
@@ -273,6 +282,7 @@ Headers
 
 ```text
 Cookie: access_token=<jwt>
+X-CSRF-Token: <csrf_token cookie value>
 ```
 
 Request
@@ -324,6 +334,7 @@ Headers
 
 ```text
 Cookie: access_token=<jwt>
+X-CSRF-Token: <csrf_token cookie value>
 ```
 
 Request
@@ -370,6 +381,7 @@ Headers
 
 ```text
 Cookie: access_token=<jwt>
+X-CSRF-Token: <csrf_token cookie value>
 ```
 
 Request
@@ -417,6 +429,7 @@ Headers
 
 ```text
 Cookie: access_token=<jwt>
+X-CSRF-Token: <csrf_token cookie value>
 ```
 
 Response 200
@@ -445,6 +458,7 @@ Headers
 
 ```text
 Cookie: access_token=<jwt>
+X-CSRF-Token: <csrf_token cookie value>
 ```
 
 Response 200

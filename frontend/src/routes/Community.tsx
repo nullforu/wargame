@@ -434,13 +434,14 @@ const Community = () => {
                         type='button'
                         className='px-3 py-1 text-xs text-text transition hover:bg-surface-muted disabled:opacity-50'
                         disabled={!pagination.has_prev}
+                        aria-label={t('common.previous')}
                         onClick={() => {
                             if (!pagination.has_prev) return
                             const nextPage = Math.max(1, page - 1)
                             changePage(nextPage)
                         }}
                     >
-                        {t('common.previous')}
+                        <span aria-hidden='true'>&lt;</span>
                     </button>
                     {pageNumbers.map((p) => (
                         <button
@@ -456,13 +457,14 @@ const Community = () => {
                         type='button'
                         className='px-3 py-1 text-xs text-text transition hover:bg-surface-muted disabled:opacity-50'
                         disabled={!pagination.has_next}
+                        aria-label={t('common.next')}
                         onClick={() => {
                             if (!pagination.has_next) return
                             const nextPage = page + 1
                             changePage(nextPage)
                         }}
                     >
-                        {t('common.next')}
+                        <span aria-hidden='true'>&gt;</span>
                     </button>
                 </div>
             </div>

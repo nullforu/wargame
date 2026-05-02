@@ -135,6 +135,26 @@ func TestCommunityRepoLikes(t *testing.T) {
 	if err != nil || count != 1 {
 		t.Fatalf("count likes expected 1, got %d err=%v", count, err)
 	}
+
+	inserted, err := repo.CreateLikeIfNotExists(context.Background(), post.ID, u1.ID)
+	if err != nil || !inserted {
+		t.Fatalf("expected insert true, inserted=%v err=%v", inserted, err)
+	}
+
+	inserted, err = repo.CreateLikeIfNotExists(context.Background(), post.ID, u1.ID)
+	if err != nil || inserted {
+		t.Fatalf("expected insert false on conflict, inserted=%v err=%v", inserted, err)
+	}
+
+	deleted, err := repo.DeleteLikeIfExists(context.Background(), post.ID, u1.ID)
+	if err != nil || !deleted {
+		t.Fatalf("expected delete true, deleted=%v err=%v", deleted, err)
+	}
+
+	deleted, err = repo.DeleteLikeIfExists(context.Background(), post.ID, u1.ID)
+	if err != nil || deleted {
+		t.Fatalf("expected delete false when missing, deleted=%v err=%v", deleted, err)
+	}
 }
 
 func TestCommunityRepoAdditionalBranches(t *testing.T) {

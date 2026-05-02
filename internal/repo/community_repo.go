@@ -89,8 +89,8 @@ func (r *CommunityRepo) baseDetailQuery() *bun.SelectQuery {
 		ColumnExpr("cp.title").
 		ColumnExpr("cp.content").
 		ColumnExpr("cp.view_count").
-		ColumnExpr("(SELECT COUNT(*) FROM community_post_likes AS cpl WHERE cpl.post_id = cp.id) AS like_count").
-		ColumnExpr("(SELECT COUNT(*) FROM community_comments AS cpc WHERE cpc.post_id = cp.id) AS comment_count").
+		ColumnExpr("COALESCE(lc.like_count, 0) AS like_count").
+		ColumnExpr("COALESCE(cc.comment_count, 0) AS comment_count").
 		ColumnExpr("cp.created_at").
 		ColumnExpr("cp.updated_at").
 		ColumnExpr("u.username").
@@ -98,6 +98,8 @@ func (r *CommunityRepo) baseDetailQuery() *bun.SelectQuery {
 		ColumnExpr("aff.name AS affiliation").
 		ColumnExpr("u.bio").
 		Join("JOIN users AS u ON u.id = cp.user_id").
+		Join("LEFT JOIN (SELECT post_id, COUNT(*) AS like_count FROM community_post_likes GROUP BY post_id) AS lc ON lc.post_id = cp.id").
+		Join("LEFT JOIN (SELECT post_id, COUNT(*) AS comment_count FROM community_comments GROUP BY post_id) AS cc ON cc.post_id = cp.id").
 		Join("LEFT JOIN affiliations AS aff ON aff.id = u.affiliation_id")
 }
 
@@ -121,24 +123,29 @@ func (r *CommunityRepo) GetDetailByID(ctx context.Context, id int64, viewerID in
 func (r *CommunityRepo) Page(ctx context.Context, filter CommunityListFilter, page, pageSize int, viewerID int64) ([]models.CommunityPostDetail, int, error) {
 	rows := make([]models.CommunityPostDetail, 0, pageSize)
 	base := withLikedByMe(r.baseDetailQuery(), viewerID)
+	countBase := r.db.NewSelect().TableExpr("community_posts AS cp")
 
 	if filter.Category != nil {
 		base = base.Where("cp.category = ?", *filter.Category)
+		countBase = countBase.Where("cp.category = ?", *filter.Category)
 	}
 
 	if filter.ExcludeNotice {
 		base = base.Where("cp.category <> ?", models.CommunityCategoryNotice)
+		countBase = countBase.Where("cp.category <> ?", models.CommunityCategoryNotice)
 	}
 
 	if filter.PopularOnly {
 		base = base.Where("(SELECT COUNT(*) FROM community_post_likes AS cpl_pop WHERE cpl_pop.post_id = cp.id) >= ?", models.PopularPostLikeThreshold)
+		countBase = countBase.Where("(SELECT COUNT(*) FROM community_post_likes AS cpl_pop WHERE cpl_pop.post_id = cp.id) >= ?", models.PopularPostLikeThreshold)
 	}
 
 	if query := strings.TrimSpace(filter.Query); query != "" {
 		base = base.Where("cp.title ILIKE ? OR cp.content ILIKE ?", "%"+query+"%", "%"+query+"%")
+		countBase = countBase.Where("cp.title ILIKE ? OR cp.content ILIKE ?", "%"+query+"%", "%"+query+"%")
 	}
 
-	totalCount, err := r.db.NewSelect().TableExpr("(?) AS community_posts", base).ColumnExpr("community_posts.id").Count(ctx)
+	totalCount, err := countBase.Count(ctx)
 	if err != nil {
 		return nil, 0, wrapError("communityRepo.Page count", err)
 	}
@@ -186,6 +193,25 @@ func (r *CommunityRepo) CreateLike(ctx context.Context, postID, userID int64) er
 	return nil
 }
 
+func (r *CommunityRepo) CreateLikeIfNotExists(ctx context.Context, postID, userID int64) (bool, error) {
+	row := &models.CommunityPostLike{
+		PostID:    postID,
+		UserID:    userID,
+		CreatedAt: time.Now().UTC(),
+	}
+	result, err := r.db.NewInsert().Model(row).On("CONFLICT (post_id, user_id) DO NOTHING").Exec(ctx)
+	if err != nil {
+		return false, wrapError("communityRepo.CreateLikeIfNotExists", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, wrapError("communityRepo.CreateLikeIfNotExists rows", err)
+	}
+
+	return affected > 0, nil
+}
+
 func (r *CommunityRepo) DeleteLike(ctx context.Context, postID, userID int64) error {
 	if _, err := r.db.NewDelete().
 		Model((*models.CommunityPostLike)(nil)).
@@ -196,6 +222,24 @@ func (r *CommunityRepo) DeleteLike(ctx context.Context, postID, userID int64) er
 	}
 
 	return nil
+}
+
+func (r *CommunityRepo) DeleteLikeIfExists(ctx context.Context, postID, userID int64) (bool, error) {
+	result, err := r.db.NewDelete().
+		Model((*models.CommunityPostLike)(nil)).
+		Where("post_id = ?", postID).
+		Where("user_id = ?", userID).
+		Exec(ctx)
+	if err != nil {
+		return false, wrapError("communityRepo.DeleteLikeIfExists", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, wrapError("communityRepo.DeleteLikeIfExists rows", err)
+	}
+
+	return affected > 0, nil
 }
 
 func (r *CommunityRepo) CountLikesByPostID(ctx context.Context, postID int64) (int, error) {

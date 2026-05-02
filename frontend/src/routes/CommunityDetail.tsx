@@ -455,16 +455,18 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
                                 <button
                                     className='rounded-lg bg-surface-muted px-3 py-1.5 hover:bg-surface-subtle disabled:opacity-50'
                                     disabled={!commentPagination.has_prev || commentLoading}
+                                    aria-label={t('common.previous')}
                                     onClick={() => setCommentPage((prev) => Math.max(1, prev - 1))}
                                 >
-                                    {t('common.previous')}
+                                    <span aria-hidden='true'>&lt;</span>
                                 </button>
                                 <button
                                     className='rounded-lg bg-surface-muted px-3 py-1.5 hover:bg-surface-subtle disabled:opacity-50'
                                     disabled={!commentPagination.has_next || commentLoading}
+                                    aria-label={t('common.next')}
                                     onClick={() => setCommentPage((prev) => prev + 1)}
                                 >
-                                    {t('common.next')}
+                                    <span aria-hidden='true'>&gt;</span>
                                 </button>
                             </div>
                         </div>
@@ -528,12 +530,22 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
                                 </span>
 
                                 <div className='flex gap-2'>
-                                    <button className='rounded-lg bg-surface-muted px-3 py-1.5 hover:bg-surface-subtle disabled:opacity-50' disabled={!likePagination.has_prev} onClick={() => setLikePage((prev) => Math.max(1, prev - 1))}>
-                                        {t('common.previous')}
+                                    <button
+                                        className='rounded-lg bg-surface-muted px-3 py-1.5 hover:bg-surface-subtle disabled:opacity-50'
+                                        disabled={!likePagination.has_prev}
+                                        aria-label={t('common.previous')}
+                                        onClick={() => setLikePage((prev) => Math.max(1, prev - 1))}
+                                    >
+                                        <span aria-hidden='true'>&lt;</span>
                                     </button>
 
-                                    <button className='rounded-lg bg-surface-muted px-3 py-1.5 hover:bg-surface-subtle disabled:opacity-50' disabled={!likePagination.has_next} onClick={() => setLikePage((prev) => prev + 1)}>
-                                        {t('common.next')}
+                                    <button
+                                        className='rounded-lg bg-surface-muted px-3 py-1.5 hover:bg-surface-subtle disabled:opacity-50'
+                                        disabled={!likePagination.has_next}
+                                        aria-label={t('common.next')}
+                                        onClick={() => setLikePage((prev) => prev + 1)}
+                                    >
+                                        <span aria-hidden='true'>&gt;</span>
                                     </button>
                                 </div>
                             </div>
