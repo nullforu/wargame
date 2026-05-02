@@ -19,6 +19,7 @@ const defaultPresignTTL = 15 * time.Minute
 type S3ChallengeFileStore struct {
 	bucket     string
 	presignTTL time.Duration
+	uploadType string
 	client     *s3.Client
 	presigner  *s3.PresignClient
 }
@@ -29,7 +30,7 @@ func NewS3ChallengeFileStore(ctx context.Context, cfg config.S3Config) (*S3Chall
 	}
 
 	if cfg.Bucket == "" {
-		return nil, errors.New("S3_BUCKET must not be empty")
+		return nil, errors.New("S3_CHALLENGE_BUCKET must not be empty")
 	}
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.Region))
@@ -39,7 +40,7 @@ func NewS3ChallengeFileStore(ctx context.Context, cfg config.S3Config) (*S3Chall
 
 	if cfg.AccessKeyID != "" || cfg.SecretAccessKey != "" {
 		if cfg.AccessKeyID == "" || cfg.SecretAccessKey == "" {
-			return nil, errors.New("S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must both be set")
+			return nil, errors.New("S3_CHALLENGE_ACCESS_KEY_ID and S3_CHALLENGE_SECRET_ACCESS_KEY must both be set")
 		}
 
 		awsCfg.Credentials = credentials.NewStaticCredentialsProvider(cfg.AccessKeyID, cfg.SecretAccessKey, "")
@@ -61,12 +62,33 @@ func NewS3ChallengeFileStore(ctx context.Context, cfg config.S3Config) (*S3Chall
 	return &S3ChallengeFileStore{
 		bucket:     cfg.Bucket,
 		presignTTL: presignTTL,
+		uploadType: cfg.UploadMethod,
 		client:     client,
 		presigner:  s3.NewPresignClient(client),
 	}, nil
 }
 
-func (s *S3ChallengeFileStore) PresignUpload(ctx context.Context, key, contentType string) (PresignedPost, error) {
+func (s *S3ChallengeFileStore) PresignUpload(ctx context.Context, key, contentType string) (PresignedUpload, error) {
+	if s.uploadType == "put" {
+		resp, err := s.presigner.PresignPutObject(ctx, &s3.PutObjectInput{
+			Bucket:      aws.String(s.bucket),
+			Key:         aws.String(key),
+			ContentType: aws.String(contentType),
+		}, func(o *s3.PresignOptions) {
+			o.Expires = s.presignTTL
+		})
+		if err != nil {
+			return PresignedUpload{}, err
+		}
+
+		return PresignedUpload{
+			URL:       resp.URL,
+			Method:    "PUT",
+			Headers:   map[string]string{"Content-Type": contentType},
+			ExpiresAt: time.Now().UTC().Add(s.presignTTL),
+		}, nil
+	}
+
 	input := &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(key),
@@ -82,15 +104,16 @@ func (s *S3ChallengeFileStore) PresignUpload(ctx context.Context, key, contentTy
 
 	resp, err := s.presigner.PresignPostObject(ctx, input, opts)
 	if err != nil {
-		return PresignedPost{}, err
+		return PresignedUpload{}, err
 	}
 
 	fields := make(map[string]string, len(resp.Values)+1)
 	maps.Copy(fields, resp.Values)
 	fields["Content-Type"] = contentType
 
-	return PresignedPost{
+	return PresignedUpload{
 		URL:       resp.URL,
+		Method:    "POST",
 		Fields:    fields,
 		ExpiresAt: time.Now().UTC().Add(s.presignTTL),
 	}, nil

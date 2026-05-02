@@ -3,6 +3,11 @@
 - See [nullforu/wargame](https://github.com/nullforu/wargame) for the backend of the platform.
 - See [nullforu/wargame-docs](https://github.com/nullforu/wargame-docs) for the documentation of the platform.
 
+## Environment Variables
+
+- `VITE_API_BASE` (default: `http://localhost:8080`)
+- `VITE_S3_CHALLENGE_UPLOAD_PRESIGN_METHOD` (default: `POST`, supported: `POST`, `PUT`)
+
 <!-- # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

@@ -24,14 +24,15 @@ func NewMemoryChallengeFileStore(presignTTL time.Duration) *MemoryChallengeFileS
 	}
 }
 
-func (m *MemoryChallengeFileStore) PresignUpload(ctx context.Context, key, contentType string) (PresignedPost, error) {
+func (m *MemoryChallengeFileStore) PresignUpload(ctx context.Context, key, contentType string) (PresignedUpload, error) {
 	_ = ctx
 	m.mu.Lock()
 	m.keys[key] = struct{}{}
 	m.mu.Unlock()
 
-	return PresignedPost{
-		URL: "https://example.com/upload",
+	return PresignedUpload{
+		URL:    "https://example.com/upload",
+		Method: "POST",
 		Fields: map[string]string{
 			"key":          key,
 			"Content-Type": contentType,

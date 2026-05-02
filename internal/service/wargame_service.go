@@ -659,7 +659,7 @@ func (s *WargameService) SubmitFlag(ctx context.Context, userID, challengeID int
 	return correct, nil
 }
 
-func (s *WargameService) RequestChallengeFileUpload(ctx context.Context, id int64, filename string) (*models.Challenge, storage.PresignedPost, error) {
+func (s *WargameService) RequestChallengeFileUpload(ctx context.Context, id int64, filename string) (*models.Challenge, storage.PresignedUpload, error) {
 	filename = normalizeTrim(filename)
 	validator := newFieldValidator()
 	validator.PositiveID("id", id)
@@ -670,25 +670,25 @@ func (s *WargameService) RequestChallengeFileUpload(ctx context.Context, id int6
 	}
 
 	if err := validator.Error(); err != nil {
-		return nil, storage.PresignedPost{}, err
+		return nil, storage.PresignedUpload{}, err
 	}
 
 	if s.fileStore == nil {
-		return nil, storage.PresignedPost{}, ErrStorageUnavailable
+		return nil, storage.PresignedUpload{}, ErrStorageUnavailable
 	}
 
 	challenge, err := s.challengeRepo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
-			return nil, storage.PresignedPost{}, ErrChallengeNotFound
+			return nil, storage.PresignedUpload{}, ErrChallengeNotFound
 		}
-		return nil, storage.PresignedPost{}, fmt.Errorf("wargame.RequestChallengeFileUpload lookup: %w", err)
+		return nil, storage.PresignedUpload{}, fmt.Errorf("wargame.RequestChallengeFileUpload lookup: %w", err)
 	}
 
 	key := uuid.NewString() + ".zip"
 	upload, err := s.fileStore.PresignUpload(ctx, key, "application/zip")
 	if err != nil {
-		return nil, storage.PresignedPost{}, fmt.Errorf("wargame.RequestChallengeFileUpload presign: %w", err)
+		return nil, storage.PresignedUpload{}, fmt.Errorf("wargame.RequestChallengeFileUpload presign: %w", err)
 	}
 
 	previousKey := challenge.FileKey
@@ -698,7 +698,7 @@ func (s *WargameService) RequestChallengeFileUpload(ctx context.Context, id int6
 	challenge.FileUploadedAt = &now
 
 	if err := s.challengeRepo.Update(ctx, challenge); err != nil {
-		return nil, storage.PresignedPost{}, fmt.Errorf("wargame.RequestChallengeFileUpload update: %w", err)
+		return nil, storage.PresignedUpload{}, fmt.Errorf("wargame.RequestChallengeFileUpload update: %w", err)
 	}
 
 	if previousKey != nil && *previousKey != "" && s.fileStore != nil {

@@ -174,9 +174,11 @@ export interface AdminStackListItem {
     challenge_category: string
 }
 
-export interface PresignedPost {
+export interface PresignedUpload {
     url: string
-    fields: Record<string, string>
+    method: 'POST' | 'PUT'
+    fields?: Record<string, string>
+    headers?: Record<string, string>
     expires_at: string
 }
 
@@ -187,7 +189,7 @@ export interface PresignedURL {
 
 export interface ChallengeFileUploadResponse {
     challenge: ChallengeDetail
-    upload: PresignedPost
+    upload: PresignedUpload
 }
 
 export interface FlagSubmissionPayload {

@@ -47,6 +47,7 @@ import type {
 } from './types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8080'
+const UPLOAD_PRESIGN_METHOD = String(import.meta.env.VITE_S3_CHALLENGE_UPLOAD_PRESIGN_METHOD ?? 'POST').toUpperCase()
 const CSRF_TOKEN_HEADER = 'X-CSRF-Token'
 
 export interface ApiErrorDetail {
@@ -646,19 +647,32 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
     }
 }
 
-export const uploadPresignedPost = async (upload: { url: string; fields: Record<string, string> }, file: File) => {
+export const uploadPresignedFile = async (
+    upload: { url: string; fields?: Record<string, string>; headers?: Record<string, string>; method?: string },
+    file: File
+) => {
+    const method = UPLOAD_PRESIGN_METHOD === 'PUT' ? 'PUT' : 'POST'
+
+    if (method === 'PUT') {
+        const response = await fetch(upload.url, {
+            method: 'PUT',
+            headers: upload.headers ?? { 'Content-Type': file.type || 'application/zip' },
+            body: file,
+        })
+        if (!response.ok) {
+            throw new Error('File upload failed')
+        }
+        return
+    }
+
     const formData = new FormData()
-    Object.entries(upload.fields).forEach(([key, value]) => {
+    Object.entries(upload.fields ?? {}).forEach(([key, value]) => {
         formData.append(key, value)
     })
     formData.append('file', file)
 
-    try {
-        const response = await fetch(upload.url, { method: 'POST', body: formData })
-        if (!response.ok) {
-            throw new Error('File upload failed')
-        }
-    } catch (error) {
-        throw error
+    const response = await fetch(upload.url, { method: 'POST', body: formData })
+    if (!response.ok) {
+        throw new Error('File upload failed')
     }
 }

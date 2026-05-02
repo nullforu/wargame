@@ -58,6 +58,9 @@ func TestLoadConfigDefaults(t *testing.T) {
 	if cfg.S3.Region != "us-east-1" {
 		t.Errorf("expected S3.Region us-east-1, got %s", cfg.S3.Region)
 	}
+	if cfg.S3.UploadMethod != "post" {
+		t.Errorf("expected S3.UploadMethod post, got %s", cfg.S3.UploadMethod)
+	}
 
 	if cfg.Stack.CreateWindow != time.Minute {
 		t.Errorf("expected Stack.CreateWindow 1m, got %v", cfg.Stack.CreateWindow)
@@ -89,14 +92,15 @@ func TestLoadConfigCustomValues(t *testing.T) {
 	os.Setenv("LOG_DIR", "logs-test")
 	os.Setenv("LOG_FILE_PREFIX", "app-test")
 	os.Setenv("LOG_MAX_BODY_BYTES", "2048")
-	os.Setenv("S3_ENABLED", "true")
-	os.Setenv("S3_REGION", "ap-northeast-2")
-	os.Setenv("S3_BUCKET", "wargame-test")
-	os.Setenv("S3_ACCESS_KEY_ID", "access-key")
-	os.Setenv("S3_SECRET_ACCESS_KEY", "secret-key")
-	os.Setenv("S3_ENDPOINT", "https://s3.example.com")
-	os.Setenv("S3_FORCE_PATH_STYLE", "true")
-	os.Setenv("S3_PRESIGN_TTL", "20m")
+	os.Setenv("S3_CHALLENGE_ENABLED", "true")
+	os.Setenv("S3_CHALLENGE_REGION", "ap-northeast-2")
+	os.Setenv("S3_CHALLENGE_BUCKET", "wargame-test")
+	os.Setenv("S3_CHALLENGE_ACCESS_KEY_ID", "access-key")
+	os.Setenv("S3_CHALLENGE_SECRET_ACCESS_KEY", "secret-key")
+	os.Setenv("S3_CHALLENGE_ENDPOINT", "https://s3.example.com")
+	os.Setenv("S3_CHALLENGE_FORCE_PATH_STYLE", "true")
+	os.Setenv("S3_CHALLENGE_PRESIGN_TTL", "20m")
+	os.Setenv("S3_CHALLENGE_UPLOAD_PRESIGN_METHOD", "put")
 	os.Setenv("STACKS_ENABLED", "true")
 	os.Setenv("STACKS_MAX_PER", "5")
 	os.Setenv("STACKS_PROVISIONER_BASE_URL", "http://localhost:18081")
@@ -182,6 +186,9 @@ func TestLoadConfigCustomValues(t *testing.T) {
 	if cfg.S3.PresignTTL != 20*time.Minute {
 		t.Errorf("expected S3.PresignTTL 20m, got %v", cfg.S3.PresignTTL)
 	}
+	if cfg.S3.UploadMethod != "put" {
+		t.Errorf("expected S3.UploadMethod put, got %s", cfg.S3.UploadMethod)
+	}
 	if cfg.Logging.MaxBodyBytes != 2048 {
 		t.Errorf("expected Logging.MaxBodyBytes 2048, got %d", cfg.Logging.MaxBodyBytes)
 	}
@@ -210,9 +217,10 @@ func TestLoadConfigInvalidValues(t *testing.T) {
 		{"negative db port", "DB_PORT", "-1"},
 		{"zero db port", "DB_PORT", "0"},
 		{"invalid log max body", "LOG_MAX_BODY_BYTES", "nope"},
-		{"invalid s3 enabled", "S3_ENABLED", "not-a-bool"},
-		{"invalid s3 presign ttl", "S3_PRESIGN_TTL", "bad-duration"},
-		{"invalid s3 force path", "S3_FORCE_PATH_STYLE", "bad-bool"},
+		{"invalid s3 enabled", "S3_CHALLENGE_ENABLED", "not-a-bool"},
+		{"invalid s3 presign ttl", "S3_CHALLENGE_PRESIGN_TTL", "bad-duration"},
+		{"invalid s3 force path", "S3_CHALLENGE_FORCE_PATH_STYLE", "bad-bool"},
+		{"invalid s3 upload method", "S3_CHALLENGE_UPLOAD_PRESIGN_METHOD", "patch"},
 		{"invalid stack max scope", "STACKS_MAX_SCOPE", "org"},
 		{"invalid leaderboard cache ttl", "LEADERBOARD_CACHE_TTL", "bad-duration"},
 	}
@@ -239,28 +247,28 @@ func TestLoadConfigS3ValidationErrors(t *testing.T) {
 		{
 			name: "missing bucket",
 			setup: func() {
-				os.Setenv("S3_ENABLED", "true")
-				os.Setenv("S3_REGION", "us-east-1")
-				os.Setenv("S3_BUCKET", "")
+				os.Setenv("S3_CHALLENGE_ENABLED", "true")
+				os.Setenv("S3_CHALLENGE_REGION", "us-east-1")
+				os.Setenv("S3_CHALLENGE_BUCKET", "")
 			},
 		},
 		{
 			name: "partial credentials",
 			setup: func() {
-				os.Setenv("S3_ENABLED", "true")
-				os.Setenv("S3_REGION", "us-east-1")
-				os.Setenv("S3_BUCKET", "bucket")
-				os.Setenv("S3_ACCESS_KEY_ID", "access")
-				os.Setenv("S3_SECRET_ACCESS_KEY", "")
+				os.Setenv("S3_CHALLENGE_ENABLED", "true")
+				os.Setenv("S3_CHALLENGE_REGION", "us-east-1")
+				os.Setenv("S3_CHALLENGE_BUCKET", "bucket")
+				os.Setenv("S3_CHALLENGE_ACCESS_KEY_ID", "access")
+				os.Setenv("S3_CHALLENGE_SECRET_ACCESS_KEY", "")
 			},
 		},
 		{
 			name: "invalid presign ttl",
 			setup: func() {
-				os.Setenv("S3_ENABLED", "true")
-				os.Setenv("S3_REGION", "us-east-1")
-				os.Setenv("S3_BUCKET", "bucket")
-				os.Setenv("S3_PRESIGN_TTL", "0s")
+				os.Setenv("S3_CHALLENGE_ENABLED", "true")
+				os.Setenv("S3_CHALLENGE_REGION", "us-east-1")
+				os.Setenv("S3_CHALLENGE_BUCKET", "bucket")
+				os.Setenv("S3_CHALLENGE_PRESIGN_TTL", "0s")
 			},
 		},
 	}

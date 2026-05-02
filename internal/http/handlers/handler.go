@@ -1071,7 +1071,16 @@ func (h *Handler) RequestChallengeFileUpload(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, challengeFileUploadResponse{Challenge: newChallengeResponse(challenge, false, nil), Upload: presignedPostResponse{URL: upload.URL, Fields: upload.Fields, ExpiresAt: upload.ExpiresAt}})
+	ctx.JSON(http.StatusOK, challengeFileUploadResponse{
+		Challenge: newChallengeResponse(challenge, false, nil),
+		Upload: presignedUploadResponse{
+			URL:       upload.URL,
+			Method:    upload.Method,
+			Fields:    upload.Fields,
+			Headers:   upload.Headers,
+			ExpiresAt: upload.ExpiresAt,
+		},
+	})
 }
 
 func (h *Handler) RequestChallengeFileDownload(ctx *gin.Context) {

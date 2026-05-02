@@ -420,9 +420,11 @@ type adminChallengeResponse struct {
 	StackPodSpec *string `json:"stack_pod_spec,omitempty"`
 }
 
-type presignedPostResponse struct {
+type presignedUploadResponse struct {
 	URL       string            `json:"url"`
+	Method    string            `json:"method"`
 	Fields    map[string]string `json:"fields"`
+	Headers   map[string]string `json:"headers,omitempty"`
 	ExpiresAt time.Time         `json:"expires_at"`
 }
 
@@ -432,8 +434,8 @@ type presignedURLResponse struct {
 }
 
 type challengeFileUploadResponse struct {
-	Challenge challengeResponse     `json:"challenge"`
-	Upload    presignedPostResponse `json:"upload"`
+	Challenge challengeResponse       `json:"challenge"`
+	Upload    presignedUploadResponse `json:"upload"`
 }
 
 type timelineResponse struct {
