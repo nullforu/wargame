@@ -423,7 +423,7 @@ const Home = ({ routeParams = {} }: RouteProps) => {
                                           <UserAvatar username={row.username} profileImage={row.profile_image ?? null} size='sm' />
                                           <div className='min-w-0 flex-1'>
                                               <p className='truncate text-sm text-text'>{row.username}</p>
-                                              <p className='truncate text-[11px] text-text-subtle'>{row.affiliation_name?.trim() ? row.affiliation_name : t('common.na')}</p>
+                                              {row.affiliation_name?.trim() ? <p className='truncate text-[11px] text-text-subtle'>{row.affiliation_name}</p> : null}
                                           </div>
                                           <span className='text-xs font-semibold text-text'>{t('common.pointsShort', { points: row.score })}</span>
                                       </button>
