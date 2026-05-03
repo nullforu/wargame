@@ -86,7 +86,7 @@ func main() {
 
 	var profileImageStore storage.ProfileImageStore
 	if cfg.S3Media.Enabled {
-		store, err := storage.NewS3MediaProfileImageStore(ctx, cfg.S3Media)
+		store, err := storage.NewS3MediaFileStore(ctx, cfg.S3Media)
 		if err != nil {
 			logger.Error("s3 media init error", slog.Any("error", err))
 			os.Exit(1)

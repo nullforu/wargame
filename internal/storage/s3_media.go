@@ -14,14 +14,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-type S3MediaProfileImageStore struct {
+type S3MediaFileStore struct {
 	bucket     string
 	presignTTL time.Duration
 	client     *s3.Client
 	presigner  *s3.PresignClient
 }
 
-func NewS3MediaProfileImageStore(ctx context.Context, cfg config.S3Config) (*S3MediaProfileImageStore, error) {
+func NewS3MediaFileStore(ctx context.Context, cfg config.S3Config) (*S3MediaFileStore, error) {
 	if !cfg.Enabled {
 		return nil, ErrNotConfigured
 	}
@@ -56,7 +56,7 @@ func NewS3MediaProfileImageStore(ctx context.Context, cfg config.S3Config) (*S3M
 		presignTTL = defaultPresignTTL
 	}
 
-	return &S3MediaProfileImageStore{
+	return &S3MediaFileStore{
 		bucket:     cfg.Bucket,
 		presignTTL: presignTTL,
 		client:     client,
@@ -64,7 +64,7 @@ func NewS3MediaProfileImageStore(ctx context.Context, cfg config.S3Config) (*S3M
 	}, nil
 }
 
-func (s *S3MediaProfileImageStore) PresignUpload(ctx context.Context, key, contentType string, maxSizeBytes int64) (PresignedUpload, error) {
+func (s *S3MediaFileStore) PresignUpload(ctx context.Context, key, contentType string, maxSizeBytes int64) (PresignedUpload, error) {
 	input := &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(key),
@@ -96,7 +96,7 @@ func (s *S3MediaProfileImageStore) PresignUpload(ctx context.Context, key, conte
 	}, nil
 }
 
-func (s *S3MediaProfileImageStore) Delete(ctx context.Context, key string) error {
+func (s *S3MediaFileStore) Delete(ctx context.Context, key string) error {
 	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),

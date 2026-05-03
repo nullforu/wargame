@@ -10,8 +10,8 @@ import (
 	"wargame/internal/config"
 )
 
-func TestNewS3MediaProfileImageStoreDisabled(t *testing.T) {
-	if _, err := NewS3MediaProfileImageStore(context.Background(), config.S3Config{}); err == nil {
+func TestNewS3MediaFileStoreDisabled(t *testing.T) {
+	if _, err := NewS3MediaFileStore(context.Background(), config.S3Config{}); err == nil {
 		t.Fatalf("expected error")
 	}
 }
@@ -36,8 +36,8 @@ func TestMemoryProfileImageStorePresignUpload(t *testing.T) {
 	}
 }
 
-func TestS3MediaProfileImageStorePresignUploadPolicyIncludesSizeLimit(t *testing.T) {
-	store, err := NewS3MediaProfileImageStore(context.Background(), config.S3Config{
+func TestS3MediaFileStorePresignUploadPolicyIncludesSizeLimit(t *testing.T) {
+	store, err := NewS3MediaFileStore(context.Background(), config.S3Config{
 		Enabled:         true,
 		Region:          "auto",
 		Bucket:          "media-bucket",
