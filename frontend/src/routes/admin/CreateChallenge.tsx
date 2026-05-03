@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { uploadPresignedPost } from '../../lib/api'
+import { uploadPresignedFile } from '../../lib/api'
 import { CHALLENGE_CATEGORIES } from '../../lib/constants'
 import { formatApiError, isZipFile, trimToMaxUtf8Bytes, utf8ByteLength, type FieldErrors } from '../../lib/utils'
 import MonacoEditor from '../../components/MonacoEditor'
@@ -102,7 +102,7 @@ const CreateChallenge = () => {
                 try {
                     setChallengeFileUploading(true)
                     const uploadResponse = await api.requestChallengeFileUpload(created.id, challengeFile.name)
-                    await uploadPresignedPost(uploadResponse.upload, challengeFile)
+                    await uploadPresignedFile(uploadResponse.upload, challengeFile)
                     setSuccessMessage(t('admin.create.successWithFile', { title: created.title, id: created.id }))
                 } catch (uploadError) {
                     const formattedUpload = formatApiError(uploadError, t)

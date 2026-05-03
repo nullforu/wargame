@@ -50,6 +50,7 @@ type CommunityPostDetail struct {
 	AffiliationID *int64    `bun:"affiliation_id"`
 	Affiliation   *string   `bun:"affiliation"`
 	Bio           *string   `bun:"bio"`
+	ProfileImage  *string   `bun:"profile_image"`
 }
 
 type CommunityPostLikeDetail struct {
@@ -60,6 +61,7 @@ type CommunityPostLikeDetail struct {
 	AffiliationID *int64    `bun:"affiliation_id"`
 	Affiliation   *string   `bun:"affiliation"`
 	Bio           *string   `bun:"bio"`
+	ProfileImage  *string   `bun:"profile_image"`
 }
 
 type CommunityComment struct {
@@ -83,5 +85,6 @@ type CommunityCommentDetail struct {
 	AffiliationID *int64    `bun:"affiliation_id"`
 	Affiliation   *string   `bun:"affiliation"`
 	Bio           *string   `bun:"bio"`
+	ProfileImage  *string   `bun:"profile_image"`
 	PostTitle     string    `bun:"post_title"`
 }

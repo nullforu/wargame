@@ -177,7 +177,7 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                                 <div key={user.id} className='px-4 py-3 cursor-pointer' onClick={() => navigate(`/users/${user.id}${window.location.search}`)}>
                                     <div className='flex items-center justify-between gap-3'>
                                         <div className='min-w-0 flex items-center gap-3.75'>
-                                            <UserAvatar username={user.username} size='md' />
+                                            <UserAvatar username={user.username} profileImage={user.profile_image ?? null} size='md' />
                                             <div className='min-w-0'>
                                                 <p className='truncate text-sm font-semibold text-text'>{user.username}</p>
                                                 <p className='mt-1 text-xs text-text-muted bg-accent/10 inline-block rounded px-1.5 py-0.5 dark:bg-accent/20 dark:text-accent'>{t(getRoleKey(user.role))}</p>
@@ -205,7 +205,7 @@ const Users = ({ routeParams = {} }: RouteProps) => {
                                 >
                                     <p className='text-sm text-text dark:text-text'>{user.id}</p>
                                     <div className='flex items-center gap-3.75 truncate'>
-                                        <UserAvatar username={user.username} size='sm' />
+                                        <UserAvatar username={user.username} profileImage={user.profile_image ?? null} size='sm' />
                                         <div className='min-w-0 pr-3'>
                                             <p className='truncate text-sm text-text dark:text-text'>{user.username}</p>
                                             <p className='truncate text-xs text-text-subtle'>{user.affiliation?.trim() ? user.affiliation : ''}</p>

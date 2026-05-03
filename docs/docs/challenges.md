@@ -34,10 +34,14 @@ Response 200
             "level": 0,
             "points": 100,
             "solve_count": 12,
-            "created_by_user_id": 1,
-            "created_by_username": "admin",
-            "created_by_affiliation_id": 3,
-            "created_by_affiliation": "Blue Team High",
+            "created_by": {
+                "user_id": 1,
+                "username": "admin",
+                "affiliation_id": 3,
+                "affiliation": "Blue Team High",
+                "bio": "problem setter",
+                "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440999.jpg"
+            },
             "is_active": true,
             "is_locked": false,
             "is_solved": true,
@@ -97,10 +101,14 @@ Response 200
             "level": 0,
             "points": 100,
             "solve_count": 12,
-            "created_by_user_id": 1,
-            "created_by_username": "admin",
-            "created_by_affiliation_id": 3,
-            "created_by_affiliation": "Blue Team High",
+            "created_by": {
+                "user_id": 1,
+                "username": "admin",
+                "affiliation_id": 3,
+                "affiliation": "Blue Team High",
+                "bio": "problem setter",
+                "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440999.jpg"
+            },
             "is_active": true,
             "is_locked": false,
             "is_solved": true,
@@ -147,15 +155,20 @@ Response 200
     ],
     "points": 100,
     "solve_count": 12,
-    "created_by_user_id": 1,
-    "created_by_username": "admin",
-    "created_by_affiliation_id": 3,
-    "created_by_affiliation": "Blue Team High",
+    "created_by": {
+        "user_id": 1,
+        "username": "admin",
+        "affiliation_id": 3,
+        "affiliation": "Blue Team High",
+        "bio": "problem setter",
+        "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440999.jpg"
+    },
     "first_blood": {
         "user_id": 7,
         "username": "alice",
         "affiliation": "Blue Team High",
         "bio": "pwn lover",
+        "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
         "solved_at": "2026-01-24T12:03:00Z",
         "is_first_blood": true
     },
@@ -193,6 +206,9 @@ Response 200
         {
             "user_id": 7,
             "username": "alice",
+            "affiliation": "Blue Team High",
+            "bio": "pwn lover",
+            "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
             "solved_at": "2026-01-24T12:00:00Z",
             "is_first_blood": true
         }
@@ -307,6 +323,7 @@ Response 200
         {
             "user_id": 7,
             "username": "alice",
+            "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
             "level": 7,
             "updated_at": "2026-01-24T12:00:00Z"
         }
@@ -415,7 +432,8 @@ Response 200
                 "username": "alice",
                 "affiliation_id": 3,
                 "affiliation": "Blue Team High",
-                "bio": "pwn lover"
+                "bio": "pwn lover",
+                "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg"
             },
             "challenge": {
                 "id": 1,
@@ -482,7 +500,8 @@ Response 201
         "username": "alice",
         "affiliation_id": 3,
         "affiliation": "Blue Team High",
-        "bio": "pwn lover"
+        "bio": "pwn lover",
+        "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg"
     },
     "challenge": {
         "id": 1,
@@ -533,7 +552,11 @@ Response 200
     "updated_at": "2026-01-24T12:30:00Z",
     "author": {
         "user_id": 7,
-        "username": "alice"
+        "username": "alice",
+        "affiliation_id": 3,
+        "affiliation": "Blue Team High",
+        "bio": "pwn lover",
+        "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg"
     },
     "challenge": {
         "id": 1,

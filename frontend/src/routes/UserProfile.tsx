@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Cropper from 'react-easy-crop'
+import type { Area } from 'react-easy-crop'
+import 'react-easy-crop/react-easy-crop.css'
 import type { Affiliation, PaginationMeta, Stack, UserDetail, SolvedChallenge, Writeup } from '../lib/types'
 import { formatApiError, formatDateTime, parseRouteId } from '../lib/utils'
 import { navigate } from '../lib/router'
+import { uploadPresignedPost } from '../lib/api'
 import ProfileHeader from '../components/UserProfile/ProfileHeader'
 import AccountCard from '../components/UserProfile/AccountCard'
 import ActiveStacksCard from '../components/UserProfile/ActiveStacksCard'
@@ -18,7 +22,7 @@ interface RouteProps {
 const UserProfile = ({ routeParams = {} }: RouteProps) => {
     const t = useT()
     const api = useApi()
-    const { state: auth } = useAuth()
+    const { state: auth, setAuthUser } = useAuth()
     const locale = useLocale()
     const localeTag = useMemo(() => getLocaleTag(locale), [locale])
     const [user, setUser] = useState<UserDetail | null>(null)
@@ -61,6 +65,19 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     const [affiliationPagination, setAffiliationPagination] = useState<PaginationMeta>({ page: 1, page_size: 20, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
     const [selectedAffiliationID, setSelectedAffiliationID] = useState<number | null>(null)
     const [loadingAffiliations, setLoadingAffiliations] = useState(false)
+    const [profileImagePreview, setProfileImagePreview] = useState('')
+    const [profileImageUploading, setProfileImageUploading] = useState(false)
+    const [profileImageError, setProfileImageError] = useState('')
+    const [profileImageSuccess, setProfileImageSuccess] = useState('')
+    const [profileImageCropModalOpen, setProfileImageCropModalOpen] = useState(false)
+    const [profileImageSource, setProfileImageSource] = useState('')
+    const [profileImagePendingFile, setProfileImagePendingFile] = useState<File | null>(null)
+    const [profileImageCrop, setProfileImageCrop] = useState({ x: 0, y: 0 })
+    const [profileImageZoom, setProfileImageZoom] = useState(1)
+    const [profileImageCroppedArea, setProfileImageCroppedArea] = useState<Area | null>(null)
+    const [profileImageCropError, setProfileImageCropError] = useState('')
+    const [profileImageDeleting, setProfileImageDeleting] = useState(false)
+    const profileImageInputRef = useRef<HTMLInputElement | null>(null)
     const lastStacksLoadedForUserIdRef = useRef<number | null>(null)
 
     const routeUserId = useMemo(() => parseRouteId(routeParams.id), [routeParams.id])
@@ -201,6 +218,160 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
         }
     }, [api, bioInput, t, user])
 
+    const processProfileImage = useCallback(
+        async (sourceURL: string, area: Area, fileName: string) => {
+            try {
+                const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+                    const img = new Image()
+                    img.onload = () => resolve(img)
+                    img.onerror = () => reject(new Error('load image failed'))
+                    img.src = sourceURL
+                })
+
+                const canvas = document.createElement('canvas')
+                canvas.width = 256
+                canvas.height = 256
+                const ctx = canvas.getContext('2d')
+                if (!ctx) throw new Error('canvas unsupported')
+                ctx.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, 256, 256)
+
+                const lowerName = fileName.toLowerCase()
+                const targetType = lowerName.endsWith('.png') ? 'image/png' : 'image/jpeg'
+                const blob = await new Promise<Blob | null>((resolve) => {
+                    canvas.toBlob((value) => resolve(value), targetType, targetType === 'image/jpeg' ? 0.92 : undefined)
+                })
+                if (!blob) throw new Error('encode failed')
+                return new File([blob], fileName, { type: targetType })
+            } catch {
+                throw new Error(t('profile.imageCropError'))
+            }
+        },
+        [t],
+    )
+
+    const closeProfileImageModal = useCallback(
+        (preservePreparedImage = false) => {
+            setProfileImageCropModalOpen(false)
+            setProfileImageCrop({ x: 0, y: 0 })
+            setProfileImageZoom(1)
+            setProfileImageCroppedArea(null)
+            setProfileImageCropError('')
+            setProfileImagePendingFile(null)
+            if (!preservePreparedImage) {
+                if (profileImagePreview) URL.revokeObjectURL(profileImagePreview)
+                setProfileImagePreview('')
+                if (profileImageInputRef.current) profileImageInputRef.current.value = ''
+            }
+            setProfileImageSource((prev) => {
+                if (prev) URL.revokeObjectURL(prev)
+                return ''
+            })
+        },
+        [profileImagePreview],
+    )
+
+    const onProfileImageSelected = useCallback(
+        async (file: File | null) => {
+            setProfileImageError('')
+            setProfileImageSuccess('')
+            setProfileImagePreview('')
+            setProfileImageCropError('')
+            if (!file) return
+
+            const lower = file.name.toLowerCase()
+            if (!(lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg'))) {
+                setProfileImageError(t('profile.imageTypeError'))
+                return
+            }
+
+            const source = URL.createObjectURL(file)
+            setProfileImageSource(source)
+            setProfileImagePendingFile(file)
+            setProfileImageCropModalOpen(true)
+        },
+        [t],
+    )
+
+    const uploadProfileImageFile = useCallback(
+        async (file: File, showGlobalError: boolean) => {
+            if (!user) return false
+            setProfileImageUploading(true)
+            setProfileImageError('')
+            setProfileImageSuccess('')
+            try {
+                const response = await api.requestProfileImageUpload(file.name)
+                await uploadPresignedPost(response.upload, file)
+                const uploadKey = response.upload.fields?.key ?? ''
+                const updated = await api.finalizeProfileImageUpload(uploadKey)
+                setUser(updated)
+                if (auth.user && auth.user.id === updated.id) {
+                    setAuthUser(updated)
+                }
+                setProfileImageSuccess(t('profile.imageUploaded'))
+                if (profileImageInputRef.current) profileImageInputRef.current.value = ''
+                return true
+            } catch (error) {
+                if (showGlobalError) {
+                    setProfileImageError(formatApiError(error, t).message)
+                } else {
+                    setProfileImageCropError(formatApiError(error, t).message)
+                }
+                return false
+            } finally {
+                setProfileImageUploading(false)
+            }
+        },
+        [api, auth.user, setAuthUser, t, user],
+    )
+
+    const applyProfileImageCrop = useCallback(async () => {
+        if (!profileImagePendingFile || !profileImageSource || !profileImageCroppedArea) {
+            setProfileImageCropError(t('profile.imageRequired'))
+            return
+        }
+        setProfileImageCropError('')
+        try {
+            const cropped = await processProfileImage(profileImageSource, profileImageCroppedArea, profileImagePendingFile.name)
+            if (cropped.size > 100 * 1024) {
+                setProfileImageCropError(t('profile.imageSizeError'))
+                return
+            }
+            if (profileImagePreview) URL.revokeObjectURL(profileImagePreview)
+            setProfileImagePreview(URL.createObjectURL(cropped))
+            setProfileImageError('')
+            setProfileImageSuccess('')
+            const uploaded = await uploadProfileImageFile(cropped, false)
+            if (!uploaded) {
+                return
+            }
+            closeProfileImageModal(false)
+        } catch (error) {
+            setProfileImageCropError(formatApiError(error, t).message)
+        }
+    }, [closeProfileImageModal, processProfileImage, profileImageCroppedArea, profileImagePendingFile, profileImagePreview, profileImageSource, t, uploadProfileImageFile])
+
+    const deleteProfileImage = useCallback(async () => {
+        if (!user || profileImageDeleting) return
+        setProfileImageDeleting(true)
+        setProfileImageError('')
+        setProfileImageSuccess('')
+        try {
+            const updated = await api.deleteProfileImage()
+            setUser(updated)
+            if (auth.user && auth.user.id === updated.id) {
+                setAuthUser(updated)
+            }
+            if (profileImagePreview) URL.revokeObjectURL(profileImagePreview)
+            setProfileImagePreview('')
+            if (profileImageInputRef.current) profileImageInputRef.current.value = ''
+            setProfileImageSuccess(t('profile.imageDeleted'))
+        } catch (error) {
+            setProfileImageError(formatApiError(error, t).message)
+        } finally {
+            setProfileImageDeleting(false)
+        }
+    }, [api, auth.user, profileImageDeleting, profileImagePreview, setAuthUser, t, user])
+
     const pushSolvedPageQuery = useCallback((nextPage: number) => {
         if (typeof window === 'undefined') return
         const params = new URLSearchParams(window.location.search)
@@ -259,6 +430,13 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
         }, 250)
         return () => window.clearTimeout(timer)
     }, [affiliationQuery, editingAffiliation, isOwnProfile])
+
+    useEffect(() => {
+        return () => {
+            if (profileImagePreview) URL.revokeObjectURL(profileImagePreview)
+            if (profileImageSource) URL.revokeObjectURL(profileImageSource)
+        }
+    }, [profileImagePreview, profileImageSource])
 
     useEffect(() => {
         if (targetUserId === null) return
@@ -370,6 +548,74 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
                                 onAffiliationPageChange={setAffiliationPage}
                                 onSaveAffiliation={saveAffiliation}
                             />
+
+                            <div className='mt-6 rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-lg md:border md:border-border md:bg-surface md:p-6'>
+                                <h3 className='text-lg text-text'>{t('profile.imageTitle')}</h3>
+                                <p className='mt-2 text-xs text-text-muted'>{t('profile.imageHint')}</p>
+                                <div className='mt-4 flex flex-wrap items-center gap-3'>
+                                    <input
+                                        ref={profileImageInputRef}
+                                        type='file'
+                                        accept='.png,.jpg,.jpeg,image/png,image/jpeg'
+                                        className='hidden'
+                                        onChange={(event) => {
+                                            void onProfileImageSelected(event.target.files?.[0] ?? null)
+                                        }}
+                                        disabled={profileImageUploading}
+                                    />
+                                    <button type='button' className='rounded-md border border-border px-3 py-1.5 text-sm text-text disabled:opacity-50' onClick={() => profileImageInputRef.current?.click()} disabled={profileImageUploading}>
+                                        {profileImageUploading ? t('admin.create.uploading') : t('profile.imageUpload')}
+                                    </button>
+                                    <button
+                                        type='button'
+                                        className='rounded-md border border-border px-3 py-1.5 text-sm text-text disabled:opacity-50'
+                                        onClick={() => {
+                                            void deleteProfileImage()
+                                        }}
+                                        disabled={profileImageUploading || profileImageDeleting || !user.profile_image}
+                                    >
+                                        {profileImageDeleting ? t('admin.create.uploading') : t('profile.imageDelete')}
+                                    </button>
+                                </div>
+                                {profileImageError ? <p className='mt-2 text-sm text-danger'>{profileImageError}</p> : null}
+                                {profileImageSuccess ? <p className='mt-2 text-sm text-accent'>{profileImageSuccess}</p> : null}
+                            </div>
+                            {profileImageCropModalOpen ? (
+                                <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4'>
+                                    <div className='w-full max-w-lg rounded-lg border border-border bg-surface p-4'>
+                                        <h4 className='text-base font-medium text-text'>{t('profile.imageCropTitle')}</h4>
+                                        <p className='mt-1 text-xs text-text-muted'>{t('profile.imageCropHint')}</p>
+                                        <div className='relative mt-4 h-80 w-full overflow-hidden rounded-md bg-black'>
+                                            <Cropper
+                                                image={profileImageSource}
+                                                crop={profileImageCrop}
+                                                zoom={profileImageZoom}
+                                                aspect={1}
+                                                cropShape='round'
+                                                showGrid={false}
+                                                onCropChange={setProfileImageCrop}
+                                                onZoomChange={setProfileImageZoom}
+                                                onCropComplete={(_, areaPixels) => setProfileImageCroppedArea(areaPixels)}
+                                            />
+                                        </div>
+                                        <div className='mt-4'>
+                                            <label className='text-xs text-text-muted'>
+                                                {t('profile.imageCropZoom')}: {profileImageZoom.toFixed(1)}x
+                                            </label>
+                                            <input className='mt-1 w-full' type='range' min={1} max={3} step={0.1} value={profileImageZoom} onChange={(event) => setProfileImageZoom(Number(event.target.value))} />
+                                        </div>
+                                        <div className='mt-4 flex justify-end gap-2'>
+                                            <button className='rounded-md border border-border px-3 py-1.5 text-sm text-text disabled:opacity-50' type='button' onClick={() => closeProfileImageModal(false)} disabled={profileImageUploading}>
+                                                {t('common.cancel')}
+                                            </button>
+                                            <button className='rounded-md border border-border px-3 py-1.5 text-sm text-text disabled:opacity-50' type='button' onClick={() => void applyProfileImageCrop()} disabled={profileImageUploading}>
+                                                {profileImageUploading ? t('admin.create.uploading') : t('profile.imageCropApply')}
+                                            </button>
+                                        </div>
+                                        {profileImageCropError ? <p className='mt-3 text-sm text-danger'>{profileImageCropError}</p> : null}
+                                    </div>
+                                </div>
+                            ) : null}
 
                             <ActiveStacksCard
                                 activeStacks={activeStacks}

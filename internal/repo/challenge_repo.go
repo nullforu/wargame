@@ -44,7 +44,8 @@ func (r *ChallengeRepo) ListActiveFiltered(ctx context.Context, filter Challenge
 		ColumnExpr("author.username AS created_by_username").
 		ColumnExpr("author.affiliation_id AS created_by_affiliation_id").
 		ColumnExpr("author_aff.name AS created_by_affiliation").
-		ColumnExpr("author.bio AS created_by_bio")
+		ColumnExpr("author.bio AS created_by_bio").
+		ColumnExpr("author.profile_image AS created_by_profile_image")
 
 	query := strings.TrimSpace(filter.Query)
 	if query != "" {
@@ -127,6 +128,7 @@ func (r *ChallengeRepo) GetByID(ctx context.Context, id int64) (*models.Challeng
 		ColumnExpr("author.affiliation_id AS created_by_affiliation_id").
 		ColumnExpr("author_aff.name AS created_by_affiliation").
 		ColumnExpr("author.bio AS created_by_bio").
+		ColumnExpr("author.profile_image AS created_by_profile_image").
 		Where("challenge.id = ?", id).
 		Scan(ctx); err != nil {
 		return nil, wrapNotFound("challengeRepo.GetByID", err)

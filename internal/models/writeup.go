@@ -28,6 +28,7 @@ type WriteupDetail struct {
 	AffiliationID     *int64    `bun:"affiliation_id"`
 	Affiliation       *string   `bun:"affiliation"`
 	Bio               *string   `bun:"bio"`
+	ProfileImage      *string   `bun:"profile_image"`
 	ChallengeTitle    string    `bun:"challenge_title"`
 	ChallengeCategory string    `bun:"challenge_category"`
 	ChallengePoints   int       `bun:"challenge_points"`

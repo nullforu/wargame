@@ -1,4 +1,8 @@
 .DS_Store
+.git
+.git/**
+.github
+.github/**
 .env
 .env.*
 *.local.*
@@ -8,3 +12,9 @@ logs
 logs/**
 *.log
 coverage.out
+frontend/node_modules
+frontend/node_modules/**
+frontend/dist
+frontend/dist/**
+frontend/.wrangler
+frontend/.wrangler/**

@@ -24,11 +24,11 @@ type errorFileStore struct {
 	deleteErr   error
 }
 
-func (e errorFileStore) PresignUpload(ctx context.Context, key, contentType string) (storage.PresignedPost, error) {
+func (e errorFileStore) PresignUpload(ctx context.Context, key, contentType string) (storage.PresignedUpload, error) {
 	if e.uploadErr != nil {
-		return storage.PresignedPost{}, e.uploadErr
+		return storage.PresignedUpload{}, e.uploadErr
 	}
-	return storage.PresignedPost{URL: "https://example.com/upload", Fields: map[string]string{"key": key}}, nil
+	return storage.PresignedUpload{URL: "https://example.com/upload", Method: "POST", Fields: map[string]string{"key": key}}, nil
 }
 
 func (e errorFileStore) PresignDownload(ctx context.Context, key, filename string) (storage.PresignedURL, error) {

@@ -8,6 +8,7 @@ import type {
     ChallengeCreateResponse,
     ChallengeUpdatePayload,
     ChallengeFileUploadResponse,
+    ProfileImageUploadResponse,
     ChallengeMyVoteResponse,
     ChallengeVotesResponse,
     ChallengeWriteupsResponse,
@@ -310,6 +311,23 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
         },
         me: () => request<AuthUser>(`/api/me`, { auth: true }),
         updateMe: (payload: { username?: string; affiliation_id?: number | null; bio?: string | null }) => request<AuthUser>(`/api/me`, { method: 'PUT', body: payload, auth: true }),
+        requestProfileImageUpload: (filename: string) =>
+            request<ProfileImageUploadResponse>(`/api/me/profile-image/upload`, {
+                method: 'POST',
+                body: { filename },
+                auth: true,
+            }),
+        finalizeProfileImageUpload: (key: string) =>
+            request<AuthUser>(`/api/me/profile-image`, {
+                method: 'PUT',
+                body: { key },
+                auth: true,
+            }),
+        deleteProfileImage: () =>
+            request<AuthUser>(`/api/me/profile-image`, {
+                method: 'DELETE',
+                auth: true,
+            }),
         challenges: async (page?: number, pageSize?: number) => {
             const data = await request<{ challenges?: Challenge[]; pagination?: PaginationMeta }>(withPagination(`/api/challenges`, page, pageSize), { auth: true })
             return {
@@ -646,19 +664,46 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
     }
 }
 
-export const uploadPresignedPost = async (upload: { url: string; fields: Record<string, string> }, file: File) => {
+export const uploadPresignedFile = async (upload: { url: string; fields?: Record<string, string>; headers?: Record<string, string>; method?: string }, file: File) => {
+    const method = String(upload.method ?? 'POST').toUpperCase()
+
+    if (method === 'PUT') {
+        const response = await fetch(upload.url, {
+            method: 'PUT',
+            headers: upload.headers ?? { 'Content-Type': file.type || 'application/zip' },
+            body: file,
+        })
+        if (!response.ok) {
+            throw new Error('File upload failed')
+        }
+        return
+    }
+
+    if (method !== 'POST') {
+        throw new Error(`Unsupported upload method: ${method}`)
+    }
+
     const formData = new FormData()
-    Object.entries(upload.fields).forEach(([key, value]) => {
+    Object.entries(upload.fields ?? {}).forEach(([key, value]) => {
         formData.append(key, value)
     })
     formData.append('file', file)
 
-    try {
-        const response = await fetch(upload.url, { method: 'POST', body: formData })
-        if (!response.ok) {
-            throw new Error('File upload failed')
-        }
-    } catch (error) {
-        throw error
+    const response = await fetch(upload.url, { method: 'POST', body: formData })
+    if (!response.ok) {
+        throw new Error(`File upload failed (${response.status})`)
+    }
+}
+
+export const uploadPresignedPost = async (upload: { url: string; fields?: Record<string, string> }, file: File) => {
+    const formData = new FormData()
+    Object.entries(upload.fields ?? {}).forEach(([key, value]) => {
+        formData.append(key, value)
+    })
+    formData.append('file', file)
+
+    const response = await fetch(upload.url, { method: 'POST', body: formData })
+    if (!response.ok) {
+        throw new Error(`File upload failed (${response.status})`)
     }
 }

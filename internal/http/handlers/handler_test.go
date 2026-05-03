@@ -1582,6 +1582,69 @@ func TestHandlerAuthMeUpdateFlow(t *testing.T) {
 		if middleware.UserID(ctx) != user.ID {
 			t.Fatalf("expected middleware user id %d", user.ID)
 		}
+
+		uploadBody := []byte(`{"filename":"avatar.png"}`)
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/me/profile-image/upload", uploadBody)
+		ctx.Set("userID", user.ID)
+		env.handler.RequestProfileImageUpload(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("profile image upload status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var uploadResp profileImageUploadResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &uploadResp); err != nil {
+			t.Fatalf("decode profile image upload: %v", err)
+		}
+
+		if uploadResp.Upload.Method != "POST" || uploadResp.Upload.URL == "" {
+			t.Fatalf("unexpected upload response: %+v", uploadResp.Upload)
+		}
+		if uploadResp.User.ProfileImage != nil {
+			t.Fatalf("request upload should not update profile image immediately, got %+v", uploadResp.User.ProfileImage)
+		}
+
+		key := strings.TrimSpace(uploadResp.Upload.Fields["key"])
+		if key == "" {
+			t.Fatalf("expected key in presigned upload fields")
+		}
+
+		finalizeBody := []byte(`{"key":"` + key + `"}`)
+		ctx, rec = newJSONContext(t, http.MethodPut, "/api/me/profile-image", finalizeBody)
+		ctx.Set("userID", user.ID)
+		env.handler.FinalizeProfileImageUpload(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("profile image finalize status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var finalizedResp userMeResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &finalizedResp); err != nil {
+			t.Fatalf("decode profile image finalize: %v", err)
+		}
+		if finalizedResp.ProfileImage == nil || *finalizedResp.ProfileImage != key {
+			t.Fatalf("expected finalized profile image key %q, got %+v", key, finalizedResp.ProfileImage)
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodPost, "/api/me/profile-image/upload", []byte(`{"filename":"avatar.gif"}`))
+		ctx.Set("userID", user.ID)
+		env.handler.RequestProfileImageUpload(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 invalid extension, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		ctx, rec = newJSONContext(t, http.MethodDelete, "/api/me/profile-image", nil)
+		ctx.Set("userID", user.ID)
+		env.handler.DeleteProfileImage(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("profile image delete status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var deletedResp userMeResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &deletedResp); err != nil {
+			t.Fatalf("decode profile image delete: %v", err)
+		}
+		if deletedResp.ProfileImage != nil {
+			t.Fatalf("expected nil profile image after delete, got %+v", deletedResp.ProfileImage)
+		}
 	})
 }
 

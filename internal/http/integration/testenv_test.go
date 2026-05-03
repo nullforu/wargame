@@ -247,7 +247,7 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
 
 	authSvc := service.NewAuthService(cfg, userRepo, testRedis)
-	userSvc := service.NewUserService(userRepo, affiliationRepo)
+	userSvc := service.NewUserService(userRepo, affiliationRepo, storage.NewMemoryProfileImageStore(10*time.Minute))
 	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(testDB), repo.NewCommunityRepo(testDB), testRedis, fileStore)
@@ -560,7 +560,7 @@ func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testE
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
 
 	authSvc := service.NewAuthService(cfg, userRepo, testRedis)
-	userSvc := service.NewUserService(userRepo, affiliationRepo)
+	userSvc := service.NewUserService(userRepo, affiliationRepo, storage.NewMemoryProfileImageStore(10*time.Minute))
 	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(testDB), repo.NewCommunityRepo(testDB), testRedis, fileStore)

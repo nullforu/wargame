@@ -206,7 +206,7 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
 
-	userSvc := service.NewUserService(userRepo, affiliationRepo)
+	userSvc := service.NewUserService(userRepo, affiliationRepo, storage.NewMemoryProfileImageStore(10*time.Minute))
 	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	authSvc := service.NewAuthService(handlerCfg, userRepo, handlerRedis)
 	scoreSvc := service.NewScoreboardService(scoreRepo)

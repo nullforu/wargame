@@ -17,6 +17,10 @@ export const formatApiError = (error: unknown, translate: (key: string, vars?: R
         return { message: error.message, fieldErrors }
     }
 
+    if (error instanceof Error) {
+        return { message: error.message, fieldErrors: {} }
+    }
+
     console.log('Unknown error format:', error)
     return { message: translate('errors.network'), fieldErrors: {} }
 }

@@ -97,7 +97,7 @@ const ChallengeCommentsPanel = ({
                             <div key={item.id} className='rounded-lg bg-surface/50 p-3'>
                                 <div className='flex items-start justify-between gap-2'>
                                     <div className='flex min-w-0 items-center gap-2'>
-                                        <UserAvatar username={item.author.username} size='sm' />
+                                        <UserAvatar username={item.author.username} profileImage={item.author.profile_image ?? null} size='sm' />
                                         <span className='truncate text-sm font-semibold text-text'>{item.author.username}</span>
                                     </div>
                                     <span className='shrink-0 text-xs text-text-subtle'>{formatTimestamp(item.created_at)}</span>

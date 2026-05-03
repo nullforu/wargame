@@ -353,6 +353,60 @@ func (h *Handler) UpdateMe(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
 }
 
+func (h *Handler) RequestProfileImageUpload(ctx *gin.Context) {
+	var req profileImageUploadRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	user, upload, err := h.users.RequestProfileImageUpload(ctx.Request.Context(), middleware.UserID(ctx), req.Filename)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
+	ctx.JSON(http.StatusOK, profileImageUploadResponse{
+		User: newUserMeResponse(user, stackCount, stackLimit),
+		Upload: presignedUploadResponse{
+			URL:       upload.URL,
+			Method:    upload.Method,
+			Fields:    upload.Fields,
+			Headers:   upload.Headers,
+			ExpiresAt: upload.ExpiresAt,
+		},
+	})
+}
+
+func (h *Handler) DeleteProfileImage(ctx *gin.Context) {
+	user, err := h.users.DeleteProfileImage(ctx.Request.Context(), middleware.UserID(ctx))
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
+	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
+}
+
+func (h *Handler) FinalizeProfileImageUpload(ctx *gin.Context) {
+	var req profileImageFinalizeRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	user, err := h.users.FinalizeProfileImageUpload(ctx.Request.Context(), middleware.UserID(ctx), req.Key)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
+	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
+}
+
 func (h *Handler) ListChallenges(ctx *gin.Context) {
 	page, pageSize, ok := parsePaginationParams(ctx)
 	if !ok {
@@ -1071,7 +1125,16 @@ func (h *Handler) RequestChallengeFileUpload(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, challengeFileUploadResponse{Challenge: newChallengeResponse(challenge, false, nil), Upload: presignedPostResponse{URL: upload.URL, Fields: upload.Fields, ExpiresAt: upload.ExpiresAt}})
+	ctx.JSON(http.StatusOK, challengeFileUploadResponse{
+		Challenge: newChallengeResponse(challenge, false, nil),
+		Upload: presignedUploadResponse{
+			URL:       upload.URL,
+			Method:    upload.Method,
+			Fields:    upload.Fields,
+			Headers:   upload.Headers,
+			ExpiresAt: upload.ExpiresAt,
+		},
+	})
 }
 
 func (h *Handler) RequestChallengeFileDownload(ctx *gin.Context) {

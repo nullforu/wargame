@@ -4,22 +4,29 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"wargame/internal/db"
 	"wargame/internal/models"
 	"wargame/internal/repo"
+	"wargame/internal/storage"
+
+	"github.com/google/uuid"
 )
 
 type UserService struct {
 	userRepo        *repo.UserRepo
 	affiliationRepo *repo.AffiliationRepo
+	profileStore    storage.ProfileImageStore
 }
 
-func NewUserService(userRepo *repo.UserRepo, affiliationRepo *repo.AffiliationRepo) *UserService {
-	return &UserService{userRepo: userRepo, affiliationRepo: affiliationRepo}
+func NewUserService(userRepo *repo.UserRepo, affiliationRepo *repo.AffiliationRepo, profileStore storage.ProfileImageStore) *UserService {
+	return &UserService{userRepo: userRepo, affiliationRepo: affiliationRepo, profileStore: profileStore}
 }
+
+const maxProfileImageBytes int64 = 100 * 1024
 
 func (s *UserService) GetByID(ctx context.Context, id int64) (*models.User, error) {
 	validator := newFieldValidator()
@@ -145,6 +152,160 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID int64, username 
 	}
 
 	return updated, nil
+}
+
+func (s *UserService) RequestProfileImageUpload(ctx context.Context, userID int64, filename string) (*models.User, storage.PresignedUpload, error) {
+	filename = normalizeTrim(filename)
+	validator := newFieldValidator()
+	validator.PositiveID("user_id", userID)
+	validator.Required("filename", filename)
+	if err := validator.Error(); err != nil {
+		return nil, storage.PresignedUpload{}, err
+	}
+
+	if s.profileStore == nil {
+		return nil, storage.PresignedUpload{}, ErrStorageUnavailable
+	}
+
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, storage.PresignedUpload{}, ErrNotFound
+		}
+		return nil, storage.PresignedUpload{}, fmt.Errorf("user.RequestProfileImageUpload lookup: %w", err)
+	}
+
+	ext := strings.ToLower(filepath.Ext(filename))
+	contentType := ""
+	switch ext {
+	case ".png":
+		contentType = "image/png"
+	case ".jpg", ".jpeg":
+		contentType = "image/jpeg"
+	default:
+		return nil, storage.PresignedUpload{}, NewValidationError(FieldError{Field: "filename", Reason: "must be a .png, .jpg, or .jpeg file"})
+	}
+
+	key := "profiles/" + uuid.NewString() + ext
+	upload, err := s.profileStore.PresignUpload(ctx, key, contentType, maxProfileImageBytes)
+	if err != nil {
+		return nil, storage.PresignedUpload{}, fmt.Errorf("user.RequestProfileImageUpload presign: %w", err)
+	}
+
+	return user, upload, nil
+}
+
+func (s *UserService) FinalizeProfileImageUpload(ctx context.Context, userID int64, key string) (*models.User, error) {
+	validator := newFieldValidator()
+	validator.PositiveID("user_id", userID)
+	validator.Required("key", normalizeTrim(key))
+	if err := validator.Error(); err != nil {
+		return nil, err
+	}
+
+	if s.profileStore == nil {
+		return nil, ErrStorageUnavailable
+	}
+
+	normalizedKey, err := normalizeProfileImageKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("user.FinalizeProfileImageUpload lookup: %w", err)
+	}
+
+	oldKey := ""
+	if user.ProfileImage != nil {
+		oldKey = strings.TrimSpace(*user.ProfileImage)
+	}
+
+	user.ProfileImage = &normalizedKey
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return nil, fmt.Errorf("user.FinalizeProfileImageUpload update: %w", err)
+	}
+
+	if oldKey != "" && oldKey != normalizedKey {
+		_ = s.profileStore.Delete(ctx, oldKey)
+	}
+
+	updated, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("user.FinalizeProfileImageUpload reload: %w", err)
+	}
+
+	return updated, nil
+}
+
+func (s *UserService) DeleteProfileImage(ctx context.Context, userID int64) (*models.User, error) {
+	validator := newFieldValidator()
+	validator.PositiveID("user_id", userID)
+	if err := validator.Error(); err != nil {
+		return nil, err
+	}
+
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+
+		return nil, fmt.Errorf("user.DeleteProfileImage lookup: %w", err)
+	}
+
+	if s.profileStore == nil {
+		return nil, ErrStorageUnavailable
+	}
+
+	oldKey := ""
+	if user.ProfileImage != nil {
+		oldKey = strings.TrimSpace(*user.ProfileImage)
+	}
+
+	user.ProfileImage = nil
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return nil, fmt.Errorf("user.DeleteProfileImage update: %w", err)
+	}
+
+	if oldKey != "" {
+		_ = s.profileStore.Delete(ctx, oldKey)
+	}
+
+	updated, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("user.DeleteProfileImage reload: %w", err)
+	}
+
+	return updated, nil
+}
+
+func normalizeProfileImageKey(key string) (string, error) {
+	k := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(key), "/"))
+	if !strings.HasPrefix(k, "profiles/") {
+		return "", NewValidationError(FieldError{Field: "key", Reason: "must start with profiles/"})
+	}
+
+	filename := strings.TrimPrefix(k, "profiles/")
+	if filename == "" || strings.Contains(filename, "/") {
+		return "", NewValidationError(FieldError{Field: "key", Reason: "invalid profile image key"})
+	}
+
+	ext := strings.ToLower(filepath.Ext(filename))
+	if ext != ".png" && ext != ".jpg" && ext != ".jpeg" {
+		return "", NewValidationError(FieldError{Field: "key", Reason: "must end with .png, .jpg, or .jpeg"})
+	}
+
+	id := strings.TrimSuffix(filename, ext)
+	if _, err := uuid.Parse(id); err != nil {
+		return "", NewValidationError(FieldError{Field: "key", Reason: "must include UUID filename"})
+	}
+
+	return k, nil
 }
 
 func (s *UserService) BlockUser(ctx context.Context, userID int64, reason string) (*models.User, error) {

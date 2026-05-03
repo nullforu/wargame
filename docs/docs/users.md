@@ -28,6 +28,7 @@ Response 200
     "affiliation_id": 2,
     "affiliation": "Blue Team",
     "bio": "Blue Team player",
+    "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
     "stack_count": 0,
     "stack_limit": 3,
     "blocked_reason": null,
@@ -72,6 +73,7 @@ Response 200
     "affiliation_id": 2,
     "affiliation": "Blue Team",
     "bio": "Blue Team player",
+    "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
     "stack_count": 0,
     "stack_limit": 3,
     "blocked_reason": null,
@@ -85,6 +87,166 @@ Errors:
 - 401 `invalid token` or `missing access_token cookie`
 - 403 `user blocked`
 - 409 `user already exists` (username already in use)
+
+---
+
+## Upload Profile Image
+
+`POST /api/me/profile-image/upload`
+
+Headers
+
+```
+Cookie: access_token=<jwt>
+```
+
+Request
+
+```json
+{
+    "filename": "avatar.png"
+}
+```
+
+Response 200
+
+```json
+{
+    "user": {
+        "id": 1,
+        "email": "user@example.com",
+        "username": "new_username",
+        "role": "user",
+        "affiliation_id": 2,
+        "affiliation": "Blue Team",
+        "bio": "Blue Team player",
+        "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
+        "stack_count": 0,
+        "stack_limit": 3,
+        "blocked_reason": null,
+        "blocked_at": null
+    },
+    "upload": {
+        "url": "https://media.example.com/...",
+        "method": "POST",
+        "fields": {
+            "key": "profiles/550e8400-e29b-41d4-a716-446655440000.png",
+            "Content-Type": "image/png"
+        },
+        "expires_at": "2026-01-01T00:00:00Z"
+    }
+}
+```
+
+Notes for this response:
+
+- This endpoint only issues a presigned upload and does not update `profile_image` in DB.
+- `user.profile_image` returns the current saved key (or `null`) until finalize API succeeds.
+
+Validation and policy notes:
+
+- Allowed filename extensions: `.png`, `.jpg`, `.jpeg`
+- Key format: `profiles/{uuid}.{ext}`
+- Upload method is always `POST`
+- Max size is limited to `100KB` by presigned POST policy (`content-length-range`)
+- API stores only the object key (for example `profiles/550e8400-e29b-41d4-a716-446655440000.png`) in DB. Client should render using CDN base URL + key.
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid token` or `missing access_token cookie`
+- 403 `user blocked`
+- 503 `storage unavailable`
+
+---
+
+## Finalize Profile Image Upload
+
+`PUT /api/me/profile-image`
+
+Headers
+
+```
+Cookie: access_token=<jwt>
+```
+
+Request
+
+```json
+{
+    "key": "profiles/550e8400-e29b-41d4-a716-446655440000.png"
+}
+```
+
+Response 200
+
+```json
+{
+    "id": 1,
+    "email": "user@example.com",
+    "username": "new_username",
+    "role": "user",
+    "affiliation_id": 2,
+    "affiliation": "Blue Team",
+    "bio": "Blue Team player",
+    "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.png",
+    "stack_count": 0,
+    "stack_limit": 3,
+    "blocked_reason": null,
+    "blocked_at": null
+}
+```
+
+Finalize behavior:
+
+- Validates key format as `profiles/{uuid}.{ext}` with `.png`, `.jpg`, `.jpeg`.
+- Saves only the key into DB.
+- If user already had a profile image key, DB switches to the new key first, then old object is deleted as cleanup.
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid token` or `missing access_token cookie`
+- 403 `user blocked`
+- 503 `storage unavailable`
+
+---
+
+## Delete Profile Image
+
+`DELETE /api/me/profile-image`
+
+Headers
+
+```
+Cookie: access_token=<jwt>
+```
+
+Response 200
+
+```json
+{
+    "id": 1,
+    "email": "user@example.com",
+    "username": "new_username",
+    "role": "user",
+    "affiliation_id": 2,
+    "affiliation": "Blue Team",
+    "bio": "Blue Team player",
+    "profile_image": null,
+    "stack_count": 0,
+    "stack_limit": 3,
+    "blocked_reason": null,
+    "blocked_at": null
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid token` or `missing access_token cookie`
+- 403 `user blocked`
+- 503 `storage unavailable`
 
 ---
 
@@ -109,6 +271,7 @@ Response 200
             "affiliation_id": 2,
             "affiliation": "Blue Team",
             "bio": "Blue Team player",
+            "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
             "blocked_reason": null,
             "blocked_at": null
         },
@@ -119,6 +282,7 @@ Response 200
             "affiliation_id": null,
             "affiliation": null,
             "bio": null,
+            "profile_image": null,
             "blocked_reason": null,
             "blocked_at": null
         }
@@ -162,6 +326,7 @@ Response 200
             "affiliation_id": 2,
             "affiliation": "Blue Team",
             "bio": "Blue Team player",
+            "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
             "blocked_reason": null,
             "blocked_at": null
         }
@@ -197,6 +362,7 @@ Response 200
     "affiliation_id": 2,
     "affiliation": "Blue Team",
     "bio": "Blue Team player",
+    "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
     "blocked_reason": null,
     "blocked_at": null
 }

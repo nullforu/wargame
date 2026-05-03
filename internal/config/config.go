@@ -28,6 +28,7 @@ type Config struct {
 	CORS     CORSConfig
 	Logging  LoggingConfig
 	S3       S3Config
+	S3Media  S3Config
 	Stack    StackConfig
 }
 
@@ -86,6 +87,7 @@ type S3Config struct {
 	Endpoint        string
 	ForcePathStyle  bool
 	PresignTTL      time.Duration
+	UploadMethod    string
 }
 
 type StackConfig struct {
@@ -196,17 +198,33 @@ func Load() (Config, error) {
 		errs = append(errs, err)
 	}
 
-	s3Enabled, err := getEnvBool("S3_ENABLED", false)
+	s3Enabled, err := getEnvBool("S3_CHALLENGE_ENABLED", false)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	s3PresignTTL, err := getDuration("S3_PRESIGN_TTL", 15*time.Minute)
+	s3PresignTTL, err := getDuration("S3_CHALLENGE_PRESIGN_TTL", 15*time.Minute)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	s3ForcePathStyle, err := getEnvBool("S3_FORCE_PATH_STYLE", false)
+	s3ForcePathStyle, err := getEnvBool("S3_CHALLENGE_FORCE_PATH_STYLE", false)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	s3UploadMethod := strings.ToLower(strings.TrimSpace(getEnv("S3_CHALLENGE_UPLOAD_PRESIGN_METHOD", "post")))
+
+	s3MediaEnabled, err := getEnvBool("S3_MEDIA_ENABLED", false)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	s3MediaPresignTTL, err := getDuration("S3_MEDIA_PRESIGN_TTL", 15*time.Minute)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	s3MediaForcePathStyle, err := getEnvBool("S3_MEDIA_FORCE_PATH_STYLE", false)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -293,13 +311,25 @@ func Load() (Config, error) {
 		},
 		S3: S3Config{
 			Enabled:         s3Enabled,
-			Region:          getEnv("S3_REGION", "us-east-1"),
-			Bucket:          getEnv("S3_BUCKET", ""),
-			AccessKeyID:     getEnv("S3_ACCESS_KEY_ID", ""),
-			SecretAccessKey: getEnv("S3_SECRET_ACCESS_KEY", ""),
-			Endpoint:        getEnv("S3_ENDPOINT", ""),
+			Region:          getEnv("S3_CHALLENGE_REGION", "us-east-1"),
+			Bucket:          getEnv("S3_CHALLENGE_BUCKET", ""),
+			AccessKeyID:     getEnv("S3_CHALLENGE_ACCESS_KEY_ID", ""),
+			SecretAccessKey: getEnv("S3_CHALLENGE_SECRET_ACCESS_KEY", ""),
+			Endpoint:        getEnv("S3_CHALLENGE_ENDPOINT", ""),
 			ForcePathStyle:  s3ForcePathStyle,
 			PresignTTL:      s3PresignTTL,
+			UploadMethod:    s3UploadMethod,
+		},
+		S3Media: S3Config{
+			Enabled:         s3MediaEnabled,
+			Region:          getEnv("S3_MEDIA_REGION", "us-east-1"),
+			Bucket:          getEnv("S3_MEDIA_BUCKET", ""),
+			AccessKeyID:     getEnv("S3_MEDIA_ACCESS_KEY_ID", ""),
+			SecretAccessKey: getEnv("S3_MEDIA_SECRET_ACCESS_KEY", ""),
+			Endpoint:        getEnv("S3_MEDIA_ENDPOINT", ""),
+			ForcePathStyle:  s3MediaForcePathStyle,
+			PresignTTL:      s3MediaPresignTTL,
+			UploadMethod:    "post",
 		},
 		Stack: StackConfig{
 			Enabled:             stackEnabled,
@@ -446,16 +476,33 @@ func validateConfig(cfg Config) error {
 
 	if cfg.S3.Enabled {
 		if cfg.S3.Region == "" {
-			errs = append(errs, errors.New("S3_REGION must not be empty"))
+			errs = append(errs, errors.New("S3_CHALLENGE_REGION must not be empty"))
 		}
 		if cfg.S3.Bucket == "" {
-			errs = append(errs, errors.New("S3_BUCKET must not be empty"))
+			errs = append(errs, errors.New("S3_CHALLENGE_BUCKET must not be empty"))
 		}
 		if (cfg.S3.AccessKeyID == "") != (cfg.S3.SecretAccessKey == "") {
-			errs = append(errs, errors.New("S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must both be set"))
+			errs = append(errs, errors.New("S3_CHALLENGE_ACCESS_KEY_ID and S3_CHALLENGE_SECRET_ACCESS_KEY must both be set"))
 		}
 		if cfg.S3.PresignTTL <= 0 {
-			errs = append(errs, errors.New("S3_PRESIGN_TTL must be positive"))
+			errs = append(errs, errors.New("S3_CHALLENGE_PRESIGN_TTL must be positive"))
+		}
+		if cfg.S3.UploadMethod != "post" && cfg.S3.UploadMethod != "put" {
+			errs = append(errs, errors.New("S3_CHALLENGE_UPLOAD_PRESIGN_METHOD must be either post or put"))
+		}
+	}
+	if cfg.S3Media.Enabled {
+		if cfg.S3Media.Region == "" {
+			errs = append(errs, errors.New("S3_MEDIA_REGION must not be empty"))
+		}
+		if cfg.S3Media.Bucket == "" {
+			errs = append(errs, errors.New("S3_MEDIA_BUCKET must not be empty"))
+		}
+		if (cfg.S3Media.AccessKeyID == "") != (cfg.S3Media.SecretAccessKey == "") {
+			errs = append(errs, errors.New("S3_MEDIA_ACCESS_KEY_ID and S3_MEDIA_SECRET_ACCESS_KEY must both be set"))
+		}
+		if cfg.S3Media.PresignTTL <= 0 {
+			errs = append(errs, errors.New("S3_MEDIA_PRESIGN_TTL must be positive"))
 		}
 	}
 
@@ -500,6 +547,8 @@ func Redact(cfg Config) Config {
 	cfg.JWT.Secret = redact(cfg.JWT.Secret)
 	cfg.S3.AccessKeyID = redact(cfg.S3.AccessKeyID)
 	cfg.S3.SecretAccessKey = redact(cfg.S3.SecretAccessKey)
+	cfg.S3Media.AccessKeyID = redact(cfg.S3Media.AccessKeyID)
+	cfg.S3Media.SecretAccessKey = redact(cfg.S3Media.SecretAccessKey)
 	cfg.Stack.ProvisionerAPIKey = redact(cfg.Stack.ProvisionerAPIKey)
 
 	return cfg
@@ -593,6 +642,18 @@ func FormatForLog(cfg Config) map[string]any {
 			"endpoint":          cfg.S3.Endpoint,
 			"force_path_style":  cfg.S3.ForcePathStyle,
 			"presign_ttl":       seconds(cfg.S3.PresignTTL),
+			"upload_method":     cfg.S3.UploadMethod,
+		},
+		"s3_media": map[string]any{
+			"enabled":           cfg.S3Media.Enabled,
+			"region":            cfg.S3Media.Region,
+			"bucket":            cfg.S3Media.Bucket,
+			"access_key_id":     cfg.S3Media.AccessKeyID,
+			"secret_access_key": cfg.S3Media.SecretAccessKey,
+			"endpoint":          cfg.S3Media.Endpoint,
+			"force_path_style":  cfg.S3Media.ForcePathStyle,
+			"presign_ttl":       seconds(cfg.S3Media.PresignTTL),
+			"upload_method":     cfg.S3Media.UploadMethod,
 		},
 		"stack": map[string]any{
 			"enabled":               cfg.Stack.Enabled,

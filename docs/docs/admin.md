@@ -404,6 +404,7 @@ Response 200
     },
     "upload": {
         "url": "https://s3.example.com/...",
+        "method": "POST",
         "fields": {
             "key": "uuid.zip",
             "Content-Type": "application/zip"
@@ -412,6 +413,11 @@ Response 200
     }
 }
 ```
+
+`upload.method` is either `POST` or `PUT`.
+
+- `POST`: upload with multipart form data using `upload.fields` and append file as `file`.
+- `PUT`: upload raw file bytes to `upload.url` with `upload.headers`.
 
 Errors:
 

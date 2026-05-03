@@ -22,6 +22,7 @@ type Challenge struct {
 	CreatedByAffiliationID *int64                `bun:"created_by_affiliation_id,scanonly"`
 	CreatedByAffiliation   *string               `bun:"created_by_affiliation,scanonly"`
 	CreatedByBio           *string               `bun:"created_by_bio,scanonly"`
+	CreatedByProfileImage  *string               `bun:"created_by_profile_image,scanonly"`
 	PreviousChallengeID    *int64                `bun:"previous_challenge_id,nullzero"`
 	FileKey                *string               `bun:"file_key,nullzero"`
 	FileName               *string               `bun:"file_name,nullzero"`

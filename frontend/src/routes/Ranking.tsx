@@ -246,7 +246,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                             onClick={() => navigate(`/users/${row.user_id}`)}
                                                         >
                                                             <span className={`inline-flex h-7 min-w-9 items-center justify-center rounded-full px-2 text-xs font-semibold md:mr-4 ${rankToneClass(rank)}`}>#{rank}</span>
-                                                            <UserAvatar username={row.username} size='sm' />
+                                                            <UserAvatar username={row.username} profileImage={row.profile_image ?? null} size='sm' />
                                                             <div className='min-w-0 flex-1'>
                                                                 <p className='truncate text-sm text-text'>{row.username}</p>
                                                                 <p className='truncate text-xs text-text-subtle'>{row.affiliation_name?.trim() ? row.affiliation_name : ''}</p>
@@ -399,7 +399,7 @@ const Ranking = ({ routeParams = {} }: RouteProps) => {
                                                                 onClick={() => navigate(`/users/${row.user_id}`)}
                                                             >
                                                                 <span className={`inline-flex h-7 min-w-9 items-center justify-center rounded-full px-2 text-xs font-semibold md:mr-4 ${rankToneClass(rank)}`}>#{rank}</span>
-                                                                <UserAvatar username={row.username} size='sm' />
+                                                                <UserAvatar username={row.username} profileImage={row.profile_image ?? null} size='sm' />
                                                                 <div className='min-w-0 flex-1'>
                                                                     <p className='truncate text-sm text-text'>{row.username}</p>
                                                                     <p className='truncate text-xs text-text-subtle'>{selectedTitle}</p>

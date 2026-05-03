@@ -14,7 +14,7 @@ const ProfileHeader = ({ user }: ProfileHeaderProps) => {
     return (
         <div className='flex flex-wrap items-end justify-between gap-4'>
             <div className='flex items-center gap-4.75'>
-                <UserAvatar username={user.username} size='lg' />
+                <UserAvatar username={user.username} profileImage={user.profile_image} size='xl' />
                 <div>
                     <h2 className='text-2xl text-text sm:text-3xl'>{user.username}</h2>
                     <p className='mt-1 text-sm text-text-muted'>{user.affiliation?.trim() ? user.affiliation : ''}</p>

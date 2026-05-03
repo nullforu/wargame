@@ -44,7 +44,8 @@ Response 200
                 "username": "alice",
                 "affiliation_id": 2,
                 "affiliation": "Semyeong High",
-                "bio": "web / pwn"
+                "bio": "web / pwn",
+                "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg"
             }
         }
     ],
@@ -89,7 +90,8 @@ Response 200
             "username": "alice",
             "affiliation_id": 2,
             "affiliation": "Semyeong High",
-            "bio": "web / pwn"
+            "bio": "web / pwn",
+            "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg"
         }
     }
 }
@@ -122,6 +124,7 @@ Response 200
             "affiliation_id": 2,
             "affiliation": "Semyeong High",
             "bio": "web / pwn",
+            "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
             "created_at": "2026-05-01T12:20:00Z"
         }
     ],
@@ -167,7 +170,8 @@ Response 200
                 "username": "alice",
                 "affiliation_id": 2,
                 "affiliation": "Semyeong High",
-                "bio": "web / pwn"
+                "bio": "web / pwn",
+                "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg"
             },
             "post": {
                 "id": 101,
@@ -260,7 +264,11 @@ Response 201
     "updated_at": "2026-05-01T12:00:00Z",
     "author": {
         "user_id": 7,
-        "username": "alice"
+        "username": "alice",
+        "affiliation_id": 2,
+        "affiliation": "Semyeong High",
+        "bio": "web / pwn",
+        "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg"
     }
 }
 ```
@@ -311,7 +319,11 @@ Response 200
     "updated_at": "2026-05-01T12:30:00Z",
     "author": {
         "user_id": 7,
-        "username": "alice"
+        "username": "alice",
+        "affiliation_id": 2,
+        "affiliation": "Semyeong High",
+        "bio": "web / pwn",
+        "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg"
     }
 }
 ```
@@ -355,7 +367,11 @@ Response 201
     "updated_at": "2026-05-01T12:20:00Z",
     "author": {
         "user_id": 7,
-        "username": "alice"
+        "username": "alice",
+        "affiliation_id": 2,
+        "affiliation": "Semyeong High",
+        "bio": "web / pwn",
+        "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg"
     },
     "post": {
         "id": 101,
@@ -402,7 +418,11 @@ Response 200
     "updated_at": "2026-05-01T12:30:00Z",
     "author": {
         "user_id": 7,
-        "username": "alice"
+        "username": "alice",
+        "affiliation_id": 2,
+        "affiliation": "Semyeong High",
+        "bio": "web / pwn",
+        "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg"
     },
     "post": {
         "id": 101,

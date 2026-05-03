@@ -168,7 +168,7 @@ const LegacyLeaderboard = ({ refreshTrigger = 0 }: LegacyLeaderboardProps) => {
                                         <span className='text-xs text-text-subtle'>#{(pagination.page - 1) * pagination.page_size + index + 1}</span>
                                         <span className='text-xs font-semibold text-text'>{t('common.pointsShort', { points: entry.score })}</span>
                                         <div className='flex items-center gap-3.75 truncate'>
-                                            <UserAvatar username={entry.username} size='sm' />
+                                            <UserAvatar username={entry.username} profileImage={entry.profile_image ?? null} size='sm' />
                                             <span className='truncate text-sm text-text'>{entry.username}</span>
                                         </div>
                                         {challenges.map((challenge) => {

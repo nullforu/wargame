@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { uploadPresignedPost } from '../../lib/api'
+import { uploadPresignedFile } from '../../lib/api'
 import { CHALLENGE_CATEGORIES } from '../../lib/constants'
 import { formatApiError, isZipFile, trimToMaxUtf8Bytes, utf8ByteLength, type FieldErrors } from '../../lib/utils'
 import type { Challenge, ChallengeDetail, ChallengeUpdatePayload, TargetPortSpec } from '../../lib/types'
@@ -377,7 +377,7 @@ const ChallengeManagement = () => {
 
         try {
             const uploadResponse = await api.requestChallengeFileUpload(challenge.id, editFile.name)
-            await uploadPresignedPost(uploadResponse.upload, editFile)
+            await uploadPresignedFile(uploadResponse.upload, editFile)
             setChallenges((prev) => prev.map((item) => (item.id === uploadResponse.challenge.id ? uploadResponse.challenge : item)))
             setEditFileSuccess(t('admin.manage.fileUploaded'))
             setEditFile(null)

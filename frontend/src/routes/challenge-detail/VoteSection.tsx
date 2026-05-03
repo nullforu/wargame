@@ -115,7 +115,7 @@ const VoteSection = ({
                         ) : (
                             votes.map((vote) => (
                                 <div key={`${vote.user_id}-${vote.updated_at}`} className='flex flex-wrap items-start gap-3 rounded-xl p-2.5 sm:flex-nowrap'>
-                                    <UserAvatar username={vote.username} size='sm' />
+                                    <UserAvatar username={vote.username} profileImage={vote.profile_image ?? null} size='sm' />
                                     <div className='min-w-0 flex-1'>
                                         <button className='block max-w-full truncate text-left text-sm font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${vote.user_id}`)}>
                                             {vote.username}

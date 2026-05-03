@@ -52,6 +52,14 @@ type meUpdateRequest struct {
 	Bio           optionalString `json:"bio"`
 }
 
+type profileImageUploadRequest struct {
+	Filename string `json:"filename" binding:"required"`
+}
+
+type profileImageFinalizeRequest struct {
+	Key string `json:"key" binding:"required"`
+}
+
 type adminAffiliationCreateRequest struct {
 	Name string `json:"name" binding:"required"`
 }
@@ -169,6 +177,7 @@ type userMeResponse struct {
 	AffiliationID *int64     `json:"affiliation_id"`
 	Affiliation   *string    `json:"affiliation"`
 	Bio           *string    `json:"bio"`
+	ProfileImage  *string    `json:"profile_image"`
 	StackCount    int        `json:"stack_count"`
 	StackLimit    int        `json:"stack_limit"`
 	BlockedReason *string    `json:"blocked_reason"`
@@ -182,6 +191,7 @@ type userDetailResponse struct {
 	AffiliationID *int64     `json:"affiliation_id"`
 	Affiliation   *string    `json:"affiliation"`
 	Bio           *string    `json:"bio"`
+	ProfileImage  *string    `json:"profile_image"`
 	BlockedReason *string    `json:"blocked_reason"`
 	BlockedAt     *time.Time `json:"blocked_at"`
 }
@@ -194,6 +204,7 @@ type adminUserResponse struct {
 	AffiliationID *int64     `json:"affiliation_id"`
 	Affiliation   *string    `json:"affiliation"`
 	Bio           *string    `json:"bio"`
+	ProfileImage  *string    `json:"profile_image"`
 	BlockedReason *string    `json:"blocked_reason"`
 	BlockedAt     *time.Time `json:"blocked_at"`
 }
@@ -244,6 +255,7 @@ type challengeCreatorResponse struct {
 	AffiliationID *int64  `json:"affiliation_id,omitempty"`
 	Affiliation   *string `json:"affiliation,omitempty"`
 	Bio           *string `json:"bio,omitempty"`
+	ProfileImage  *string `json:"profile_image,omitempty"`
 }
 
 type challengeVotesResponse struct {
@@ -275,6 +287,7 @@ type challengeSolverResponse struct {
 	Username     string    `json:"username"`
 	Affiliation  *string   `json:"affiliation,omitempty"`
 	Bio          *string   `json:"bio,omitempty"`
+	ProfileImage *string   `json:"profile_image,omitempty"`
 	SolvedAt     time.Time `json:"solved_at"`
 	IsFirstBlood bool      `json:"is_first_blood"`
 }
@@ -290,6 +303,7 @@ type writeupAuthorResponse struct {
 	AffiliationID *int64  `json:"affiliation_id,omitempty"`
 	Affiliation   *string `json:"affiliation,omitempty"`
 	Bio           *string `json:"bio,omitempty"`
+	ProfileImage  *string `json:"profile_image,omitempty"`
 }
 
 type writeupChallengeResponse struct {
@@ -326,6 +340,7 @@ type commentAuthorResponse struct {
 	AffiliationID *int64  `json:"affiliation_id,omitempty"`
 	Affiliation   *string `json:"affiliation,omitempty"`
 	Bio           *string `json:"bio,omitempty"`
+	ProfileImage  *string `json:"profile_image,omitempty"`
 }
 
 type commentChallengeResponse struct {
@@ -353,6 +368,7 @@ type communityPostAuthorResponse struct {
 	AffiliationID *int64  `json:"affiliation_id,omitempty"`
 	Affiliation   *string `json:"affiliation,omitempty"`
 	Bio           *string `json:"bio,omitempty"`
+	ProfileImage  *string `json:"profile_image,omitempty"`
 }
 
 type communityPostResponse struct {
@@ -384,6 +400,7 @@ type communityPostLikeResponse struct {
 	AffiliationID *int64    `json:"affiliation_id,omitempty"`
 	Affiliation   *string   `json:"affiliation,omitempty"`
 	Bio           *string   `json:"bio,omitempty"`
+	ProfileImage  *string   `json:"profile_image,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 }
 
@@ -420,9 +437,11 @@ type adminChallengeResponse struct {
 	StackPodSpec *string `json:"stack_pod_spec,omitempty"`
 }
 
-type presignedPostResponse struct {
+type presignedUploadResponse struct {
 	URL       string            `json:"url"`
+	Method    string            `json:"method"`
 	Fields    map[string]string `json:"fields"`
+	Headers   map[string]string `json:"headers,omitempty"`
 	ExpiresAt time.Time         `json:"expires_at"`
 }
 
@@ -432,8 +451,13 @@ type presignedURLResponse struct {
 }
 
 type challengeFileUploadResponse struct {
-	Challenge challengeResponse     `json:"challenge"`
-	Upload    presignedPostResponse `json:"upload"`
+	Challenge challengeResponse       `json:"challenge"`
+	Upload    presignedUploadResponse `json:"upload"`
+}
+
+type profileImageUploadResponse struct {
+	User   userMeResponse          `json:"user"`
+	Upload presignedUploadResponse `json:"upload"`
 }
 
 type timelineResponse struct {
@@ -526,6 +550,7 @@ func newUserMeResponse(user *models.User, stackCount, stackLimit int) userMeResp
 		AffiliationID: user.AffiliationID,
 		Affiliation:   user.Affiliation,
 		Bio:           user.Bio,
+		ProfileImage:  user.ProfileImage,
 		StackCount:    stackCount,
 		StackLimit:    stackLimit,
 		BlockedReason: user.BlockedReason,
@@ -541,6 +566,7 @@ func newUserDetailResponse(user *models.User) userDetailResponse {
 		AffiliationID: user.AffiliationID,
 		Affiliation:   user.Affiliation,
 		Bio:           user.Bio,
+		ProfileImage:  user.ProfileImage,
 		BlockedReason: user.BlockedReason,
 		BlockedAt:     user.BlockedAt,
 	}
@@ -555,6 +581,7 @@ func newAdminUserResponse(user *models.User) adminUserResponse {
 		AffiliationID: user.AffiliationID,
 		Affiliation:   user.Affiliation,
 		Bio:           user.Bio,
+		ProfileImage:  user.ProfileImage,
 		BlockedReason: user.BlockedReason,
 		BlockedAt:     user.BlockedAt,
 	}
@@ -623,7 +650,7 @@ func newLockedChallengeResponse(challenge *models.Challenge, previous *models.Ch
 }
 
 func newChallengeCreatorResponse(challenge *models.Challenge) *challengeCreatorResponse {
-	if challenge.CreatedByUserID == nil && challenge.CreatedByUsername == "" && challenge.CreatedByAffiliationID == nil && challenge.CreatedByAffiliation == nil && challenge.CreatedByBio == nil {
+	if challenge.CreatedByUserID == nil && challenge.CreatedByUsername == "" && challenge.CreatedByAffiliationID == nil && challenge.CreatedByAffiliation == nil && challenge.CreatedByBio == nil && challenge.CreatedByProfileImage == nil {
 		return nil
 	}
 
@@ -633,6 +660,7 @@ func newChallengeCreatorResponse(challenge *models.Challenge) *challengeCreatorR
 		AffiliationID: challenge.CreatedByAffiliationID,
 		Affiliation:   challenge.CreatedByAffiliation,
 		Bio:           challenge.CreatedByBio,
+		ProfileImage:  challenge.CreatedByProfileImage,
 	}
 }
 
@@ -642,6 +670,7 @@ func newChallengeSolverResponse(row models.ChallengeSolver) challengeSolverRespo
 		Username:     row.Username,
 		Affiliation:  row.Affiliation,
 		Bio:          row.Bio,
+		ProfileImage: row.ProfileImage,
 		SolvedAt:     row.SolvedAt.UTC(),
 		IsFirstBlood: row.IsFirstBlood,
 	}
@@ -665,6 +694,7 @@ func newWriteupResponse(row models.WriteupDetail, includeContent bool) writeupRe
 			AffiliationID: row.AffiliationID,
 			Affiliation:   row.Affiliation,
 			Bio:           row.Bio,
+			ProfileImage:  row.ProfileImage,
 		},
 		Challenge: writeupChallengeResponse{
 			ID:       row.ChallengeID,
@@ -688,6 +718,7 @@ func newChallengeCommentResponse(row models.ChallengeCommentDetail) challengeCom
 			AffiliationID: row.AffiliationID,
 			Affiliation:   row.Affiliation,
 			Bio:           row.Bio,
+			ProfileImage:  row.ProfileImage,
 		},
 		Challenge: commentChallengeResponse{
 			ID:    row.ChallengeID,
@@ -714,6 +745,7 @@ func newCommunityPostResponse(row models.CommunityPostDetail) communityPostRespo
 			AffiliationID: row.AffiliationID,
 			Affiliation:   row.Affiliation,
 			Bio:           row.Bio,
+			ProfileImage:  row.ProfileImage,
 		},
 	}
 }
@@ -730,6 +762,7 @@ func newCommunityCommentResponse(row models.CommunityCommentDetail) communityCom
 			AffiliationID: row.AffiliationID,
 			Affiliation:   row.Affiliation,
 			Bio:           row.Bio,
+			ProfileImage:  row.ProfileImage,
 		},
 	}
 	resp.Post.ID = row.PostID
@@ -744,6 +777,7 @@ func newCommunityPostLikeResponse(row models.CommunityPostLikeDetail) communityP
 		AffiliationID: row.AffiliationID,
 		Affiliation:   row.Affiliation,
 		Bio:           row.Bio,
+		ProfileImage:  row.ProfileImage,
 		CreatedAt:     row.CreatedAt.UTC(),
 	}
 }

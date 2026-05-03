@@ -230,7 +230,7 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
                         <div className='rounded-2xl bg-surface/70'>
                             <div className='flex items-start justify-between gap-4 py-2'>
                                 <div className='min-w-0 flex flex-1 items-center gap-3.75'>
-                                    <UserAvatar username={post.author.username} size='md' />
+                                    <UserAvatar username={post.author.username} profileImage={post.author.profile_image ?? null} size='md' />
                                     <div className='min-w-0'>
                                         <button className='block max-w-full truncate text-left text-lg font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${post.author.user_id}`)}>
                                             {post.author.username}
@@ -367,7 +367,7 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
                                         <div key={item.id} className='rounded-lg bg-surface/50 px-2 py-3'>
                                             <div className='flex items-start justify-between gap-2'>
                                                 <div className='flex min-w-0 items-center gap-2'>
-                                                    <UserAvatar username={item.author.username} size='sm' />
+                                                    <UserAvatar username={item.author.username} profileImage={item.author.profile_image ?? null} size='sm' />
                                                     <span className='truncate text-sm font-semibold text-text'>{item.author.username}</span>
                                                 </div>
                                                 <span className='shrink-0 text-xs text-text-subtle'>{formatDateTime(item.created_at, localeTag)}</span>
@@ -482,7 +482,7 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
                         <div className='hidden lg:block rounded-2xl bg-surface/70'>
                             <div className='flex items-start justify-between gap-4 py-2'>
                                 <div className='min-w-0 flex flex-1 items-center gap-3.75'>
-                                    <UserAvatar username={post.author.username} size='md' />
+                                    <UserAvatar username={post.author.username} profileImage={post.author.profile_image ?? null} size='md' />
                                     <div className='min-w-0'>
                                         <button className='block max-w-full truncate text-left text-lg font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${post.author.user_id}`)}>
                                             {post.author.username}
@@ -506,7 +506,7 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
                                     likes.map((like, index) => (
                                         <div key={`${like.user_id}-${index}`} className='flex items-start justify-between gap-4 py-2'>
                                             <div className='min-w-0 flex flex-1 items-center gap-3.75'>
-                                                <UserAvatar username={like.username} size='md' />
+                                                <UserAvatar username={like.username} profileImage={like.profile_image ?? null} size='md' />
                                                 <div className='min-w-0'>
                                                     <button className='block max-w-full truncate text-left text-lg font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${like.user_id}`)}>
                                                         {like.username}

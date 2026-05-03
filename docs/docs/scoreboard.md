@@ -23,6 +23,7 @@ Response 200
         {
             "user_id": 1,
             "username": "user1",
+            "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440001.jpg",
             "score": 300,
             "solves": [
                 {
@@ -42,7 +43,6 @@ Response 200
         "has_next": true
     }
 }
-
 ```
 
 ---
@@ -59,10 +59,12 @@ Response 200
         {
             "user_id": 3,
             "username": "user3",
+            "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440003.jpg",
             "score": 500,
             "solved_count": 4,
             "affiliation_id": 2,
-            "affiliation_name": "Blue Team"
+            "affiliation_name": "Blue Team",
+            "bio": "forensics / web"
         }
     ],
     "pagination": {
@@ -129,10 +131,12 @@ Response 200
         {
             "user_id": 3,
             "username": "user3",
+            "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440003.jpg",
             "score": 500,
             "solved_count": 4,
             "affiliation_id": 2,
-            "affiliation_name": "Blue Team"
+            "affiliation_name": "Blue Team",
+            "bio": "forensics / web"
         }
     ],
     "pagination": {
@@ -167,4 +171,3 @@ Response 200
     ]
 }
 ```
-

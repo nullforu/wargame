@@ -84,8 +84,18 @@ func main() {
 		fileStore = store
 	}
 
+	var profileImageStore storage.ProfileImageStore
+	if cfg.S3Media.Enabled {
+		store, err := storage.NewS3MediaFileStore(ctx, cfg.S3Media)
+		if err != nil {
+			logger.Error("s3 media init error", slog.Any("error", err))
+			os.Exit(1)
+		}
+		profileImageStore = store
+	}
+
 	authSvc := service.NewAuthService(cfg, userRepo, redisClient)
-	userSvc := service.NewUserService(userRepo, affiliationRepo)
+	userSvc := service.NewUserService(userRepo, affiliationRepo, profileImageStore)
 	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, challengeCommentRepo, communityRepo, redisClient, fileStore)
