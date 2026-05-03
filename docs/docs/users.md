@@ -128,12 +128,12 @@ Response 200
     },
     "upload": {
         "url": "https://media.example.com/...",
-            "method": "POST",
-            "fields": {
-                "key": "profiles/550e8400-e29b-41d4-a716-446655440000.png",
-                "Content-Type": "image/png"
-            },
-            "expires_at": "2026-01-01T00:00:00Z"
+        "method": "POST",
+        "fields": {
+            "key": "profiles/550e8400-e29b-41d4-a716-446655440000.png",
+            "Content-Type": "image/png"
+        },
+        "expires_at": "2026-01-01T00:00:00Z"
     }
 }
 ```

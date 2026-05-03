@@ -43,7 +43,6 @@ Response 200
         "has_next": true
     }
 }
-
 ```
 
 ---
