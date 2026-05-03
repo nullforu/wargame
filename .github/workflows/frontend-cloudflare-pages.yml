@@ -40,6 +40,7 @@ jobs:
       - name: Build
         env:
           VITE_API_BASE: https://internal.swua.kr/wargame
+          VITE_S3_MEDIA_CDN_BASE_URL: https://wargame-cdn.swua.kr
         run: npm run build
 
       - name: Deploy to Cloudflare Pages
