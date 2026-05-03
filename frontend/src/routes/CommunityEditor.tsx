@@ -65,9 +65,9 @@ const CommunityEditor = ({ routeParams = {} }: RouteProps) => {
         )
     }
 
-    const authorName = auth.user.username?.trim() || t('common.na')
-    const authorAffiliation = auth.user.affiliation?.trim() ?? ''
-    const authorBio = auth.user.bio?.trim() ?? ''
+    const authorName = auth.user.username.trim()
+    const authorAffiliation = auth.user.affiliation?.trim()
+    const authorBio = auth.user.bio?.trim()
     const isAdmin = auth.user.role === 'admin'
 
     return (
@@ -129,7 +129,7 @@ const CommunityEditor = ({ routeParams = {} }: RouteProps) => {
                                         <button className='block max-w-full truncate text-left text-base font-semibold text-text hover:text-accent' onClick={() => navigate('/profile')}>
                                             {authorName}
                                         </button>
-                                        <p className='mt-1 text-sm text-text-subtle'>{authorAffiliation || t('common.na')}</p>
+                                        {authorAffiliation && <p className='mt-1 text-sm text-text-subtle'>{authorAffiliation}</p>}
                                         <p className='mt-1 max-w-full truncate text-sm text-text-subtle'>{authorBio || t('profile.noBio')}</p>
                                     </div>
                                 </div>

@@ -377,7 +377,7 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
                                                 </div>
                                                 <div>
                                                     <span className='font-medium text-text'>{t('challenge.stackCreatedBy')}</span>
-                                                    <span className='ml-2'>{stackInfo.created_by_username || t('common.na')}</span>
+                                                    <span className='ml-2'>{stackInfo.created_by_username}</span>
                                                 </div>
                                                 <div>
                                                     <span className='font-medium text-text'>{t('challenge.stackPorts')}</span>

@@ -159,7 +159,7 @@ const Home = ({ routeParams = {} }: RouteProps) => {
                                     <UserAvatar username={displayProfile.username} profileImage={displayProfile.profile_image} size='md' />
                                     <div className='min-w-0'>
                                         <p className='truncate text-lg font-semibold text-text'>{displayProfile.username}</p>
-                                        <p className='truncate text-xs text-text-subtle'>{displayProfile.affiliation?.trim() ? displayProfile.affiliation : t('common.na')}</p>
+                                        {displayProfile.affiliation?.trim() && <p className='truncate text-xs text-text-subtle'>{displayProfile.affiliation}</p>}
                                     </div>
                                 </div>
                                 <button
@@ -282,7 +282,7 @@ const Home = ({ routeParams = {} }: RouteProps) => {
                                                     <UserAvatar username={challenge.created_by?.username ?? 'unknown'} profileImage={challenge.created_by?.profile_image ?? null} size='sm' />
                                                     <div className='min-w-0'>
                                                         <p className='truncate text-sm font-semibold text-text'>{challenge.created_by?.username ?? t('common.na')}</p>
-                                                        <p className='truncate text-[11px] text-text-subtle'>{challenge.created_by?.affiliation ?? t('common.na')}</p>
+                                                        {challenge.created_by?.affiliation?.trim() && <p className='truncate text-[11px] text-text-subtle'>{challenge.created_by.affiliation}</p>}
                                                     </div>
                                                 </div>
                                                 <div className='flex flex-1 flex-col items-center justify-center px-3 py-2'>

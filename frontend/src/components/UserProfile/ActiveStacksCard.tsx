@@ -48,7 +48,7 @@ const ActiveStacksCard = ({ activeStacks, stacksError, stacksLoading, stackDelet
                                 <div>
                                     <p className='text-sm font-medium text-text'>{formatChallengeTitle(stack)}</p>
                                     <p className='mt-1 text-xs text-text-subtle'>{t('profile.statusLabel', { status: stack.status })}</p>
-                                    <p className='mt-1 text-xs text-text-subtle'>{t('profile.createdBy', { username: stack.created_by_username || t('common.na') })}</p>
+                                    <p className='mt-1 text-xs text-text-subtle'>{t('profile.createdBy', { username: stack.created_by_username })}</p>
                                 </div>
                                 <div className='flex w-full flex-col gap-2 text-xs text-text-muted sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-3'>
                                     <span className='break-all'>{formatEndpoints(stack)}</span>
