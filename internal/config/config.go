@@ -228,7 +228,6 @@ func Load() (Config, error) {
 	if err != nil {
 		errs = append(errs, err)
 	}
-	s3MediaUploadMethod := strings.ToLower(strings.TrimSpace(getEnv("S3_MEDIA_UPLOAD_PRESIGN_METHOD", "post")))
 
 	stackEnabled, err := getEnvBool("STACKS_ENABLED", true)
 	if err != nil {
@@ -330,7 +329,7 @@ func Load() (Config, error) {
 			Endpoint:        getEnv("S3_MEDIA_ENDPOINT", ""),
 			ForcePathStyle:  s3MediaForcePathStyle,
 			PresignTTL:      s3MediaPresignTTL,
-			UploadMethod:    s3MediaUploadMethod,
+			UploadMethod:    "post",
 		},
 		Stack: StackConfig{
 			Enabled:             stackEnabled,
@@ -504,9 +503,6 @@ func validateConfig(cfg Config) error {
 		}
 		if cfg.S3Media.PresignTTL <= 0 {
 			errs = append(errs, errors.New("S3_MEDIA_PRESIGN_TTL must be positive"))
-		}
-		if cfg.S3Media.UploadMethod != "post" {
-			errs = append(errs, errors.New("S3_MEDIA_UPLOAD_PRESIGN_METHOD must be post"))
 		}
 	}
 

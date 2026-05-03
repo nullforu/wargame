@@ -114,7 +114,6 @@ func TestLoadConfigCustomValues(t *testing.T) {
 	os.Setenv("S3_MEDIA_ENDPOINT", "https://media.example.com")
 	os.Setenv("S3_MEDIA_FORCE_PATH_STYLE", "false")
 	os.Setenv("S3_MEDIA_PRESIGN_TTL", "10m")
-	os.Setenv("S3_MEDIA_UPLOAD_PRESIGN_METHOD", "post")
 	os.Setenv("STACKS_ENABLED", "true")
 	os.Setenv("STACKS_MAX_PER", "5")
 	os.Setenv("STACKS_PROVISIONER_BASE_URL", "http://localhost:18081")
@@ -310,20 +309,6 @@ func TestLoadConfigS3ValidationErrors(t *testing.T) {
 				t.Fatalf("expected error")
 			}
 		})
-	}
-}
-
-func TestLoadConfigS3MediaValidationErrors(t *testing.T) {
-	os.Clearenv()
-	os.Setenv("S3_MEDIA_ENABLED", "true")
-	os.Setenv("S3_MEDIA_REGION", "auto")
-	os.Setenv("S3_MEDIA_BUCKET", "media-bucket")
-	os.Setenv("S3_MEDIA_UPLOAD_PRESIGN_METHOD", "put")
-	os.Setenv("STACKS_PROVISIONER_API_KEY", "test-key")
-	defer os.Clearenv()
-
-	if _, err := Load(); err == nil {
-		t.Fatalf("expected validation error for S3_MEDIA_UPLOAD_PRESIGN_METHOD")
 	}
 }
 

@@ -49,7 +49,6 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8080'
 const UPLOAD_PRESIGN_METHOD = String(import.meta.env.VITE_S3_CHALLENGE_UPLOAD_PRESIGN_METHOD ?? 'POST').toUpperCase()
-const MEDIA_UPLOAD_PRESIGN_METHOD = String(import.meta.env.VITE_S3_MEDIA_UPLOAD_PRESIGN_METHOD ?? 'POST').toUpperCase()
 const CSRF_TOKEN_HEADER = 'X-CSRF-Token'
 
 export interface ApiErrorDetail {
@@ -688,10 +687,6 @@ export const uploadPresignedFile = async (upload: { url: string; fields?: Record
 }
 
 export const uploadPresignedPost = async (upload: { url: string; fields?: Record<string, string> }, file: File) => {
-    if (MEDIA_UPLOAD_PRESIGN_METHOD !== 'POST') {
-        throw new Error('Media upload presign method must be POST')
-    }
-
     const formData = new FormData()
     Object.entries(upload.fields ?? {}).forEach(([key, value]) => {
         formData.append(key, value)

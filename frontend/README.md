@@ -8,7 +8,6 @@
 - `VITE_API_BASE` (default: `http://localhost:8080`)
 - `VITE_S3_CHALLENGE_UPLOAD_PRESIGN_METHOD` (default: `POST`, supported: `POST`, `PUT`)
 - `VITE_S3_MEDIA_CDN_BASE_URL` (example: `https://wargame-cdn.swua.kr`)
-- `VITE_S3_MEDIA_UPLOAD_PRESIGN_METHOD` (default: `POST`, supported: `POST`)
 
 Profile image UX notes:
 
@@ -22,13 +21,11 @@ Profile image UX notes:
 VITE_API_BASE=http://localhost:8080 \
 VITE_S3_CHALLENGE_UPLOAD_PRESIGN_METHOD=PUT \
 VITE_S3_MEDIA_CDN_BASE_URL=https://wargame-cdn.swua.kr \
-VITE_S3_MEDIA_UPLOAD_PRESIGN_METHOD=POST \
 npm run dev
 
 VITE_API_BASE=https://internal.swua.kr/wargame \
 VITE_S3_CHALLENGE_UPLOAD_PRESIGN_METHOD=PUT \
 VITE_S3_MEDIA_CDN_BASE_URL=https://wargame-cdn.swua.kr \
-VITE_S3_MEDIA_UPLOAD_PRESIGN_METHOD=POST \
 npm run build
 
 wrangler pages deploy dist \
