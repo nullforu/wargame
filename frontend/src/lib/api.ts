@@ -48,7 +48,6 @@ import type {
 } from './types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8080'
-const UPLOAD_PRESIGN_METHOD = String(import.meta.env.VITE_S3_CHALLENGE_UPLOAD_PRESIGN_METHOD ?? 'POST').toUpperCase()
 const CSRF_TOKEN_HEADER = 'X-CSRF-Token'
 
 export interface ApiErrorDetail {
@@ -316,6 +315,12 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
             request<ProfileImageUploadResponse>(`/api/me/profile-image/upload`, {
                 method: 'POST',
                 body: { filename },
+                auth: true,
+            }),
+        finalizeProfileImageUpload: (key: string) =>
+            request<AuthUser>(`/api/me/profile-image`, {
+                method: 'PUT',
+                body: { key },
                 auth: true,
             }),
         deleteProfileImage: () =>
@@ -660,7 +665,7 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
 }
 
 export const uploadPresignedFile = async (upload: { url: string; fields?: Record<string, string>; headers?: Record<string, string>; method?: string }, file: File) => {
-    const method = UPLOAD_PRESIGN_METHOD === 'PUT' ? 'PUT' : 'POST'
+    const method = String(upload.method ?? 'POST').toUpperCase()
 
     if (method === 'PUT') {
         const response = await fetch(upload.url, {
@@ -672,6 +677,10 @@ export const uploadPresignedFile = async (upload: { url: string; fields?: Record
             throw new Error('File upload failed')
         }
         return
+    }
+
+    if (method !== 'POST') {
+        throw new Error(`Unsupported upload method: ${method}`)
     }
 
     const formData = new FormData()

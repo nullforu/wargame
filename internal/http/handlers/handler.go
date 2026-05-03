@@ -390,6 +390,23 @@ func (h *Handler) DeleteProfileImage(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
 }
 
+func (h *Handler) FinalizeProfileImageUpload(ctx *gin.Context) {
+	var req profileImageFinalizeRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	user, err := h.users.FinalizeProfileImageUpload(ctx.Request.Context(), middleware.UserID(ctx), req.Key)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
+	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
+}
+
 func (h *Handler) ListChallenges(ctx *gin.Context) {
 	page, pageSize, ok := parsePaginationParams(ctx)
 	if !ok {

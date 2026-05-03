@@ -301,9 +301,11 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
             try {
                 const response = await api.requestProfileImageUpload(file.name)
                 await uploadPresignedPost(response.upload, file)
-                setUser(response.user)
-                if (auth.user && auth.user.id === response.user.id) {
-                    setAuthUser(response.user)
+                const uploadKey = response.upload.fields?.key ?? ''
+                const updated = await api.finalizeProfileImageUpload(uploadKey)
+                setUser(updated)
+                if (auth.user && auth.user.id === updated.id) {
+                    setAuthUser(updated)
                 }
                 setProfileImageSuccess(t('profile.imageUploaded'))
                 if (profileImageInputRef.current) profileImageInputRef.current.value = ''

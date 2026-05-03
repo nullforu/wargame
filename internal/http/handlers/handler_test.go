@@ -1599,8 +1599,29 @@ func TestHandlerAuthMeUpdateFlow(t *testing.T) {
 		if uploadResp.Upload.Method != "POST" || uploadResp.Upload.URL == "" {
 			t.Fatalf("unexpected upload response: %+v", uploadResp.Upload)
 		}
-		if uploadResp.User.ProfileImage == nil || *uploadResp.User.ProfileImage == "" {
-			t.Fatalf("expected profile image key in response, got %+v", uploadResp.User)
+		if uploadResp.User.ProfileImage != nil {
+			t.Fatalf("request upload should not update profile image immediately, got %+v", uploadResp.User.ProfileImage)
+		}
+
+		key := strings.TrimSpace(uploadResp.Upload.Fields["key"])
+		if key == "" {
+			t.Fatalf("expected key in presigned upload fields")
+		}
+
+		finalizeBody := []byte(`{"key":"` + key + `"}`)
+		ctx, rec = newJSONContext(t, http.MethodPut, "/api/me/profile-image", finalizeBody)
+		ctx.Set("userID", user.ID)
+		env.handler.FinalizeProfileImageUpload(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("profile image finalize status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var finalizedResp userMeResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &finalizedResp); err != nil {
+			t.Fatalf("decode profile image finalize: %v", err)
+		}
+		if finalizedResp.ProfileImage == nil || *finalizedResp.ProfileImage != key {
+			t.Fatalf("expected finalized profile image key %q, got %+v", key, finalizedResp.ProfileImage)
 		}
 
 		ctx, rec = newJSONContext(t, http.MethodPost, "/api/me/profile-image/upload", []byte(`{"filename":"avatar.gif"}`))

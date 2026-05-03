@@ -56,6 +56,10 @@ type profileImageUploadRequest struct {
 	Filename string `json:"filename" binding:"required"`
 }
 
+type profileImageFinalizeRequest struct {
+	Key string `json:"key" binding:"required"`
+}
+
 type adminAffiliationCreateRequest struct {
 	Name string `json:"name" binding:"required"`
 }

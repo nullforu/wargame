@@ -192,17 +192,54 @@ func (s *UserService) RequestProfileImageUpload(ctx context.Context, userID int6
 		return nil, storage.PresignedUpload{}, fmt.Errorf("user.RequestProfileImageUpload presign: %w", err)
 	}
 
-	user.ProfileImage = &key
+	return user, upload, nil
+}
+
+func (s *UserService) FinalizeProfileImageUpload(ctx context.Context, userID int64, key string) (*models.User, error) {
+	validator := newFieldValidator()
+	validator.PositiveID("user_id", userID)
+	validator.Required("key", normalizeTrim(key))
+	if err := validator.Error(); err != nil {
+		return nil, err
+	}
+
+	if s.profileStore == nil {
+		return nil, ErrStorageUnavailable
+	}
+
+	normalizedKey, err := normalizeProfileImageKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("user.FinalizeProfileImageUpload lookup: %w", err)
+	}
+
+	oldKey := ""
+	if user.ProfileImage != nil {
+		oldKey = strings.TrimSpace(*user.ProfileImage)
+	}
+
+	user.ProfileImage = &normalizedKey
 	if err := s.userRepo.Update(ctx, user); err != nil {
-		return nil, storage.PresignedUpload{}, fmt.Errorf("user.RequestProfileImageUpload update: %w", err)
+		return nil, fmt.Errorf("user.FinalizeProfileImageUpload update: %w", err)
+	}
+
+	if oldKey != "" && oldKey != normalizedKey {
+		_ = s.profileStore.Delete(ctx, oldKey)
 	}
 
 	updated, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
-		return nil, storage.PresignedUpload{}, fmt.Errorf("user.RequestProfileImageUpload reload: %w", err)
+		return nil, fmt.Errorf("user.FinalizeProfileImageUpload reload: %w", err)
 	}
 
-	return updated, upload, nil
+	return updated, nil
 }
 
 func (s *UserService) DeleteProfileImage(ctx context.Context, userID int64) (*models.User, error) {
@@ -221,19 +258,22 @@ func (s *UserService) DeleteProfileImage(ctx context.Context, userID int64) (*mo
 		return nil, fmt.Errorf("user.DeleteProfileImage lookup: %w", err)
 	}
 
-	if user.ProfileImage != nil && strings.TrimSpace(*user.ProfileImage) != "" {
-		if s.profileStore == nil {
-			return nil, ErrStorageUnavailable
-		}
+	if s.profileStore == nil {
+		return nil, ErrStorageUnavailable
+	}
 
-		if err := s.profileStore.Delete(ctx, strings.TrimSpace(*user.ProfileImage)); err != nil {
-			return nil, fmt.Errorf("user.DeleteProfileImage delete object: %w", err)
-		}
+	oldKey := ""
+	if user.ProfileImage != nil {
+		oldKey = strings.TrimSpace(*user.ProfileImage)
 	}
 
 	user.ProfileImage = nil
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, fmt.Errorf("user.DeleteProfileImage update: %w", err)
+	}
+
+	if oldKey != "" {
+		_ = s.profileStore.Delete(ctx, oldKey)
 	}
 
 	updated, err := s.userRepo.GetByID(ctx, userID)
@@ -242,6 +282,30 @@ func (s *UserService) DeleteProfileImage(ctx context.Context, userID int64) (*mo
 	}
 
 	return updated, nil
+}
+
+func normalizeProfileImageKey(key string) (string, error) {
+	k := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(key), "/"))
+	if !strings.HasPrefix(k, "profiles/") {
+		return "", NewValidationError(FieldError{Field: "key", Reason: "must start with profiles/"})
+	}
+
+	filename := strings.TrimPrefix(k, "profiles/")
+	if filename == "" || strings.Contains(filename, "/") {
+		return "", NewValidationError(FieldError{Field: "key", Reason: "invalid profile image key"})
+	}
+
+	ext := strings.ToLower(filepath.Ext(filename))
+	if ext != ".png" && ext != ".jpg" && ext != ".jpeg" {
+		return "", NewValidationError(FieldError{Field: "key", Reason: "must end with .png, .jpg, or .jpeg"})
+	}
+
+	id := strings.TrimSuffix(filename, ext)
+	if _, err := uuid.Parse(id); err != nil {
+		return "", NewValidationError(FieldError{Field: "key", Reason: "must include UUID filename"})
+	}
+
+	return k, nil
 }
 
 func (s *UserService) BlockUser(ctx context.Context, userID int64, reason string) (*models.User, error) {

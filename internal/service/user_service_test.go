@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -219,22 +220,50 @@ func TestUserServiceRequestProfileImageUpload(t *testing.T) {
 		t.Fatalf("expected presigned POST upload, got %+v", upload)
 	}
 
-	if updated.ProfileImage == nil || !regexp.MustCompile(`^profiles/[0-9a-f-]+\.png$`).MatchString(*updated.ProfileImage) {
-		t.Fatalf("unexpected profile image key: %+v", updated.ProfileImage)
+	if updated.ProfileImage != nil {
+		t.Fatalf("request upload should not update DB profile image, got %+v", updated.ProfileImage)
 	}
 
-	prevKey := *updated.ProfileImage
+	key1 := strings.TrimSpace(upload.Fields["key"])
+	if !regexp.MustCompile(`^profiles/[0-9a-f-]+\.png$`).MatchString(key1) {
+		t.Fatalf("unexpected presigned key: %q", key1)
+	}
+
+	updated, err = env.userSvc.FinalizeProfileImageUpload(context.Background(), user.ID, key1)
+	if err != nil {
+		t.Fatalf("FinalizeProfileImageUpload: %v", err)
+	}
+	if updated.ProfileImage == nil || *updated.ProfileImage != key1 {
+		t.Fatalf("unexpected finalized profile image key: %+v", updated.ProfileImage)
+	}
+
 	updated, _, err = env.userSvc.RequestProfileImageUpload(context.Background(), user.ID, "avatar.jpg")
 	if err != nil {
 		t.Fatalf("RequestProfileImageUpload overwrite: %v", err)
 	}
 
-	if updated.ProfileImage == nil || !regexp.MustCompile(`^profiles/[0-9a-f-]+\.jpg$`).MatchString(*updated.ProfileImage) {
-		t.Fatalf("unexpected overwritten profile image key: %+v", updated.ProfileImage)
+	if updated.ProfileImage == nil || *updated.ProfileImage != key1 {
+		t.Fatalf("request upload should not change existing profile image, got %+v", updated.ProfileImage)
 	}
 
-	if *updated.ProfileImage == prevKey {
+	_, upload2, err := env.userSvc.RequestProfileImageUpload(context.Background(), user.ID, "avatar.jpg")
+	if err != nil {
+		t.Fatalf("RequestProfileImageUpload second presign: %v", err)
+	}
+	key2 := strings.TrimSpace(upload2.Fields["key"])
+	if !regexp.MustCompile(`^profiles/[0-9a-f-]+\.jpg$`).MatchString(key2) {
+		t.Fatalf("unexpected second presigned key: %q", key2)
+	}
+	if key2 == key1 {
 		t.Fatalf("expected new UUID key on each upload")
+	}
+
+	finalized2, err := env.userSvc.FinalizeProfileImageUpload(context.Background(), user.ID, key2)
+	if err != nil {
+		t.Fatalf("FinalizeProfileImageUpload second: %v", err)
+	}
+	if finalized2.ProfileImage == nil || *finalized2.ProfileImage != key2 {
+		t.Fatalf("expected finalized second key, got %+v", finalized2.ProfileImage)
 	}
 
 	if _, _, err := env.userSvc.RequestProfileImageUpload(context.Background(), user.ID, "avatar.gif"); err == nil {
@@ -253,6 +282,14 @@ func TestUserServiceRequestProfileImageUpload(t *testing.T) {
 		t.Fatalf("expected ErrStorageUnavailable, got %v", err)
 	}
 
+	if _, err := env.userSvc.FinalizeProfileImageUpload(context.Background(), user.ID, "profiles/not-uuid.png"); err == nil {
+		t.Fatalf("expected key validation error")
+	}
+
+	if _, err := NewUserService(env.userRepo, env.affiliationRepo, nil).FinalizeProfileImageUpload(context.Background(), user.ID, key2); !errors.Is(err, ErrStorageUnavailable) {
+		t.Fatalf("expected finalize ErrStorageUnavailable, got %v", err)
+	}
+
 	deleted, err := env.userSvc.DeleteProfileImage(context.Background(), user.ID)
 	if err != nil {
 		t.Fatalf("DeleteProfileImage: %v", err)
@@ -260,5 +297,9 @@ func TestUserServiceRequestProfileImageUpload(t *testing.T) {
 
 	if deleted.ProfileImage != nil {
 		t.Fatalf("expected profile image to be nil, got %+v", deleted.ProfileImage)
+	}
+
+	if _, err := NewUserService(env.userRepo, env.affiliationRepo, nil).DeleteProfileImage(context.Background(), user.ID); !errors.Is(err, ErrStorageUnavailable) {
+		t.Fatalf("expected delete ErrStorageUnavailable, got %v", err)
 	}
 }
