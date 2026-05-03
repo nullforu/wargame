@@ -28,6 +28,7 @@ Response 200
     "affiliation_id": 2,
     "affiliation": "Blue Team",
     "bio": "Blue Team player",
+    "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
     "stack_count": 0,
     "stack_limit": 3,
     "blocked_reason": null,
@@ -72,6 +73,7 @@ Response 200
     "affiliation_id": 2,
     "affiliation": "Blue Team",
     "bio": "Blue Team player",
+    "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
     "stack_count": 0,
     "stack_limit": 3,
     "blocked_reason": null,
@@ -85,6 +87,110 @@ Errors:
 - 401 `invalid token` or `missing access_token cookie`
 - 403 `user blocked`
 - 409 `user already exists` (username already in use)
+
+---
+
+## Upload Profile Image
+
+`POST /api/me/profile-image/upload`
+
+Headers
+
+```
+Cookie: access_token=<jwt>
+```
+
+Request
+
+```json
+{
+    "filename": "avatar.png"
+}
+```
+
+Response 200
+
+```json
+{
+    "user": {
+        "id": 1,
+        "email": "user@example.com",
+        "username": "new_username",
+        "role": "user",
+        "affiliation_id": 2,
+        "affiliation": "Blue Team",
+        "bio": "Blue Team player",
+        "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.png",
+        "stack_count": 0,
+        "stack_limit": 3,
+        "blocked_reason": null,
+        "blocked_at": null
+    },
+    "upload": {
+        "url": "https://media.example.com/...",
+            "method": "POST",
+            "fields": {
+                "key": "profiles/550e8400-e29b-41d4-a716-446655440000.png",
+                "Content-Type": "image/png"
+            },
+            "expires_at": "2026-01-01T00:00:00Z"
+    }
+}
+```
+
+Validation and policy notes:
+
+- Allowed filename extensions: `.png`, `.jpg`, `.jpeg`
+- Key format: `profiles/{uuid}.{ext}`
+- Upload method is always `POST`
+- Max size is limited to `100KB` by presigned POST policy (`content-length-range`)
+- API stores only the object key (for example `profiles/550e8400-e29b-41d4-a716-446655440000.png`) in DB. Client should render using CDN base URL + key.
+- Uploading again generates a new key and keeps previous files in storage.
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid token` or `missing access_token cookie`
+- 403 `user blocked`
+- 503 `storage unavailable`
+
+---
+
+## Delete Profile Image
+
+`DELETE /api/me/profile-image`
+
+Headers
+
+```
+Cookie: access_token=<jwt>
+```
+
+Response 200
+
+```json
+{
+    "id": 1,
+    "email": "user@example.com",
+    "username": "new_username",
+    "role": "user",
+    "affiliation_id": 2,
+    "affiliation": "Blue Team",
+    "bio": "Blue Team player",
+    "profile_image": null,
+    "stack_count": 0,
+    "stack_limit": 3,
+    "blocked_reason": null,
+    "blocked_at": null
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid token` or `missing access_token cookie`
+- 403 `user blocked`
+- 503 `storage unavailable`
 
 ---
 
@@ -109,6 +215,7 @@ Response 200
             "affiliation_id": 2,
             "affiliation": "Blue Team",
             "bio": "Blue Team player",
+            "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
             "blocked_reason": null,
             "blocked_at": null
         },
@@ -119,6 +226,7 @@ Response 200
             "affiliation_id": null,
             "affiliation": null,
             "bio": null,
+            "profile_image": null,
             "blocked_reason": null,
             "blocked_at": null
         }
@@ -162,6 +270,7 @@ Response 200
             "affiliation_id": 2,
             "affiliation": "Blue Team",
             "bio": "Blue Team player",
+            "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
             "blocked_reason": null,
             "blocked_at": null
         }
@@ -197,6 +306,7 @@ Response 200
     "affiliation_id": 2,
     "affiliation": "Blue Team",
     "bio": "Blue Team player",
+    "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
     "blocked_reason": null,
     "blocked_at": null
 }

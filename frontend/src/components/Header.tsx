@@ -215,7 +215,7 @@ const Header = ({ user }: HeaderProps) => {
                                     aria-expanded={isProfileMenuOpen}
                                 >
                                     <span className='inline-flex items-center gap-2.75'>
-                                        <UserAvatar username={user.username} size='sm' />
+                                        <UserAvatar username={user.username} profileImage={user.profile_image} size='sm' />
                                         {user.username}
                                     </span>
                                     <svg className={`h-3 w-3 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>

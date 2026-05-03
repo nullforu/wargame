@@ -6,6 +6,7 @@ export interface AuthUser {
     affiliation_id: number | null
     affiliation: string | null
     bio: string | null
+    profile_image: string | null
     stack_count: number
     stack_limit: number
     blocked_reason: string | null
@@ -81,6 +82,7 @@ export interface ChallengeCreator {
     affiliation_id?: number | null
     affiliation?: string | null
     bio?: string | null
+    profile_image?: string | null
 }
 
 export interface LevelVoteCount {
@@ -91,6 +93,7 @@ export interface LevelVoteCount {
 export interface ChallengeVote {
     user_id: number
     username: string
+    profile_image?: string | null
     level: number
     updated_at: string
 }
@@ -192,6 +195,11 @@ export interface ChallengeFileUploadResponse {
     upload: PresignedUpload
 }
 
+export interface ProfileImageUploadResponse {
+    user: AuthUser
+    upload: PresignedUpload
+}
+
 export interface FlagSubmissionPayload {
     flag: string
 }
@@ -235,6 +243,7 @@ export interface ChallengeSolver {
     username: string
     affiliation?: string | null
     bio?: string | null
+    profile_image?: string | null
     solved_at: string
     is_first_blood: boolean
 }
@@ -250,6 +259,7 @@ export interface WriteupAuthor {
     affiliation_id?: number | null
     affiliation?: string | null
     bio?: string | null
+    profile_image?: string | null
 }
 
 export interface WriteupChallenge {
@@ -286,6 +296,7 @@ export interface ChallengeCommentItemAuthor {
     affiliation_id?: number | null
     affiliation?: string | null
     bio?: string | null
+    profile_image?: string | null
 }
 
 export interface ChallengeCommentItem {
@@ -311,6 +322,7 @@ export interface CommunityPostAuthor {
     affiliation_id?: number | null
     affiliation?: string | null
     bio?: string | null
+    profile_image?: string | null
 }
 
 export interface CommunityPost {
@@ -350,6 +362,7 @@ export interface CommunityPostLike {
     affiliation_id?: number | null
     affiliation?: string | null
     bio?: string | null
+    profile_image?: string | null
     created_at: string
 }
 
@@ -383,6 +396,7 @@ export interface LeaderboardSolve {
 export interface ScoreEntry {
     user_id: number
     username: string
+    profile_image?: string | null
     score: number
     solves: LeaderboardSolve[]
 }
@@ -412,6 +426,7 @@ export interface UserListItem {
     affiliation_id?: number | null
     affiliation?: string | null
     bio?: string | null
+    profile_image?: string | null
     blocked_reason: string | null
     blocked_at: string | null
 }
@@ -423,6 +438,7 @@ export interface UserDetail {
     affiliation_id: number | null
     affiliation: string | null
     bio: string | null
+    profile_image: string | null
     blocked_reason: string | null
     blocked_at: string | null
 }
@@ -440,6 +456,7 @@ export interface AffiliationsResponse {
 export interface UserRankingEntry {
     user_id: number
     username: string
+    profile_image?: string | null
     score: number
     solved_count: number
     affiliation_id: number | null

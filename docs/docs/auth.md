@@ -63,6 +63,7 @@ Response 200
         "affiliation_id": null,
         "affiliation": null,
         "bio": null,
+        "profile_image": null,
         "stack_count": 0,
         "stack_limit": 3,
         "blocked_reason": null,

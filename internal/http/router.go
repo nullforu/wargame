@@ -76,6 +76,8 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		unblocked := auth.Group("")
 		unblocked.Use(middleware.RequireActiveUser(userSvc))
 		unblocked.PUT("/me", h.UpdateMe)
+		unblocked.POST("/me/profile-image/upload", h.RequestProfileImageUpload)
+		unblocked.DELETE("/me/profile-image", h.DeleteProfileImage)
 		unblocked.POST("/challenges/:id/submit", h.SubmitFlag)
 		unblocked.POST("/challenges/:id/writeups", h.CreateWriteup)
 		unblocked.POST("/challenges/:id/challenge-comments", h.CreateChallengeCommentItem)

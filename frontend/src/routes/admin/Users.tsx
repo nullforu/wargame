@@ -4,6 +4,7 @@ import { useApi } from '../../lib/useApi'
 import { formatApiError, formatDateTime } from '../../lib/utils'
 import { getLocaleTag, getRoleKey, useLocale, useT } from '../../lib/i18n'
 import FormMessage from '../../components/FormMessage'
+import UserAvatar from '../../components/UserAvatar'
 
 const AdminUsers = () => {
     const t = useT()
@@ -266,9 +267,12 @@ const AdminUsers = () => {
                             return (
                                 <div key={user.id} className='rounded-xl border border-border/70 bg-surface p-3'>
                                     <div className='flex items-start justify-between gap-3'>
-                                        <div className='min-w-0'>
-                                            <p className='text-xs text-text-subtle'>#{user.id}</p>
-                                            <p className='truncate text-sm font-semibold text-text'>{user.username}</p>
+                                        <div className='min-w-0 flex items-center gap-2'>
+                                            <UserAvatar username={user.username} profileImage={user.profile_image ?? null} size='sm' />
+                                            <div className='min-w-0'>
+                                                <p className='text-xs text-text-subtle'>#{user.id}</p>
+                                                <p className='truncate text-sm font-semibold text-text'>{user.username}</p>
+                                            </div>
                                         </div>
                                         <span
                                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium uppercase ${
@@ -356,7 +360,8 @@ const AdminUsers = () => {
                             return (
                                 <div key={user.id} className='grid grid-cols-[80px_minmax(0,1fr)_140px_minmax(220px,1fr)_320px] items-start px-6 py-5 transition hover:bg-surface-muted/40'>
                                     <p className='whitespace-nowrap text-sm text-text'>{user.id}</p>
-                                    <div className='min-w-0 pr-4 text-sm text-text'>
+                                    <div className='min-w-0 pr-4 text-sm text-text flex items-center gap-2'>
+                                        <UserAvatar username={user.username} profileImage={user.profile_image ?? null} size='sm' />
                                         <p className='truncate font-medium'>{user.username}</p>
                                     </div>
                                     <div className='text-sm'>

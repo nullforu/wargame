@@ -182,6 +182,7 @@ func (r *ChallengeVoteRepo) VotesByChallengePage(ctx context.Context, challengeI
 		TableExpr("challenge_votes AS cv").
 		ColumnExpr("cv.user_id AS user_id").
 		ColumnExpr("u.username AS username").
+		ColumnExpr("u.profile_image AS profile_image").
 		ColumnExpr("cv.level AS level").
 		ColumnExpr("cv.updated_at AS updated_at").
 		Join("JOIN users AS u ON u.id = cv.user_id").

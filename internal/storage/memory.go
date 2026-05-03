@@ -12,6 +12,10 @@ type MemoryChallengeFileStore struct {
 	keys       map[string]struct{}
 }
 
+type MemoryProfileImageStore struct {
+	presignTTL time.Duration
+}
+
 // for testing purposes
 func NewMemoryChallengeFileStore(presignTTL time.Duration) *MemoryChallengeFileStore {
 	if presignTTL <= 0 {
@@ -22,6 +26,14 @@ func NewMemoryChallengeFileStore(presignTTL time.Duration) *MemoryChallengeFileS
 		presignTTL: presignTTL,
 		keys:       make(map[string]struct{}),
 	}
+}
+
+func NewMemoryProfileImageStore(presignTTL time.Duration) *MemoryProfileImageStore {
+	if presignTTL <= 0 {
+		presignTTL = defaultPresignTTL
+	}
+
+	return &MemoryProfileImageStore{presignTTL: presignTTL}
 }
 
 func (m *MemoryChallengeFileStore) PresignUpload(ctx context.Context, key, contentType string) (PresignedUpload, error) {
@@ -57,5 +69,26 @@ func (m *MemoryChallengeFileStore) Delete(ctx context.Context, key string) error
 	delete(m.keys, key)
 	m.mu.Unlock()
 
+	return nil
+}
+
+func (m *MemoryProfileImageStore) PresignUpload(ctx context.Context, key, contentType string, maxSizeBytes int64) (PresignedUpload, error) {
+	_ = ctx
+	_ = maxSizeBytes
+
+	return PresignedUpload{
+		URL:    "https://example.com/upload-profile",
+		Method: "POST",
+		Fields: map[string]string{
+			"key":          key,
+			"Content-Type": contentType,
+		},
+		ExpiresAt: time.Now().UTC().Add(m.presignTTL),
+	}, nil
+}
+
+func (m *MemoryProfileImageStore) Delete(ctx context.Context, key string) error {
+	_ = ctx
+	_ = key
 	return nil
 }

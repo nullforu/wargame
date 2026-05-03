@@ -96,7 +96,7 @@ const AccountCard = ({
                         </div>
                     ) : (
                         <div className='flex items-center gap-3.75 self-start sm:self-auto'>
-                            <UserAvatar username={user.username} size='md' />
+                            <UserAvatar username={user.username} profileImage={user.profile_image} size='md' />
                             <span>{user.username}</span>
                             <button className='text-xs text-accent hover:underline cursor-pointer' onClick={() => onEditingUsernameChange(true)}>
                                 {t('profile.edit')}

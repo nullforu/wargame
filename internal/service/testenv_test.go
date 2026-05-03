@@ -199,7 +199,7 @@ func setupServiceTest(t *testing.T) serviceEnv {
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
 
 	authSvc := NewAuthService(serviceCfg, userRepo, serviceRedis)
-	userSvc := NewUserService(userRepo, affiliationRepo)
+	userSvc := NewUserService(userRepo, affiliationRepo, storage.NewMemoryProfileImageStore(10*time.Minute))
 	affiliationSvc := NewAffiliationService(affiliationRepo)
 	scoreSvc := NewScoreboardService(scoreRepo)
 	wargameSvc := NewWargameService(serviceCfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(serviceDB), repo.NewCommunityRepo(serviceDB), serviceRedis, fileStore)

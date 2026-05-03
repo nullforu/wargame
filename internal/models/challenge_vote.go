@@ -17,8 +17,9 @@ type ChallengeVote struct {
 }
 
 type ChallengeVoteDetail struct {
-	UserID    int64     `bun:"user_id" json:"user_id"`
-	Username  string    `bun:"username" json:"username"`
-	Level     int       `bun:"level" json:"level"`
-	UpdatedAt time.Time `bun:"updated_at" json:"updated_at"`
+	UserID       int64     `bun:"user_id" json:"user_id"`
+	Username     string    `bun:"username" json:"username"`
+	ProfileImage *string   `bun:"profile_image" json:"profile_image"`
+	Level        int       `bun:"level" json:"level"`
+	UpdatedAt    time.Time `bun:"updated_at" json:"updated_at"`
 }

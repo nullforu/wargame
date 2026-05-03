@@ -86,6 +86,7 @@ func (r *WriteupRepo) baseDetailQuery(includeContent bool) *bun.SelectQuery {
 		ColumnExpr("u.affiliation_id").
 		ColumnExpr("aff.name AS affiliation").
 		ColumnExpr("u.bio").
+		ColumnExpr("u.profile_image AS profile_image").
 		ColumnExpr("c.title AS challenge_title").
 		ColumnExpr("c.category AS challenge_category").
 		ColumnExpr("c.points AS challenge_points").

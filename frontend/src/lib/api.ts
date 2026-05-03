@@ -8,6 +8,7 @@ import type {
     ChallengeCreateResponse,
     ChallengeUpdatePayload,
     ChallengeFileUploadResponse,
+    ProfileImageUploadResponse,
     ChallengeMyVoteResponse,
     ChallengeVotesResponse,
     ChallengeWriteupsResponse,
@@ -48,6 +49,7 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8080'
 const UPLOAD_PRESIGN_METHOD = String(import.meta.env.VITE_S3_CHALLENGE_UPLOAD_PRESIGN_METHOD ?? 'POST').toUpperCase()
+const MEDIA_UPLOAD_PRESIGN_METHOD = String(import.meta.env.VITE_S3_MEDIA_UPLOAD_PRESIGN_METHOD ?? 'POST').toUpperCase()
 const CSRF_TOKEN_HEADER = 'X-CSRF-Token'
 
 export interface ApiErrorDetail {
@@ -311,6 +313,17 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
         },
         me: () => request<AuthUser>(`/api/me`, { auth: true }),
         updateMe: (payload: { username?: string; affiliation_id?: number | null; bio?: string | null }) => request<AuthUser>(`/api/me`, { method: 'PUT', body: payload, auth: true }),
+        requestProfileImageUpload: (filename: string) =>
+            request<ProfileImageUploadResponse>(`/api/me/profile-image/upload`, {
+                method: 'POST',
+                body: { filename },
+                auth: true,
+            }),
+        deleteProfileImage: () =>
+            request<AuthUser>(`/api/me/profile-image`, {
+                method: 'DELETE',
+                auth: true,
+            }),
         challenges: async (page?: number, pageSize?: number) => {
             const data = await request<{ challenges?: Challenge[]; pagination?: PaginationMeta }>(withPagination(`/api/challenges`, page, pageSize), { auth: true })
             return {
@@ -647,10 +660,7 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
     }
 }
 
-export const uploadPresignedFile = async (
-    upload: { url: string; fields?: Record<string, string>; headers?: Record<string, string>; method?: string },
-    file: File
-) => {
+export const uploadPresignedFile = async (upload: { url: string; fields?: Record<string, string>; headers?: Record<string, string>; method?: string }, file: File) => {
     const method = UPLOAD_PRESIGN_METHOD === 'PUT' ? 'PUT' : 'POST'
 
     if (method === 'PUT') {
@@ -673,6 +683,23 @@ export const uploadPresignedFile = async (
 
     const response = await fetch(upload.url, { method: 'POST', body: formData })
     if (!response.ok) {
-        throw new Error('File upload failed')
+        throw new Error(`File upload failed (${response.status})`)
+    }
+}
+
+export const uploadPresignedPost = async (upload: { url: string; fields?: Record<string, string> }, file: File) => {
+    if (MEDIA_UPLOAD_PRESIGN_METHOD !== 'POST') {
+        throw new Error('Media upload presign method must be POST')
+    }
+
+    const formData = new FormData()
+    Object.entries(upload.fields ?? {}).forEach(([key, value]) => {
+        formData.append(key, value)
+    })
+    formData.append('file', file)
+
+    const response = await fetch(upload.url, { method: 'POST', body: formData })
+    if (!response.ok) {
+        throw new Error(`File upload failed (${response.status})`)
     }
 }

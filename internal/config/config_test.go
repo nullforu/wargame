@@ -58,8 +58,13 @@ func TestLoadConfigDefaults(t *testing.T) {
 	if cfg.S3.Region != "us-east-1" {
 		t.Errorf("expected S3.Region us-east-1, got %s", cfg.S3.Region)
 	}
+
 	if cfg.S3.UploadMethod != "post" {
 		t.Errorf("expected S3.UploadMethod post, got %s", cfg.S3.UploadMethod)
+	}
+
+	if cfg.S3Media.UploadMethod != "post" {
+		t.Errorf("expected S3Media.UploadMethod post, got %s", cfg.S3Media.UploadMethod)
 	}
 
 	if cfg.Stack.CreateWindow != time.Minute {
@@ -101,6 +106,15 @@ func TestLoadConfigCustomValues(t *testing.T) {
 	os.Setenv("S3_CHALLENGE_FORCE_PATH_STYLE", "true")
 	os.Setenv("S3_CHALLENGE_PRESIGN_TTL", "20m")
 	os.Setenv("S3_CHALLENGE_UPLOAD_PRESIGN_METHOD", "put")
+	os.Setenv("S3_MEDIA_ENABLED", "true")
+	os.Setenv("S3_MEDIA_REGION", "auto")
+	os.Setenv("S3_MEDIA_BUCKET", "media-test")
+	os.Setenv("S3_MEDIA_ACCESS_KEY_ID", "media-key")
+	os.Setenv("S3_MEDIA_SECRET_ACCESS_KEY", "media-secret")
+	os.Setenv("S3_MEDIA_ENDPOINT", "https://media.example.com")
+	os.Setenv("S3_MEDIA_FORCE_PATH_STYLE", "false")
+	os.Setenv("S3_MEDIA_PRESIGN_TTL", "10m")
+	os.Setenv("S3_MEDIA_UPLOAD_PRESIGN_METHOD", "post")
 	os.Setenv("STACKS_ENABLED", "true")
 	os.Setenv("STACKS_MAX_PER", "5")
 	os.Setenv("STACKS_PROVISIONER_BASE_URL", "http://localhost:18081")
@@ -189,6 +203,15 @@ func TestLoadConfigCustomValues(t *testing.T) {
 	if cfg.S3.UploadMethod != "put" {
 		t.Errorf("expected S3.UploadMethod put, got %s", cfg.S3.UploadMethod)
 	}
+	if !cfg.S3Media.Enabled {
+		t.Errorf("expected S3Media.Enabled true")
+	}
+	if cfg.S3Media.Bucket != "media-test" {
+		t.Errorf("expected S3Media.Bucket media-test, got %s", cfg.S3Media.Bucket)
+	}
+	if cfg.S3Media.UploadMethod != "post" {
+		t.Errorf("expected S3Media.UploadMethod post, got %s", cfg.S3Media.UploadMethod)
+	}
 	if cfg.Logging.MaxBodyBytes != 2048 {
 		t.Errorf("expected Logging.MaxBodyBytes 2048, got %d", cfg.Logging.MaxBodyBytes)
 	}
@@ -221,6 +244,9 @@ func TestLoadConfigInvalidValues(t *testing.T) {
 		{"invalid s3 presign ttl", "S3_CHALLENGE_PRESIGN_TTL", "bad-duration"},
 		{"invalid s3 force path", "S3_CHALLENGE_FORCE_PATH_STYLE", "bad-bool"},
 		{"invalid s3 upload method", "S3_CHALLENGE_UPLOAD_PRESIGN_METHOD", "patch"},
+		{"invalid s3 media enabled", "S3_MEDIA_ENABLED", "not-a-bool"},
+		{"invalid s3 media ttl", "S3_MEDIA_PRESIGN_TTL", "bad-duration"},
+		{"invalid s3 media force path", "S3_MEDIA_FORCE_PATH_STYLE", "bad-bool"},
 		{"invalid stack max scope", "STACKS_MAX_SCOPE", "org"},
 		{"invalid leaderboard cache ttl", "LEADERBOARD_CACHE_TTL", "bad-duration"},
 	}
@@ -284,6 +310,20 @@ func TestLoadConfigS3ValidationErrors(t *testing.T) {
 				t.Fatalf("expected error")
 			}
 		})
+	}
+}
+
+func TestLoadConfigS3MediaValidationErrors(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("S3_MEDIA_ENABLED", "true")
+	os.Setenv("S3_MEDIA_REGION", "auto")
+	os.Setenv("S3_MEDIA_BUCKET", "media-bucket")
+	os.Setenv("S3_MEDIA_UPLOAD_PRESIGN_METHOD", "put")
+	os.Setenv("STACKS_PROVISIONER_API_KEY", "test-key")
+	defer os.Clearenv()
+
+	if _, err := Load(); err == nil {
+		t.Fatalf("expected validation error for S3_MEDIA_UPLOAD_PRESIGN_METHOD")
 	}
 }
 

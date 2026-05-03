@@ -353,6 +353,43 @@ func (h *Handler) UpdateMe(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
 }
 
+func (h *Handler) RequestProfileImageUpload(ctx *gin.Context) {
+	var req profileImageUploadRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	user, upload, err := h.users.RequestProfileImageUpload(ctx.Request.Context(), middleware.UserID(ctx), req.Filename)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
+	ctx.JSON(http.StatusOK, profileImageUploadResponse{
+		User: newUserMeResponse(user, stackCount, stackLimit),
+		Upload: presignedUploadResponse{
+			URL:       upload.URL,
+			Method:    upload.Method,
+			Fields:    upload.Fields,
+			Headers:   upload.Headers,
+			ExpiresAt: upload.ExpiresAt,
+		},
+	})
+}
+
+func (h *Handler) DeleteProfileImage(ctx *gin.Context) {
+	user, err := h.users.DeleteProfileImage(ctx.Request.Context(), middleware.UserID(ctx))
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
+	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
+}
+
 func (h *Handler) ListChallenges(ctx *gin.Context) {
 	page, pageSize, ok := parsePaginationParams(ctx)
 	if !ok {

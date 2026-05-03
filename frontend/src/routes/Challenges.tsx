@@ -671,7 +671,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                             onClick={() => navigate(`/users/${entry.user_id}`)}
                                         >
                                             <div className='min-w-0 flex flex-1 items-center gap-3'>
-                                                <UserAvatar username={entry.username} size='sm' />
+                                                <UserAvatar username={entry.username} profileImage={entry.profile_image ?? null} size='sm' />
                                                 <div className='min-w-0 flex-1'>
                                                     <div className='flex min-w-0 items-center gap-1.5'>
                                                         <span className='shrink-0 text-xs text-text-subtle'>#{index + 1}</span>

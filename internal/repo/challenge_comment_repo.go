@@ -69,6 +69,7 @@ func (r *ChallengeCommentRepo) baseDetailQuery() *bun.SelectQuery {
 		ColumnExpr("u.affiliation_id").
 		ColumnExpr("aff.name AS affiliation").
 		ColumnExpr("u.bio").
+		ColumnExpr("u.profile_image AS profile_image").
 		ColumnExpr("c.title AS challenge_title").
 		Join("JOIN users AS u ON u.id = cc.user_id").
 		Join("JOIN challenges AS c ON c.id = cc.challenge_id").

@@ -72,7 +72,7 @@ const WriteupsSection = ({
                         >
                             <div className='flex items-start justify-between gap-4 py-1'>
                                 <div className='min-w-0 flex flex-1 items-center gap-3.75'>
-                                    <UserAvatar username={item.author.username} size='md' />
+                                    <UserAvatar username={item.author.username} profileImage={item.author.profile_image ?? null} size='md' />
                                     <div className='min-w-0'>
                                         <div className='flex items-center gap-2'>
                                             <span className='block max-w-full truncate text-left text-base font-semibold text-text'>{item.author.username}</span>

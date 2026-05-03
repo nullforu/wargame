@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"regexp"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ func TestUserServiceGetByIDListUpdateProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
+
 	if got.ID != user.ID {
 		t.Fatalf("unexpected user: %+v", got)
 	}
@@ -25,9 +27,11 @@ func TestUserServiceGetByIDListUpdateProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
+
 	if len(users) != 1 || users[0].ID != user.ID {
 		t.Fatalf("unexpected list: %+v", users)
 	}
+
 	if pagination.Page != 1 || pagination.PageSize != DefaultPageSize {
 		t.Fatalf("unexpected pagination: %+v", pagination)
 	}
@@ -37,6 +41,7 @@ func TestUserServiceGetByIDListUpdateProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateProfile: %v", err)
 	}
+
 	if updated.Username != newName {
 		t.Fatalf("expected username %q, got %q", newName, updated.Username)
 	}
@@ -51,6 +56,7 @@ func TestUserServiceBlockUnblock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BlockUser: %v", err)
 	}
+
 	if blocked.Role != models.BlockedRole {
 		t.Fatalf("expected blocked role, got %s", blocked.Role)
 	}
@@ -63,6 +69,7 @@ func TestUserServiceBlockUnblock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UnblockUser: %v", err)
 	}
+
 	if unblocked.Role != models.UserRole {
 		t.Fatalf("expected user role after unblock, got %s", unblocked.Role)
 	}
@@ -74,6 +81,7 @@ func TestUserServiceValidationAndNotFound(t *testing.T) {
 	if _, err := env.userSvc.GetByID(context.Background(), 0); err == nil {
 		t.Fatalf("expected validation error")
 	}
+
 	if _, err := env.userSvc.GetByID(context.Background(), 999999); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
@@ -81,6 +89,7 @@ func TestUserServiceValidationAndNotFound(t *testing.T) {
 	if _, err := env.userSvc.BlockUser(context.Background(), 1, " "); err == nil {
 		t.Fatalf("expected empty reason validation error")
 	}
+
 	if _, err := env.userSvc.UnblockUser(context.Background(), 999999); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
@@ -194,5 +203,62 @@ func TestUserServiceUpdateProfileDuplicateUsername(t *testing.T) {
 	dup := "dup-user-2"
 	if _, err := env.userSvc.UpdateProfile(context.Background(), user1.ID, &dup, nil, false, nil, false); !errors.Is(err, ErrUserExists) {
 		t.Fatalf("expected ErrUserExists, got %v", err)
+	}
+}
+
+func TestUserServiceRequestProfileImageUpload(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "image@example.com", "image-user", "pass", models.UserRole)
+
+	updated, upload, err := env.userSvc.RequestProfileImageUpload(context.Background(), user.ID, "avatar.png")
+	if err != nil {
+		t.Fatalf("RequestProfileImageUpload: %v", err)
+	}
+
+	if upload.Method != "POST" || upload.URL == "" {
+		t.Fatalf("expected presigned POST upload, got %+v", upload)
+	}
+
+	if updated.ProfileImage == nil || !regexp.MustCompile(`^profiles/[0-9a-f-]+\.png$`).MatchString(*updated.ProfileImage) {
+		t.Fatalf("unexpected profile image key: %+v", updated.ProfileImage)
+	}
+
+	prevKey := *updated.ProfileImage
+	updated, _, err = env.userSvc.RequestProfileImageUpload(context.Background(), user.ID, "avatar.jpg")
+	if err != nil {
+		t.Fatalf("RequestProfileImageUpload overwrite: %v", err)
+	}
+
+	if updated.ProfileImage == nil || !regexp.MustCompile(`^profiles/[0-9a-f-]+\.jpg$`).MatchString(*updated.ProfileImage) {
+		t.Fatalf("unexpected overwritten profile image key: %+v", updated.ProfileImage)
+	}
+
+	if *updated.ProfileImage == prevKey {
+		t.Fatalf("expected new UUID key on each upload")
+	}
+
+	if _, _, err := env.userSvc.RequestProfileImageUpload(context.Background(), user.ID, "avatar.gif"); err == nil {
+		t.Fatalf("expected extension validation error")
+	}
+
+	if _, _, err := env.userSvc.RequestProfileImageUpload(context.Background(), user.ID, " "); err == nil {
+		t.Fatalf("expected required filename validation error")
+	}
+
+	if _, _, err := env.userSvc.RequestProfileImageUpload(context.Background(), user.ID, "avatar.jpeg"); err != nil {
+		t.Fatalf("expected .jpeg allowed, got %v", err)
+	}
+
+	if _, _, err := NewUserService(env.userRepo, env.affiliationRepo, nil).RequestProfileImageUpload(context.Background(), user.ID, "avatar.png"); !errors.Is(err, ErrStorageUnavailable) {
+		t.Fatalf("expected ErrStorageUnavailable, got %v", err)
+	}
+
+	deleted, err := env.userSvc.DeleteProfileImage(context.Background(), user.ID)
+	if err != nil {
+		t.Fatalf("DeleteProfileImage: %v", err)
+	}
+
+	if deleted.ProfileImage != nil {
+		t.Fatalf("expected profile image to be nil, got %+v", deleted.ProfileImage)
 	}
 }

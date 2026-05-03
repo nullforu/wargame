@@ -97,6 +97,7 @@ func (r *CommunityRepo) baseDetailQuery() *bun.SelectQuery {
 		ColumnExpr("u.affiliation_id").
 		ColumnExpr("aff.name AS affiliation").
 		ColumnExpr("u.bio").
+		ColumnExpr("u.profile_image AS profile_image").
 		Join("JOIN users AS u ON u.id = cp.user_id").
 		Join("LEFT JOIN (SELECT post_id, COUNT(*) AS like_count FROM community_post_likes GROUP BY post_id) AS lc ON lc.post_id = cp.id").
 		Join("LEFT JOIN (SELECT post_id, COUNT(*) AS comment_count FROM community_comments GROUP BY post_id) AS cc ON cc.post_id = cp.id").
@@ -265,6 +266,7 @@ func (r *CommunityRepo) LikesByPostPage(ctx context.Context, postID int64, page,
 		ColumnExpr("u.affiliation_id").
 		ColumnExpr("aff.name AS affiliation").
 		ColumnExpr("u.bio").
+		ColumnExpr("u.profile_image AS profile_image").
 		Join("JOIN users AS u ON u.id = cpl.user_id").
 		Join("LEFT JOIN affiliations AS aff ON aff.id = u.affiliation_id").
 		Where("cpl.post_id = ?", postID)
@@ -338,6 +340,7 @@ func (r *CommunityRepo) commentDetailBaseQuery() *bun.SelectQuery {
 		ColumnExpr("u.affiliation_id").
 		ColumnExpr("aff.name AS affiliation").
 		ColumnExpr("u.bio").
+		ColumnExpr("u.profile_image AS profile_image").
 		ColumnExpr("cp.title AS post_title").
 		Join("JOIN users AS u ON u.id = cc.user_id").
 		Join("JOIN community_posts AS cp ON cp.id = cc.post_id").

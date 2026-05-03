@@ -26,3 +26,8 @@ type ChallengeFileStore interface {
 	PresignDownload(ctx context.Context, key, filename string) (PresignedURL, error)
 	Delete(ctx context.Context, key string) error
 }
+
+type ProfileImageStore interface {
+	PresignUpload(ctx context.Context, key, contentType string, maxSizeBytes int64) (PresignedUpload, error)
+	Delete(ctx context.Context, key string) error
+}

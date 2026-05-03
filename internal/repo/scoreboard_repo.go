@@ -66,11 +66,12 @@ func (r *ScoreboardRepo) Leaderboard(ctx context.Context, page, pageSize int) (m
 		TableExpr("users AS u").
 		ColumnExpr("u.id AS user_id").
 		ColumnExpr("u.username AS username").
+		ColumnExpr("u.profile_image AS profile_image").
 		ColumnExpr("COALESCE(SUM(c.points), 0) AS score").
 		Join("LEFT JOIN submissions AS s ON s.user_id = u.id AND s.correct = true").
 		Join("LEFT JOIN challenges AS c ON c.id = s.challenge_id").
 		Where("u.role != ?", models.BlockedRole).
-		GroupExpr("u.id, u.username").
+		GroupExpr("u.id, u.username, u.profile_image").
 		OrderExpr("score DESC, u.id ASC").
 		Limit(pageSize).
 		Offset(offset).
@@ -146,6 +147,7 @@ func (r *ScoreboardRepo) UserRanking(ctx context.Context, page, pageSize int) ([
 		TableExpr("users AS u").
 		ColumnExpr("u.id AS user_id").
 		ColumnExpr("u.username AS username").
+		ColumnExpr("u.profile_image AS profile_image").
 		ColumnExpr("u.affiliation_id AS affiliation_id").
 		ColumnExpr("a.name AS affiliation_name").
 		ColumnExpr("u.bio AS bio").
@@ -155,7 +157,7 @@ func (r *ScoreboardRepo) UserRanking(ctx context.Context, page, pageSize int) ([
 		Join("LEFT JOIN solved AS s ON s.user_id = u.id").
 		Join("LEFT JOIN challenges AS c ON c.id = s.challenge_id").
 		Where("u.role != ?", models.BlockedRole).
-		GroupExpr("u.id, u.username, u.affiliation_id, a.name, u.bio").
+		GroupExpr("u.id, u.username, u.profile_image, u.affiliation_id, a.name, u.bio").
 		OrderExpr("score DESC, solved_count DESC, u.id ASC").
 		Limit(pageSize).
 		Offset(offset).
@@ -227,6 +229,7 @@ func (r *ScoreboardRepo) AffiliationUserRanking(ctx context.Context, affiliation
 		TableExpr("users AS u").
 		ColumnExpr("u.id AS user_id").
 		ColumnExpr("u.username AS username").
+		ColumnExpr("u.profile_image AS profile_image").
 		ColumnExpr("u.affiliation_id AS affiliation_id").
 		ColumnExpr("a.name AS affiliation_name").
 		ColumnExpr("u.bio AS bio").
@@ -237,7 +240,7 @@ func (r *ScoreboardRepo) AffiliationUserRanking(ctx context.Context, affiliation
 		Join("LEFT JOIN challenges AS c ON c.id = s.challenge_id").
 		Where("u.role != ?", models.BlockedRole).
 		Where("u.affiliation_id = ?", affiliationID).
-		GroupExpr("u.id, u.username, u.affiliation_id, a.name, u.bio").
+		GroupExpr("u.id, u.username, u.profile_image, u.affiliation_id, a.name, u.bio").
 		OrderExpr("score DESC, solved_count DESC, u.id ASC").
 		Limit(pageSize).
 		Offset(offset).

@@ -30,6 +30,7 @@ type ChallengeSolver struct {
 	Username     string    `bun:"username" json:"username"`
 	Affiliation  *string   `bun:"affiliation" json:"affiliation"`
 	Bio          *string   `bun:"bio" json:"bio"`
+	ProfileImage *string   `bun:"profile_image" json:"profile_image"`
 	SolvedAt     time.Time `bun:"solved_at" json:"solved_at"`
 	IsFirstBlood bool      `bun:"is_first_blood" json:"is_first_blood"`
 }

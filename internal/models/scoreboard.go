@@ -3,10 +3,11 @@ package models
 import "time"
 
 type LeaderboardEntry struct {
-	UserID   int64              `bun:"user_id" json:"user_id"`
-	Username string             `bun:"username" json:"username"`
-	Score    int                `bun:"score" json:"score"`
-	Solves   []LeaderboardSolve `json:"solves"`
+	UserID       int64              `bun:"user_id" json:"user_id"`
+	Username     string             `bun:"username" json:"username"`
+	ProfileImage *string            `bun:"profile_image" json:"profile_image"`
+	Score        int                `bun:"score" json:"score"`
+	Solves       []LeaderboardSolve `json:"solves"`
 }
 
 type LeaderboardChallenge struct {
@@ -30,6 +31,7 @@ type LeaderboardResponse struct {
 type UserRankingEntry struct {
 	UserID        int64   `bun:"user_id" json:"user_id"`
 	Username      string  `bun:"username" json:"username"`
+	ProfileImage  *string `bun:"profile_image" json:"profile_image"`
 	Score         int     `bun:"score" json:"score"`
 	SolvedCount   int     `bun:"solved_count" json:"solved_count"`
 	AffiliationID *int64  `bun:"affiliation_id" json:"affiliation_id"`

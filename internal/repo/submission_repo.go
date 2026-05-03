@@ -216,13 +216,14 @@ func (r *SubmissionRepo) ChallengeSolversPage(ctx context.Context, challengeID i
 		ColumnExpr("u.username AS username").
 		ColumnExpr("aff.name AS affiliation").
 		ColumnExpr("u.bio AS bio").
+		ColumnExpr("u.profile_image AS profile_image").
 		ColumnExpr("MIN(s.submitted_at) AS solved_at").
 		ColumnExpr("BOOL_OR(s.is_first_blood) AS is_first_blood").
 		Join("JOIN users AS u ON u.id = s.user_id").
 		Join("LEFT JOIN affiliations AS aff ON aff.id = u.affiliation_id").
 		Where("s.correct = true").
 		Where("s.challenge_id = ?", challengeID).
-		GroupExpr("s.user_id, u.username, aff.name, u.bio")
+		GroupExpr("s.user_id, u.username, aff.name, u.bio, u.profile_image")
 
 	totalCount, err := r.db.NewSelect().
 		TableExpr("(?) AS solvers", base).
@@ -252,6 +253,7 @@ func (r *SubmissionRepo) ChallengeFirstBlood(ctx context.Context, challengeID in
 		ColumnExpr("u.username AS username").
 		ColumnExpr("aff.name AS affiliation").
 		ColumnExpr("u.bio AS bio").
+		ColumnExpr("u.profile_image AS profile_image").
 		ColumnExpr("s.submitted_at AS solved_at").
 		ColumnExpr("s.is_first_blood AS is_first_blood").
 		Join("JOIN users AS u ON u.id = s.user_id").

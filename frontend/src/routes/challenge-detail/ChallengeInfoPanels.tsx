@@ -79,7 +79,7 @@ const ChallengeInfoPanels = ({
                     {creatorName ? (
                         <div className='flex items-start justify-between gap-4 py-2'>
                             <div className='min-w-0 flex flex-1 items-center gap-3.75'>
-                                <UserAvatar username={creatorName} size='md' />
+                                <UserAvatar username={creatorName} profileImage={challenge.created_by?.profile_image ?? null} size='md' />
                                 <div className='min-w-0'>
                                     {challenge.created_by?.user_id ? (
                                         <button className='block max-w-full truncate text-left text-lg font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${challenge.created_by?.user_id}`)}>
@@ -123,7 +123,7 @@ const ChallengeInfoPanels = ({
                     <div className='rounded-2xl bg-surface/70'>
                         <div className='flex items-start justify-between gap-4 py-2'>
                             <div className='min-w-0 flex flex-1 items-center gap-3.75'>
-                                <UserAvatar username={firstBloodSolver.username} size='md' />
+                                <UserAvatar username={firstBloodSolver.username} profileImage={firstBloodSolver.profile_image ?? null} size='md' />
                                 <div className='min-w-0'>
                                     <button className='block max-w-full truncate text-left text-lg font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${firstBloodSolver.user_id}`)}>
                                         {firstBloodSolver.username}
@@ -150,7 +150,7 @@ const ChallengeInfoPanels = ({
                         solvers.map((solver, index) => (
                             <div key={`${solver.user_id}-${index}`} className='flex items-start justify-between gap-4 py-2'>
                                 <div className='min-w-0 flex flex-1 items-center gap-3.75'>
-                                    <UserAvatar username={solver.username} size='md' />
+                                    <UserAvatar username={solver.username} profileImage={solver.profile_image ?? null} size='md' />
                                     <div className='min-w-0'>
                                         <button className='block max-w-full truncate text-left text-lg font-semibold text-text hover:text-accent' onClick={() => navigate(`/users/${solver.user_id}`)}>
                                             {solver.username}
