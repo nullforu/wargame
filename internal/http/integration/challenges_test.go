@@ -58,6 +58,14 @@ func TestListChallengesPaginationAndSearch(t *testing.T) {
 			CreatedByUserID   int64  `json:"created_by_user_id"`
 			CreatedByUsername string `json:"created_by_username"`
 		} `json:"challenges"`
+		CategoryCounts []struct {
+			Category string `json:"category"`
+			Count    int    `json:"count"`
+		} `json:"category_counts"`
+		LevelCounts []struct {
+			Level int `json:"level"`
+			Count int `json:"count"`
+		} `json:"level_counts"`
 		Pagination struct {
 			Page       int  `json:"page"`
 			PageSize   int  `json:"page_size"`
@@ -70,8 +78,17 @@ func TestListChallengesPaginationAndSearch(t *testing.T) {
 	if len(pagedResp.Challenges) != 1 || pagedResp.Challenges[0].Title != "Web Advanced" {
 		t.Fatalf("unexpected paged challenges: %+v", pagedResp.Challenges)
 	}
+
 	if pagedResp.Pagination.Page != 2 || pagedResp.Pagination.PageSize != 1 || pagedResp.Pagination.TotalCount != 3 || !pagedResp.Pagination.HasPrev || !pagedResp.Pagination.HasNext {
 		t.Fatalf("unexpected pagination: %+v", pagedResp.Pagination)
+	}
+
+	if len(pagedResp.CategoryCounts) != 2 || pagedResp.CategoryCounts[0].Category != "Crypto" || pagedResp.CategoryCounts[0].Count != 1 || pagedResp.CategoryCounts[1].Category != "Web" || pagedResp.CategoryCounts[1].Count != 2 {
+		t.Fatalf("unexpected category counts: %+v", pagedResp.CategoryCounts)
+	}
+
+	if len(pagedResp.LevelCounts) != 1 || pagedResp.LevelCounts[0].Level != models.UnknownLevel || pagedResp.LevelCounts[0].Count != 3 {
+		t.Fatalf("unexpected level counts: %+v", pagedResp.LevelCounts)
 	}
 
 	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges/search?q=web&page=1&page_size=10", nil, nil)
@@ -83,6 +100,14 @@ func TestListChallengesPaginationAndSearch(t *testing.T) {
 		Challenges []struct {
 			Title string `json:"title"`
 		} `json:"challenges"`
+		CategoryCounts []struct {
+			Category string `json:"category"`
+			Count    int    `json:"count"`
+		} `json:"category_counts"`
+		LevelCounts []struct {
+			Level int `json:"level"`
+			Count int `json:"count"`
+		} `json:"level_counts"`
 		Pagination struct {
 			TotalCount int `json:"total_count"`
 		} `json:"pagination"`
@@ -90,6 +115,14 @@ func TestListChallengesPaginationAndSearch(t *testing.T) {
 	decodeJSON(t, rec, &searchResp)
 	if len(searchResp.Challenges) != 2 || searchResp.Pagination.TotalCount != 2 {
 		t.Fatalf("unexpected search response: %+v", searchResp)
+	}
+
+	if len(searchResp.CategoryCounts) != 2 || searchResp.CategoryCounts[0].Category != "Crypto" || searchResp.CategoryCounts[1].Category != "Web" {
+		t.Fatalf("unexpected search category counts: %+v", searchResp.CategoryCounts)
+	}
+
+	if len(searchResp.LevelCounts) != 1 || searchResp.LevelCounts[0].Level != models.UnknownLevel || searchResp.LevelCounts[0].Count != 3 {
+		t.Fatalf("unexpected search level counts: %+v", searchResp.LevelCounts)
 	}
 
 	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges?page=1&page_size=10&sort=oldest", nil, nil)

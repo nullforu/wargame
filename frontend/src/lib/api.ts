@@ -329,10 +329,15 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
                 auth: true,
             }),
         challenges: async (page?: number, pageSize?: number) => {
-            const data = await request<{ challenges?: Challenge[]; pagination?: PaginationMeta }>(withPagination(`/api/challenges`, page, pageSize), { auth: true })
+            const data = await request<{ challenges?: Challenge[]; pagination?: PaginationMeta; category_counts?: { category: string; count: number }[]; level_counts?: { level: number; count: number }[] }>(
+                withPagination(`/api/challenges`, page, pageSize),
+                { auth: true },
+            )
             return {
                 challenges: Array.isArray(data?.challenges) ? data.challenges : [],
                 pagination: normalizePagination(data?.pagination),
+                category_counts: Array.isArray(data?.category_counts) ? data.category_counts : [],
+                level_counts: Array.isArray(data?.level_counts) ? data.level_counts : [],
             } as ChallengesResponse
         },
         searchChallenges: async (
@@ -348,13 +353,15 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
         ) => {
             const trimmedQ = q.trim()
             const basePath = trimmedQ === '' ? `/api/challenges` : `/api/challenges/search`
-            const data = await request<{ challenges?: Challenge[]; pagination?: PaginationMeta }>(
+            const data = await request<{ challenges?: Challenge[]; pagination?: PaginationMeta; category_counts?: { category: string; count: number }[]; level_counts?: { level: number; count: number }[] }>(
                 withChallengeFilters(basePath, { q: trimmedQ, page, pageSize, category: filters?.category, level: filters?.level, solved: filters?.solved, sort: filters?.sort }),
                 { auth: true },
             )
             return {
                 challenges: Array.isArray(data?.challenges) ? data.challenges : [],
                 pagination: normalizePagination(data?.pagination),
+                category_counts: Array.isArray(data?.category_counts) ? data.category_counts : [],
+                level_counts: Array.isArray(data?.level_counts) ? data.level_counts : [],
             } as ChallengesResponse
         },
         challenge: (id: number) => request<Challenge>(`/api/challenges/${id}`, { auth: true }),

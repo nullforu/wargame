@@ -196,3 +196,42 @@ func (r *ChallengeRepo) SolveCountsByIDs(ctx context.Context, challengeIDs []int
 
 	return counts, nil
 }
+
+func (r *ChallengeRepo) CategoryCounts(ctx context.Context) ([]models.CategoryCount, error) {
+	rows := make([]models.CategoryCount, 0)
+	if err := r.db.NewSelect().
+		Model((*models.Challenge)(nil)).
+		ColumnExpr("category").
+		ColumnExpr("COUNT(*) AS count").
+		Where("is_active = true").
+		GroupExpr("category").
+		OrderExpr("category ASC").
+		Scan(ctx, &rows); err != nil {
+		return nil, wrapError("challengeRepo.CategoryCounts", err)
+	}
+
+	return rows, nil
+}
+
+func (r *ChallengeRepo) LevelCounts(ctx context.Context) ([]models.LevelCount, error) {
+	rows := make([]models.LevelCount, 0)
+	representativeLevels := r.db.NewSelect().
+		TableExpr("challenge_votes AS cv").
+		ColumnExpr("cv.challenge_id").
+		ColumnExpr("cv.level").
+		ColumnExpr("ROW_NUMBER() OVER (PARTITION BY cv.challenge_id ORDER BY COUNT(*) DESC, MAX(cv.updated_at) DESC, cv.level DESC) AS rn").
+		GroupExpr("cv.challenge_id, cv.level")
+
+	if err := r.db.NewSelect().
+		TableExpr("challenges AS challenge").
+		Join("LEFT JOIN (?) AS level_rank ON level_rank.challenge_id = challenge.id AND level_rank.rn = 1", representativeLevels).
+		ColumnExpr("COALESCE(level_rank.level, 0) AS level").
+		ColumnExpr("COUNT(*) AS count").
+		GroupExpr("COALESCE(level_rank.level, 0)").
+		OrderExpr("level ASC").
+		Scan(ctx, &rows); err != nil {
+		return nil, wrapError("challengeRepo.LevelCounts", err)
+	}
+
+	return rows, nil
+}

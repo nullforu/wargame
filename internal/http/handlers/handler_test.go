@@ -1075,6 +1075,14 @@ func TestHandlerListChallengesAndUsers(t *testing.T) {
 		if len(resp.Challenges) != 1 || resp.Pagination.TotalCount != 2 {
 			t.Fatalf("unexpected challenges list response: %+v", resp)
 		}
+
+		if len(resp.CategoryCounts) != 1 || resp.CategoryCounts[0].Category != "Misc" || resp.CategoryCounts[0].Count != 2 {
+			t.Fatalf("unexpected category counts: %+v", resp.CategoryCounts)
+		}
+
+		if len(resp.LevelCounts) != 1 || resp.LevelCounts[0].Level != models.UnknownLevel || resp.LevelCounts[0].Count != 2 {
+			t.Fatalf("unexpected level counts: %+v", resp.LevelCounts)
+		}
 	})
 
 	t.Run("list challenges with auth and prerequisite", func(t *testing.T) {
@@ -1104,6 +1112,10 @@ func TestHandlerListChallengesAndUsers(t *testing.T) {
 
 		if resp.Pagination.TotalCount < 4 {
 			t.Fatalf("expected expanded challenge count, got %+v", resp.Pagination)
+		}
+
+		if len(resp.CategoryCounts) == 0 || resp.CategoryCounts[0].Category != "Misc" {
+			t.Fatalf("expected category counts in auth list response, got %+v", resp.CategoryCounts)
 		}
 	})
 

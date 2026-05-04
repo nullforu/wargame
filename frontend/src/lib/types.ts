@@ -207,6 +207,8 @@ export interface FlagSubmissionPayload {
 export interface ChallengesResponse {
     challenges: Challenge[]
     pagination: PaginationMeta
+    category_counts?: { category: string; count: number }[]
+    level_counts?: { level: number; count: number }[]
 }
 
 export interface StacksResponse {

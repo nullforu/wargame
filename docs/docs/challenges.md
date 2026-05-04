@@ -58,7 +58,12 @@ Response 200
         "total_pages": 1,
         "has_prev": false,
         "has_next": false
-    }
+    },
+    "level_counts": [
+        { "level": 0, "count": 2 },
+        { "level": 1, "count": 1 },
+        { "level": 6, "count": 3 }
+    ]
 }
 ```
 
@@ -125,7 +130,12 @@ Response 200
         "total_pages": 1,
         "has_prev": false,
         "has_next": false
-    }
+    },
+    "level_counts": [
+        { "level": 0, "count": 2 },
+        { "level": 1, "count": 1 },
+        { "level": 6, "count": 3 }
+    ]
 }
 ```
 

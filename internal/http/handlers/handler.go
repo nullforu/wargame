@@ -458,7 +458,19 @@ func (h *Handler) ListChallenges(ctx *gin.Context) {
 		resp = append(resp, newChallengeResponse(&ch, isSolved, nil))
 	}
 
-	ctx.JSON(http.StatusOK, challengesListResponse{Challenges: resp, Pagination: pagination})
+	categoryCounts, err := h.wargame.ChallengeCategoryCounts(ctx.Request.Context())
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	levelCounts, err := h.wargame.ChallengeLevelCounts(ctx.Request.Context())
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, challengesListResponse{Challenges: resp, Pagination: pagination, CategoryCounts: categoryCounts, LevelCounts: levelCounts})
 }
 
 func (h *Handler) SearchChallenges(ctx *gin.Context) {
@@ -518,7 +530,19 @@ func (h *Handler) SearchChallenges(ctx *gin.Context) {
 		resp = append(resp, newChallengeResponse(&ch, isSolved, nil))
 	}
 
-	ctx.JSON(http.StatusOK, challengesListResponse{Challenges: resp, Pagination: pagination})
+	categoryCounts, err := h.wargame.ChallengeCategoryCounts(ctx.Request.Context())
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	levelCounts, err := h.wargame.ChallengeLevelCounts(ctx.Request.Context())
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, challengesListResponse{Challenges: resp, Pagination: pagination, CategoryCounts: categoryCounts, LevelCounts: levelCounts})
 }
 
 func (h *Handler) GetChallenge(ctx *gin.Context) {

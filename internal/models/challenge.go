@@ -47,3 +47,13 @@ type LevelVoteCount struct {
 	Level int `json:"level"`
 	Count int `json:"count"`
 }
+
+type CategoryCount struct {
+	Category string `bun:"category" json:"category"`
+	Count    int    `bun:"count" json:"count"`
+}
+
+type LevelCount struct {
+	Level int `bun:"level" json:"level"`
+	Count int `bun:"count" json:"count"`
+}

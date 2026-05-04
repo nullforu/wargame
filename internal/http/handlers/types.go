@@ -268,8 +268,10 @@ type challengeMyVoteResponse struct {
 }
 
 type challengesListResponse struct {
-	Challenges []any             `json:"challenges,omitempty"`
-	Pagination models.Pagination `json:"pagination"`
+	Challenges     []any                  `json:"challenges,omitempty"`
+	Pagination     models.Pagination      `json:"pagination"`
+	CategoryCounts []models.CategoryCount `json:"category_counts,omitempty"`
+	LevelCounts    []models.LevelCount    `json:"level_counts,omitempty"`
 }
 
 type usersListResponse struct {

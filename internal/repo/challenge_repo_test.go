@@ -333,6 +333,54 @@ func TestChallengeRepoChallengePointsError(t *testing.T) {
 	}
 }
 
+func TestChallengeRepoLevelCounts(t *testing.T) {
+	env := setupRepoTest(t)
+	voteRepo := NewChallengeVoteRepo(env.db)
+
+	chUnknown := createChallenge(t, env, "Unknown Level", 100, "FLAG{U}", true)
+	ch6 := createChallenge(t, env, "Level Six", 100, "FLAG{L6}", true)
+	ch7 := createChallenge(t, env, "Level Seven", 100, "FLAG{L7}", true)
+	ch8 := createChallenge(t, env, "Level Eight", 100, "FLAG{L8}", true)
+
+	now := time.Now().UTC()
+	u1 := createUserForTestUserScope(t, env, "level1@example.com", "level1", "pass", models.UserRole)
+	u2 := createUserForTestUserScope(t, env, "level2@example.com", "level2", "pass", models.UserRole)
+	u3 := createUserForTestUserScope(t, env, "level3@example.com", "level3", "pass", models.UserRole)
+	u4 := createUserForTestUserScope(t, env, "level4@example.com", "level4", "pass", models.UserRole)
+
+	mustUpsertVote(t, voteRepo, ch6.ID, u1.ID, 6, now.Add(-3*time.Minute))
+	mustUpsertVote(t, voteRepo, ch7.ID, u2.ID, 7, now.Add(-2*time.Minute))
+	mustUpsertVote(t, voteRepo, ch8.ID, u3.ID, 8, now.Add(-time.Minute))
+	_ = u4
+	_ = chUnknown
+
+	rows, err := env.challengeRepo.LevelCounts(context.Background())
+	if err != nil {
+		t.Fatalf("LevelCounts: %v", err)
+	}
+
+	m := make(map[int]int)
+	for _, r := range rows {
+		m[r.Level] = r.Count
+	}
+
+	if m[0] != 1 {
+		t.Fatalf("expected Unknown count 1, got %d", m[0])
+	}
+
+	if m[6] != 1 {
+		t.Fatalf("expected level 6 count 1, got %d", m[6])
+	}
+
+	if m[7] != 1 {
+		t.Fatalf("expected level 7 count 1, got %d", m[7])
+	}
+
+	if m[8] != 1 {
+		t.Fatalf("expected level 8 count 1, got %d", m[8])
+	}
+}
+
 func newClosedRepoDB(t *testing.T) *bun.DB {
 	t.Helper()
 	conn, err := db.New(repoCfg.DB, "test")

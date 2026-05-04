@@ -888,6 +888,24 @@ func (s *WargameService) ChallengeFirstBlood(ctx context.Context, challengeID in
 	return row, nil
 }
 
+func (s *WargameService) ChallengeCategoryCounts(ctx context.Context) ([]models.CategoryCount, error) {
+	rows, err := s.challengeRepo.CategoryCounts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("wargame.ChallengeCategoryCounts: %w", err)
+	}
+
+	return rows, nil
+}
+
+func (s *WargameService) ChallengeLevelCounts(ctx context.Context) ([]models.LevelCount, error) {
+	rows, err := s.challengeRepo.LevelCounts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("wargame.ChallengeLevelCounts: %w", err)
+	}
+
+	return rows, nil
+}
+
 func (s *WargameService) ListAllSubmissions(ctx context.Context) ([]models.Submission, error) {
 	rows, err := s.submissionRepo.ListAll(ctx)
 	if err != nil {

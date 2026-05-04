@@ -9,6 +9,156 @@ import UserAvatar from '../components/UserAvatar'
 import { levelBadgeClass, normalizeLevel } from '../lib/level'
 import FlagIcon from '../components/FlagIcon'
 
+const CategoryDistributionChart = ({ counts, hoveredCategory, setHoveredCategory }: { counts: { category: string; count: number }[]; hoveredCategory: string | null; setHoveredCategory: (category: string | null) => void }) => {
+    const t = useT()
+    const displayCounts = buildCategoryDistribution(counts, t('common.other'))
+    const total = displayCounts.reduce((s, c) => s + c.count, 0)
+    if (total === 0) return null
+
+    const size = 112
+    const radius = size / 2 - 1
+    const center = size / 2
+    const polarToCartesian = (angle: number) => {
+        const radians = ((angle - 90) * Math.PI) / 180
+        return {
+            x: center + radius * Math.cos(radians),
+            y: center + radius * Math.sin(radians),
+        }
+    }
+
+    const slicePath = (startAngle: number, endAngle: number) => {
+        const start = polarToCartesian(endAngle)
+        const end = polarToCartesian(startAngle)
+        const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1'
+        return [`M ${center} ${center}`, `L ${start.x} ${start.y}`, `A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`, 'Z'].join(' ')
+    }
+
+    let cursor = 0
+
+    return (
+        <div className='relative mt-2 flex flex-col items-center' onMouseLeave={() => setHoveredCategory(null)}>
+            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className='shrink-0'>
+                <circle cx={center} cy={center} r={radius} className='fill-surface' />
+                <g className='cursor-pointer'>
+                    {displayCounts.map((c) => {
+                        const startAngle = cursor
+                        cursor += (c.count / total) * 360
+                        const endAngle = cursor
+                        const isActive = hoveredCategory == null || hoveredCategory === c.key
+                        return <path key={c.key} d={slicePath(startAngle, endAngle)} style={{ fill: c.fill, opacity: isActive ? 1 : 0.28, transition: 'opacity 160ms ease' }} onMouseEnter={() => setHoveredCategory(c.key)} />
+                    })}
+                </g>
+            </svg>
+        </div>
+    )
+}
+
+type CategoryDistributionItem = {
+    key: string
+    label: string
+    count: number
+    fill: string
+}
+
+const buildCategoryDistribution = (counts: { category: string; count: number }[], otherLabel: string): CategoryDistributionItem[] => {
+    const sortedCounts = [...counts].sort((left, right) => right.count - left.count || left.category.localeCompare(right.category))
+    const topCounts = sortedCounts.slice(0, 5)
+    const otherCount = sortedCounts.slice(5).reduce((sum, item) => sum + item.count, 0)
+
+    return [
+        ...topCounts.map((item, index) => ({ key: item.category, label: item.category, count: item.count, fill: `rgb(var(--chart-${index + 1}))` })),
+        ...(otherCount > 0
+            ? [
+                  {
+                      key: 'other',
+                      label: otherLabel,
+                      count: otherCount,
+                      fill: 'rgb(var(--color-secondary))',
+                  },
+              ]
+            : []),
+    ]
+}
+
+const levelBarFillClass = (level: number) => {
+    if (level <= 0) return 'fill-slate-300 dark:fill-slate-500'
+    if (level <= 2) return 'fill-emerald-400 dark:fill-emerald-500'
+    if (level <= 4) return 'fill-teal-400 dark:fill-teal-500'
+    if (level <= 6) return 'fill-cyan-400 dark:fill-cyan-500'
+    if (level <= 8) return 'fill-blue-500 dark:fill-blue-500'
+    return 'fill-rose-500 dark:fill-rose-500'
+}
+
+const LevelDistributionChart = ({ counts, hoveredLevel, setHoveredLevel }: { counts: { level: number; count: number }[]; hoveredLevel: number | null; setHoveredLevel: (level: number | null) => void }) => {
+    const rows = Array.from({ length: 11 }, (_, level) => level).map((level) => ({
+        level,
+        label: level === 0 ? '?' : String(level),
+        count: counts.find((item) => item.level === level)?.count ?? 0,
+    }))
+    const total = rows.reduce((sum, item) => sum + item.count, 0)
+    if (total === 0) return null
+
+    const width = 420
+    const height = 220
+    const chartLeft = 14
+    const chartRight = 14
+    const chartTop = 16
+    const chartBottom = 44
+    const chartWidth = width - chartLeft - chartRight
+    const chartHeight = height - chartTop - chartBottom
+    const slotWidth = chartWidth / rows.length
+    const barWidth = slotWidth * 0.56
+    const maxCount = Math.max(...rows.map((item) => item.count), 1)
+    const scaleY = (value: number) => (value / maxCount) * chartHeight
+
+    return (
+        <div className='mt-2 w-full overflow-x-auto'>
+            <svg viewBox={`0 0 ${width} ${height}`} className='h-auto w-full min-w-105 overflow-visible'>
+                <line x1={chartLeft} y1={chartTop + chartHeight} x2={chartLeft + chartWidth} y2={chartTop + chartHeight} stroke='rgb(var(--color-border) / 0.7)' strokeWidth='1' />
+                {rows.map((row, index) => {
+                    const centerX = chartLeft + slotWidth * index + slotWidth / 2
+                    const barHeight = scaleY(row.count)
+                    const barX = centerX - barWidth / 2
+                    const barY = chartTop + chartHeight - barHeight
+                    const isActive = hoveredLevel == null || hoveredLevel === row.level
+
+                    return (
+                        <g key={row.level} onMouseEnter={() => setHoveredLevel(row.level)} onMouseLeave={() => setHoveredLevel(null)}>
+                            <rect x={centerX - slotWidth / 2 + slotWidth * 0.22} y={chartTop} width={slotWidth - slotWidth * 0.44} height={chartHeight} className='fill-surface-subtle' />
+                            <rect
+                                x={barX}
+                                y={barY}
+                                width={barWidth}
+                                height={Math.max(barHeight, row.count > 0 ? 4 : 0)}
+                                className={`${levelBarFillClass(row.level)} cursor-pointer`}
+                                style={{ opacity: isActive ? 1 : 0.34, transition: 'opacity 160ms ease' }}
+                            />
+                            <text x={centerX} y={Math.max(barY - 4, 10)} textAnchor='middle' className='fill-text text-[10px] font-semibold'>
+                                {row.count}
+                            </text>
+                            <foreignObject
+                                className='cursor-pointer'
+                                x={centerX - 14}
+                                y={chartTop + chartHeight + 6}
+                                width='28'
+                                height='28'
+                                style={{
+                                    opacity: isActive ? 1 : 0.34,
+                                    transition: 'opacity 160ms ease',
+                                }}
+                                onMouseEnter={() => setHoveredLevel(row.level)}
+                                onMouseLeave={() => setHoveredLevel(null)}
+                            >
+                                <LevelBadge level={row.level} active={false} size='sm' />
+                            </foreignObject>
+                        </g>
+                    )
+                })}
+            </svg>
+        </div>
+    )
+}
+
 interface RouteProps {
     routeParams?: Record<string, string>
 }
@@ -48,25 +198,32 @@ const PRIMARY_CHALLENGE_CATEGORIES = ['Web', 'Pwnable', 'Reversing', 'Crypto', '
 const PRIMARY_CATEGORY_SET = new Set<string>(PRIMARY_CHALLENGE_CATEGORIES)
 const EXTRA_CHALLENGE_CATEGORIES = CHALLENGE_CATEGORIES.filter((category) => !PRIMARY_CATEGORY_SET.has(category))
 
-export const LevelBadge = ({ level, active }: { level?: number; active?: boolean }) => {
+export const LevelBadge = ({ level, active, size = 'default' }: { level?: number; active?: boolean; size?: 'default' | 'sm' }) => {
     const normalized = normalizeLevel(level)
+    const sizeClasses = {
+        default: { outer: 'h-8 w-8', inner: 'h-6.5 w-6.5', text: 'text-[11px]' },
+        sm: { outer: 'h-6 w-6', inner: 'h-5 w-5', text: 'text-[9px]' },
+    }
+    const sizes = sizeClasses[size]
     return (
         <span
             className={`
-                inline-flex items-center justify-center
-                rounded-full bg-white dark:bg-surface
-                border border-border dark:border-border/80
-                ${active ? 'ring-1 ring-accent' : ''}
-                transition
-                h-8 w-8
-            `}
+        inline-flex items-center justify-center
+        rounded-full bg-white dark:bg-surface
+        border ${active ? 'border-accent/70' : 'border-border dark:border-border/80'}
+        ${active ? 'shadow-[0_0_0_2px_rgba(var(--color-accent),0.15)]' : ''}
+        outline-none focus:outline-none
+        transition
+        ${sizes.outer}
+    `}
         >
             <span
                 className={`
                     inline-flex items-center justify-center
-                    rounded-full text-[11px] font-bold
+                    rounded-full font-bold
                     ${levelBadgeClass(normalized)}
-                    h-6.5 w-6.5
+                    ${sizes.inner}
+                    ${sizes.text}
                 `}
             >
                 {normalized > 0 ? normalized : '?'}
@@ -111,6 +268,10 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
     const [sortFilter, setSortFilter] = useState<SortFilter>(initialQueryState.sort)
 
     const [topUsers, setTopUsers] = useState<UserRankingEntry[]>([])
+    const [categoryCounts, setCategoryCounts] = useState<{ category: string; count: number }[]>([])
+    const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
+    const [levelCounts, setLevelCounts] = useState<{ level: number; count: number }[]>([])
+    const [hoveredLevel, setHoveredLevel] = useState<number | null>(null)
     const [isExtraCategoryOpen, setIsExtraCategoryOpen] = useState(false)
     const [isSortMenuOpen, setIsSortMenuOpen] = useState(false)
     const extraCategoryMenuRef = useRef<HTMLDivElement | null>(null)
@@ -147,6 +308,8 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
             })
             setChallenges(data.challenges)
             setPagination(data.pagination)
+            setCategoryCounts(data.category_counts ?? [])
+            setLevelCounts(data.level_counts ?? [])
         } catch (error) {
             setErrorMessage(formatApiError(error, t).message)
             setPagination(EMPTY_PAGINATION)
@@ -225,6 +388,12 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
         }
     }, [isSortMenuOpen])
 
+    useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'auto' })
+    }, [page, appliedSearch, categoryFilter, levelFilter, solveFilter, sortFilter])
+
+    const displayCategoryCounts = buildCategoryDistribution(categoryCounts, t('common.other'))
+
     return (
         <section className='animate space-y-4'>
             <div className='grid gap-4 lg:grid-cols-[1.9fr_0.9fr]'>
@@ -263,6 +432,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                 {t('common.search')}
                             </button>
                         </div>
+                        {/* category counts moved to right sidebar */}
                         <div className='flex flex-wrap items-center gap-2'>
                             <span className='w-14 text-xs text-text-muted dark:text-text-muted'>{t('challenges.filterCategory')}</span>
                             <button
@@ -689,6 +859,40 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                             )}
                         </div>
                     </div>
+
+                    {displayCategoryCounts.length > 0 ? (
+                        <div className='p-0 md:p-4'>
+                            <p className='text-xl leading-none text-text dark:text-text'>{t('challenges.sidebarByCategory')}</p>
+                            <div className='mt-4 flex flex-col gap-2 lg:flex-col xl:grid xl:grid-cols-[130px_minmax(0,1fr)] xl:items-center xl:gap-3'>
+                                <div className='flex items-center justify-center'>
+                                    <CategoryDistributionChart counts={categoryCounts} hoveredCategory={hoveredCategory} setHoveredCategory={setHoveredCategory} />
+                                </div>
+                                <div className='min-w-0 space-y-1 text-xs text-text-muted'>
+                                    {displayCategoryCounts.map((c) => (
+                                        <div
+                                            key={c.key}
+                                            className='flex items-center justify-between gap-3 transition-opacity duration-150 cursor-pointer'
+                                            style={{ opacity: hoveredCategory == null || hoveredCategory === c.key ? 1 : 0.28 }}
+                                            onMouseEnter={() => setHoveredCategory(c.key)}
+                                            onMouseLeave={() => setHoveredCategory(null)}
+                                        >
+                                            <span className='truncate'>{c.label}</span>
+                                            <div className='shrink-0'>{c.count}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {levelCounts.length > 0 ? (
+                        <div className='p-0 md:p-4'>
+                            <p className='text-xl leading-none text-text dark:text-text'>{t('challenges.sidebarByLevel')}</p>
+                            <div className='mt-4 flex items-center justify-center'>
+                                <LevelDistributionChart counts={levelCounts} hoveredLevel={hoveredLevel} setHoveredLevel={setHoveredLevel} />
+                            </div>
+                        </div>
+                    ) : null}
                 </aside>
             </div>
         </section>

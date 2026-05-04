@@ -80,6 +80,84 @@ func TestWargameServiceCreateListGetChallenge(t *testing.T) {
 	}
 }
 
+func TestWargameServiceChallengeCategoryAndLevelCounts(t *testing.T) {
+	env := setupServiceTest(t)
+	createChallengeWithCategory := func(title, category string, active bool, flag string) *models.Challenge {
+		t.Helper()
+		challenge := &models.Challenge{
+			Title:       title,
+			Description: "desc",
+			Category:    category,
+			Points:      100,
+			IsActive:    active,
+			CreatedAt:   time.Now().UTC(),
+		}
+
+		hash, err := utils.HashFlag(flag, env.cfg.BcryptCost)
+		if err != nil {
+			t.Fatalf("hash flag: %v", err)
+		}
+
+		challenge.FlagHash = hash
+		if err := env.challengeRepo.Create(context.Background(), challenge); err != nil {
+			t.Fatalf("create challenge: %v", err)
+		}
+
+		return challenge
+	}
+
+	createChallengeWithCategory("Web One", "Web", true, "FLAG{WEB1}")
+	createChallengeWithCategory("Web Two", "Web", true, "FLAG{WEB2}")
+	inactive := createChallengeWithCategory("Crypto Hidden", "Crypto", false, "FLAG{CRYPTO}")
+
+	user := createUser(t, env, "counts@example.com", "counts", "pass", models.UserRole)
+	challenge := createChallengeWithCategory("Level Target", "Misc", true, "FLAG{LEVEL}")
+	createSubmission(t, env, user.ID, challenge.ID, true, time.Now().UTC())
+	if err := env.wargameSvc.VoteChallengeLevel(context.Background(), user.ID, challenge.ID, 7); err != nil {
+		t.Fatalf("VoteChallengeLevel: %v", err)
+	}
+
+	categoryCounts, err := env.wargameSvc.ChallengeCategoryCounts(context.Background())
+	if err != nil {
+		t.Fatalf("ChallengeCategoryCounts: %v", err)
+	}
+
+	categoryMap := map[string]int{}
+	for _, row := range categoryCounts {
+		categoryMap[row.Category] = row.Count
+	}
+
+	if categoryMap["Web"] != 2 {
+		t.Fatalf("expected Web count 2, got %+v", categoryMap)
+	}
+
+	if categoryMap["Misc"] != 1 {
+		t.Fatalf("expected Misc count 1, got %+v", categoryMap)
+	}
+
+	if _, ok := categoryMap[inactive.Category]; ok {
+		t.Fatalf("expected inactive category to be excluded, got %+v", categoryMap)
+	}
+
+	levelCounts, err := env.wargameSvc.ChallengeLevelCounts(context.Background())
+	if err != nil {
+		t.Fatalf("ChallengeLevelCounts: %v", err)
+	}
+
+	levelMap := map[int]int{}
+	for _, row := range levelCounts {
+		levelMap[row.Level] = row.Count
+	}
+
+	if levelMap[0] != 3 {
+		t.Fatalf("expected unknown level count 3, got %+v", levelMap)
+	}
+
+	if levelMap[7] != 1 {
+		t.Fatalf("expected level 7 count 1, got %+v", levelMap)
+	}
+}
+
 func TestWargameServiceSearchAndPagination(t *testing.T) {
 	env := setupServiceTest(t)
 	_, err := env.wargameSvc.CreateChallenge(context.Background(), "Web Warmup", "Desc", "Web", 100, "FLAG{1}", true, false, nil, nil, nil)
@@ -650,6 +728,12 @@ func TestWargameServiceErrorPathsWithClosedDB(t *testing.T) {
 	}
 	if _, err := wargameSvc.SubmitFlag(context.Background(), 1, 1, "flag{err}"); err == nil {
 		t.Fatalf("expected SubmitFlag error")
+	}
+	if _, err := wargameSvc.ChallengeCategoryCounts(context.Background()); err == nil {
+		t.Fatalf("expected ChallengeCategoryCounts error")
+	}
+	if _, err := wargameSvc.ChallengeLevelCounts(context.Background()); err == nil {
+		t.Fatalf("expected ChallengeLevelCounts error")
 	}
 }
 
