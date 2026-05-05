@@ -149,8 +149,8 @@ func TestWargameServiceChallengeCategoryAndLevelCounts(t *testing.T) {
 		levelMap[row.Level] = row.Count
 	}
 
-	if levelMap[0] != 3 {
-		t.Fatalf("expected unknown level count 3, got %+v", levelMap)
+	if levelMap[0] != 2 {
+		t.Fatalf("expected unknown level count 2, got %+v", levelMap)
 	}
 
 	if levelMap[7] != 1 {

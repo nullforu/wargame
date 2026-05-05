@@ -73,12 +73,14 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 		query string
 	}{
 		{name: "idx_challenges_category", query: "CREATE INDEX IF NOT EXISTS idx_challenges_category ON challenges (category)"},
+		{name: "idx_challenges_active_category", query: "CREATE INDEX IF NOT EXISTS idx_challenges_active_category ON challenges (is_active, category)"},
 		{name: "idx_submissions_user", query: "CREATE INDEX IF NOT EXISTS idx_submissions_user ON submissions (user_id)"},
 		{name: "idx_submissions_challenge", query: "CREATE INDEX IF NOT EXISTS idx_submissions_challenge ON submissions (challenge_id)"},
 		{name: "idx_submissions_user_challenge", query: "CREATE INDEX IF NOT EXISTS idx_submissions_user_challenge ON submissions (user_id, challenge_id)"},
 		{name: "idx_submissions_correct_time", query: "CREATE INDEX IF NOT EXISTS idx_submissions_correct_time ON submissions (correct, submitted_at) WHERE correct = true"},
 		{name: "idx_challenge_votes_challenge", query: "CREATE INDEX IF NOT EXISTS idx_challenge_votes_challenge ON challenge_votes (challenge_id)"},
 		{name: "idx_challenge_votes_challenge_level", query: "CREATE INDEX IF NOT EXISTS idx_challenge_votes_challenge_level ON challenge_votes (challenge_id, level)"},
+		{name: "idx_challenge_votes_challenge_level_updated", query: "CREATE INDEX IF NOT EXISTS idx_challenge_votes_challenge_level_updated ON challenge_votes (challenge_id, level, updated_at DESC)"},
 		{name: "idx_challenge_votes_user_challenge", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_challenge_votes_user_challenge ON challenge_votes (user_id, challenge_id)"},
 		{name: "idx_stacks_user_id", query: "CREATE INDEX IF NOT EXISTS idx_stacks_user_id ON stacks (user_id)"},
 		{name: "idx_stacks_user_challenge", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_stacks_user_challenge ON stacks (user_id, challenge_id)"},

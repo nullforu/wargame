@@ -331,6 +331,59 @@ func TestChallengeRepoChallengePointsError(t *testing.T) {
 	if _, err := repo.ChallengePoints(context.Background()); err == nil {
 		t.Fatalf("expected error from ChallengePoints")
 	}
+
+	if _, err := repo.CategoryCounts(context.Background()); err == nil {
+		t.Fatalf("expected error from CategoryCounts")
+	}
+
+	if _, err := repo.LevelCounts(context.Background()); err == nil {
+		t.Fatalf("expected error from LevelCounts")
+	}
+}
+
+func TestChallengeRepoCategoryCounts(t *testing.T) {
+	env := setupRepoTest(t)
+	web1 := createChallenge(t, env, "Web One", 100, "FLAG{W1}", true)
+	web1.Category = "Web"
+	if err := env.challengeRepo.Update(context.Background(), web1); err != nil {
+		t.Fatalf("update web1: %v", err)
+	}
+
+	web2 := createChallenge(t, env, "Web Two", 100, "FLAG{W2}", true)
+	web2.Category = "Web"
+	if err := env.challengeRepo.Update(context.Background(), web2); err != nil {
+		t.Fatalf("update web2: %v", err)
+	}
+
+	crypto := createChallenge(t, env, "Crypto One", 100, "FLAG{C1}", true)
+	crypto.Category = "Crypto"
+	if err := env.challengeRepo.Update(context.Background(), crypto); err != nil {
+		t.Fatalf("update crypto: %v", err)
+	}
+
+	inactive := createChallenge(t, env, "Hidden", 100, "FLAG{H1}", false)
+	inactive.Category = "Forensics"
+	if err := env.challengeRepo.Update(context.Background(), inactive); err != nil {
+		t.Fatalf("update inactive: %v", err)
+	}
+
+	rows, err := env.challengeRepo.CategoryCounts(context.Background())
+	if err != nil {
+		t.Fatalf("CategoryCounts: %v", err)
+	}
+
+	m := make(map[string]int, len(rows))
+	for _, r := range rows {
+		m[r.Category] = r.Count
+	}
+
+	if m["Crypto"] != 1 || m["Web"] != 2 {
+		t.Fatalf("unexpected category counts: %+v", m)
+	}
+
+	if _, ok := m["Forensics"]; ok {
+		t.Fatalf("expected inactive category excluded: %+v", m)
+	}
 }
 
 func TestChallengeRepoLevelCounts(t *testing.T) {
@@ -378,6 +431,23 @@ func TestChallengeRepoLevelCounts(t *testing.T) {
 
 	if m[8] != 1 {
 		t.Fatalf("expected level 8 count 1, got %d", m[8])
+	}
+
+	inactive := createChallenge(t, env, "Inactive Level", 100, "FLAG{I}", false)
+	mustUpsertVote(t, voteRepo, inactive.ID, u4.ID, 9, now)
+
+	rows, err = env.challengeRepo.LevelCounts(context.Background())
+	if err != nil {
+		t.Fatalf("LevelCounts after inactive vote: %v", err)
+	}
+
+	m = make(map[int]int)
+	for _, r := range rows {
+		m[r.Level] = r.Count
+	}
+
+	if _, ok := m[9]; ok {
+		t.Fatalf("expected inactive challenge level to be excluded, got %+v", m)
 	}
 }
 

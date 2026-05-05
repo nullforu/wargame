@@ -215,16 +215,29 @@ func (r *ChallengeRepo) CategoryCounts(ctx context.Context) ([]models.CategoryCo
 
 func (r *ChallengeRepo) LevelCounts(ctx context.Context) ([]models.LevelCount, error) {
 	rows := make([]models.LevelCount, 0)
-	representativeLevels := r.db.NewSelect().
+	activeChallenges := r.db.NewSelect().
+		TableExpr("challenges AS challenge").
+		ColumnExpr("challenge.id").
+		Where("challenge.is_active = true")
+
+	levelStats := r.db.NewSelect().
 		TableExpr("challenge_votes AS cv").
+		Join("JOIN (?) AS active_challenges ON active_challenges.id = cv.challenge_id", activeChallenges).
 		ColumnExpr("cv.challenge_id").
 		ColumnExpr("cv.level").
-		ColumnExpr("ROW_NUMBER() OVER (PARTITION BY cv.challenge_id ORDER BY COUNT(*) DESC, MAX(cv.updated_at) DESC, cv.level DESC) AS rn").
+		ColumnExpr("COUNT(*) AS vote_count").
+		ColumnExpr("MAX(cv.updated_at) AS latest_vote_at").
 		GroupExpr("cv.challenge_id, cv.level")
 
+	representativeLevels := r.db.NewSelect().
+		TableExpr("(?) AS level_stats", levelStats).
+		ColumnExpr("DISTINCT ON (level_stats.challenge_id) level_stats.challenge_id").
+		ColumnExpr("level_stats.level").
+		OrderExpr("level_stats.challenge_id ASC, level_stats.vote_count DESC, level_stats.latest_vote_at DESC, level_stats.level DESC")
+
 	if err := r.db.NewSelect().
-		TableExpr("challenges AS challenge").
-		Join("LEFT JOIN (?) AS level_rank ON level_rank.challenge_id = challenge.id AND level_rank.rn = 1", representativeLevels).
+		TableExpr("(?) AS active_challenges", activeChallenges).
+		Join("LEFT JOIN (?) AS level_rank ON level_rank.challenge_id = active_challenges.id", representativeLevels).
 		ColumnExpr("COALESCE(level_rank.level, 0) AS level").
 		ColumnExpr("COUNT(*) AS count").
 		GroupExpr("COALESCE(level_rank.level, 0)").
