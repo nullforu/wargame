@@ -22,7 +22,6 @@ import (
 
 const (
 	redisSubmitPrefix = "submit:"
-	maxFlagLength     = 128
 	maxWriteupContent = 100000
 	maxCommentContent = 500
 )
@@ -638,7 +637,6 @@ func (s *WargameService) SubmitFlag(ctx context.Context, userID, challengeID int
 	sub := &models.Submission{
 		UserID:      userID,
 		ChallengeID: challengeID,
-		Provided:    trimTo(flag, maxFlagLength),
 		Correct:     correct,
 		SubmittedAt: time.Now().UTC(),
 	}

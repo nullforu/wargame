@@ -61,7 +61,7 @@ func TestSubmissionRepoCreateCorrectIfNotSolvedByUser(t *testing.T) {
 	user := createUserForTestUserScope(t, env, "u1@example.com", "u1", "pass", models.UserRole)
 	ch := createChallenge(t, env, "ch1", 100, "FLAG{1}", true)
 
-	sub1 := &models.Submission{UserID: user.ID, ChallengeID: ch.ID, Provided: "flag{1}", Correct: true, SubmittedAt: time.Now().UTC()}
+	sub1 := &models.Submission{UserID: user.ID, ChallengeID: ch.ID, Correct: true, SubmittedAt: time.Now().UTC()}
 	inserted, err := env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), sub1)
 	if err != nil || !inserted {
 		t.Fatalf("first insert failed, inserted=%v err=%v", inserted, err)
@@ -70,7 +70,7 @@ func TestSubmissionRepoCreateCorrectIfNotSolvedByUser(t *testing.T) {
 		t.Fatalf("expected first blood on first solve")
 	}
 
-	sub2 := &models.Submission{UserID: user.ID, ChallengeID: ch.ID, Provided: "flag{1}", Correct: true, SubmittedAt: time.Now().UTC().Add(time.Second)}
+	sub2 := &models.Submission{UserID: user.ID, ChallengeID: ch.ID, Correct: true, SubmittedAt: time.Now().UTC().Add(time.Second)}
 	inserted, err = env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), sub2)
 	if err != nil {
 		t.Fatalf("second insert error: %v", err)
@@ -102,7 +102,7 @@ func TestSubmissionRepoCreateCorrectFalsePath(t *testing.T) {
 	user := createUserForTestUserScope(t, env, "u2@example.com", "u2", "pass", models.UserRole)
 	ch := createChallenge(t, env, "ch2", 100, "FLAG{2}", true)
 
-	sub := &models.Submission{UserID: user.ID, ChallengeID: ch.ID, Provided: "bad", Correct: false, SubmittedAt: time.Now().UTC()}
+	sub := &models.Submission{UserID: user.ID, ChallengeID: ch.ID, Correct: false, SubmittedAt: time.Now().UTC()}
 	inserted, err := env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), sub)
 	if err != nil || !inserted {
 		t.Fatalf("expected false submission insert, inserted=%v err=%v", inserted, err)
@@ -195,13 +195,13 @@ func TestSubmissionRepoChallengeFirstBlood(t *testing.T) {
 	second := createUserForTestUserScope(t, env, "second@example.com", "second", "pass", models.UserRole)
 
 	now := time.Now().UTC()
-	firstSub := &models.Submission{UserID: first.ID, ChallengeID: ch.ID, Provided: "FLAG{FB}", Correct: true, SubmittedAt: now.Add(-2 * time.Minute)}
+	firstSub := &models.Submission{UserID: first.ID, ChallengeID: ch.ID, Correct: true, SubmittedAt: now.Add(-2 * time.Minute)}
 	inserted, err := env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), firstSub)
 	if err != nil || !inserted {
 		t.Fatalf("seed first solve: inserted=%v err=%v", inserted, err)
 	}
 
-	secondSub := &models.Submission{UserID: second.ID, ChallengeID: ch.ID, Provided: "FLAG{FB}", Correct: true, SubmittedAt: now.Add(-time.Minute)}
+	secondSub := &models.Submission{UserID: second.ID, ChallengeID: ch.ID, Correct: true, SubmittedAt: now.Add(-time.Minute)}
 	inserted, err = env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), secondSub)
 	if err != nil || !inserted {
 		t.Fatalf("seed second solve: inserted=%v err=%v", inserted, err)

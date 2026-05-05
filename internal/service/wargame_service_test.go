@@ -393,13 +393,13 @@ func TestWargameServiceChallengeFirstBlood(t *testing.T) {
 	challenge := createChallenge(t, env, "firstblood", 100, "FLAG{FIRST}", true)
 
 	now := time.Now().UTC()
-	firstSub := &models.Submission{UserID: first.ID, ChallengeID: challenge.ID, Provided: "FLAG{FIRST}", Correct: true, SubmittedAt: now.Add(-2 * time.Minute)}
+	firstSub := &models.Submission{UserID: first.ID, ChallengeID: challenge.ID, Correct: true, SubmittedAt: now.Add(-2 * time.Minute)}
 	inserted, err := env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), firstSub)
 	if err != nil || !inserted {
 		t.Fatalf("seed first solve: inserted=%v err=%v", inserted, err)
 	}
 
-	secondSub := &models.Submission{UserID: second.ID, ChallengeID: challenge.ID, Provided: "FLAG{FIRST}", Correct: true, SubmittedAt: now.Add(-time.Minute)}
+	secondSub := &models.Submission{UserID: second.ID, ChallengeID: challenge.ID, Correct: true, SubmittedAt: now.Add(-time.Minute)}
 	inserted, err = env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), secondSub)
 	if err != nil || !inserted {
 		t.Fatalf("seed second solve: inserted=%v err=%v", inserted, err)

@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE submissions
+    ADD COLUMN IF NOT EXISTS provided TEXT NOT NULL DEFAULT '';
+
+COMMIT;

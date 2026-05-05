@@ -1248,7 +1248,7 @@ func TestHandlerGetChallengeAndSolvers(t *testing.T) {
 
 	t.Run("get challenge includes first blood", func(t *testing.T) {
 		now := time.Now().UTC()
-		sub := &models.Submission{UserID: user.ID, ChallengeID: prev.ID, Provided: "FLAG{PREV}", Correct: true, SubmittedAt: now.Add(-2 * time.Minute)}
+		sub := &models.Submission{UserID: user.ID, ChallengeID: prev.ID, Correct: true, SubmittedAt: now.Add(-2 * time.Minute)}
 		inserted, err := env.submissionRepo.CreateCorrectIfNotSolvedByUser(context.Background(), sub)
 		if err != nil || !inserted {
 			t.Fatalf("seed first blood: inserted=%v err=%v", inserted, err)

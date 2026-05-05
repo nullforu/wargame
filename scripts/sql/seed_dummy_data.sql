@@ -113,22 +113,20 @@ WITH solved AS (
     WHERE u.role = 'user'
       AND ((u.id * 17 + c.id * 11) % 19 = 0)
 )
-INSERT INTO submissions (user_id, challenge_id, provided, correct, is_first_blood, submitted_at)
+INSERT INTO submissions (user_id, challenge_id, correct, is_first_blood, submitted_at)
 SELECT
     s.user_id,
     s.challenge_id,
-    format('FLAG{DUMMY_%s_%s}', s.user_id, s.challenge_id),
     TRUE,
     (s.rn = 1),
     s.submitted_at
 FROM solved s;
 
 -- Incorrect submissions for noise/load testing
-INSERT INTO submissions (user_id, challenge_id, provided, correct, is_first_blood, submitted_at)
+INSERT INTO submissions (user_id, challenge_id, correct, is_first_blood, submitted_at)
 SELECT
     u.id,
     c.id,
-    format('wrong-%s-%s', u.id, c.id),
     FALSE,
     FALSE,
     (TIMESTAMP '2026-02-01 08:00:00' + (((u.id * 7 + c.id * 13) % 720) || ' minutes')::interval)
