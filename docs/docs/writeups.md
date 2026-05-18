@@ -58,6 +58,7 @@ Response 200
 Notes:
 
 - `content` is included only when `can_view_content` is `true`.
+- `can_view_content` is `true` when the viewer solved the challenge or is the challenge creator.
 - Metadata fields are always returned.
 
 Errors:
@@ -104,6 +105,7 @@ Response 200
 Notes:
 
 - `content` may be omitted when `can_view_content` is `false`.
+- `can_view_content` is `true` when the viewer solved the challenge or is the challenge creator.
 
 Errors:
 
@@ -160,7 +162,8 @@ Response 201
 Rules:
 
 - One writeup per `(user, challenge)`.
-- Only users who solved the challenge can create.
+- Users who solved the challenge can create.
+- The challenge creator can create a writeup for that challenge without solving it.
 
 Errors:
 

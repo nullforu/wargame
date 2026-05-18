@@ -525,6 +525,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const firstBloodSolvedAfterLabel = firstBloodDuration ? renderFirstBloodDuration({ count: firstBloodDuration.count }) : null
     const currentLevel = normalizeLevel(challenge?.level)
     const levelLabel = currentLevel > 0 ? String(currentLevel) : t('level.unknown')
+    const isChallengeAuthor = Boolean(challenge?.created_by?.user_id && auth.user?.id && challenge.created_by.user_id === auth.user.id)
     const voteCountsByLevel = useMemo(() => {
         const source = challenge && 'level_vote_counts' in challenge ? (challenge.level_vote_counts ?? []) : []
         const mapped = new Map<number, number>()
@@ -919,6 +920,8 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                             <WriteupsSection
                                 challengeId={challengeId}
                                 challengeSolved={challenge.is_solved}
+                                canCreateWriteup={challenge.is_solved || isChallengeAuthor}
+                                isChallengeAuthor={isChallengeAuthor}
                                 hasMyWriteup={hasMyWriteup}
                                 writeups={writeups}
                                 writeupLoading={writeupLoading}

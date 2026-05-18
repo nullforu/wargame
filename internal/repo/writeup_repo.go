@@ -90,6 +90,7 @@ func (r *WriteupRepo) baseDetailQuery(includeContent bool) *bun.SelectQuery {
 		ColumnExpr("c.title AS challenge_title").
 		ColumnExpr("c.category AS challenge_category").
 		ColumnExpr("c.points AS challenge_points").
+		ColumnExpr("c.created_by_user_id AS challenge_created_by_user_id").
 		Join("JOIN users AS u ON u.id = w.user_id").
 		Join("JOIN challenges AS c ON c.id = w.challenge_id").
 		Join("LEFT JOIN affiliations AS aff ON aff.id = u.affiliation_id")

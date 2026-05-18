@@ -460,6 +460,7 @@
     "writeup.deleting": "Deleting...",
     "writeup.hiddenUntilSolved": "Solve this challenge to view writeup contents.",
     "writeup.hint": "You can write a writeup after solving the challenge. Share your approach and solution to help others learn!",
+    "writeup.authorHint": "Challenge creators can write a writeup without solving and can view every writeup for their challenge.",
     "writeup.metaOnlyHint": "You can write a writeup, but its contents will be hidden until you solve the challenge.",
     "writeup.alreadyExists": "You already published a writeup for this challenge.",
     "writeup.empty": "No writeups yet.",

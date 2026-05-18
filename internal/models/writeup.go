@@ -18,19 +18,20 @@ type Writeup struct {
 }
 
 type WriteupDetail struct {
-	ID                int64     `bun:"id"`
-	UserID            int64     `bun:"user_id"`
-	ChallengeID       int64     `bun:"challenge_id"`
-	Content           string    `bun:"content"`
-	CreatedAt         time.Time `bun:"created_at"`
-	UpdatedAt         time.Time `bun:"updated_at"`
-	Username          string    `bun:"username"`
-	AffiliationID     *int64    `bun:"affiliation_id"`
-	Affiliation       *string   `bun:"affiliation"`
-	Bio               *string   `bun:"bio"`
-	ProfileImage      *string   `bun:"profile_image"`
-	ChallengeTitle    string    `bun:"challenge_title"`
-	ChallengeCategory string    `bun:"challenge_category"`
-	ChallengePoints   int       `bun:"challenge_points"`
-	ChallengeLevel    int       `bun:"challenge_level"`
+	ID                       int64     `bun:"id"`
+	UserID                   int64     `bun:"user_id"`
+	ChallengeID              int64     `bun:"challenge_id"`
+	Content                  string    `bun:"content"`
+	CreatedAt                time.Time `bun:"created_at"`
+	UpdatedAt                time.Time `bun:"updated_at"`
+	Username                 string    `bun:"username"`
+	AffiliationID            *int64    `bun:"affiliation_id"`
+	Affiliation              *string   `bun:"affiliation"`
+	Bio                      *string   `bun:"bio"`
+	ProfileImage             *string   `bun:"profile_image"`
+	ChallengeTitle           string    `bun:"challenge_title"`
+	ChallengeCategory        string    `bun:"challenge_category"`
+	ChallengePoints          int       `bun:"challenge_points"`
+	ChallengeCreatedByUserID *int64    `bun:"challenge_created_by_user_id"`
+	ChallengeLevel           int       `bun:"challenge_level"`
 }

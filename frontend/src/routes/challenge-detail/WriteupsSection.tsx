@@ -6,6 +6,8 @@ import type { PaginationMeta, Writeup } from '../../lib/types'
 interface WriteupsSectionProps {
     challengeId: number
     challengeSolved: boolean
+    canCreateWriteup: boolean
+    isChallengeAuthor: boolean
     hasMyWriteup: boolean
     writeups: Writeup[]
     writeupLoading: boolean
@@ -24,6 +26,8 @@ const WRITEUP_NOTICE_DISMISSED_KEY = 'writeup_notice_dismissed'
 const WriteupsSection = ({
     challengeId,
     challengeSolved,
+    canCreateWriteup,
+    isChallengeAuthor,
     hasMyWriteup,
     writeups,
     writeupLoading,
@@ -42,7 +46,7 @@ const WriteupsSection = ({
                 <h3 className='text-lg font-semibold text-text'>
                     {t('writeup.sectionTitle')} <span className='text-accent'>{writeupPagination.total_count}</span>
                 </h3>
-                {challengeSolved && !hasMyWriteup ? (
+                {canCreateWriteup && !hasMyWriteup ? (
                     <button
                         className='rounded-md border border-accent/40 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10'
                         onClick={() => {
@@ -55,7 +59,7 @@ const WriteupsSection = ({
             </div>
 
             <DismissibleNotice className='mt-3 rounded-lg' closeAriaLabel={t('common.close')} storageKey={WRITEUP_NOTICE_DISMISSED_KEY} size='small'>
-                {t('writeup.hint')}
+                {isChallengeAuthor && !challengeSolved ? t('writeup.authorHint') : t('writeup.hint')}
             </DismissibleNotice>
 
             <div className='mt-4 space-y-2'>

@@ -148,6 +148,7 @@ const WriteupEditor = ({ routeParams = {} }: RouteProps) => {
     const authorName = auth.user?.username?.trim() || t('common.na')
     const authorAffiliation = auth.user?.affiliation?.trim()
     const authorBio = auth.user?.bio?.trim()
+    const canWriteWriteup = Boolean(auth.user && (summaryChallenge.is_solved || summaryChallenge.created_by?.user_id === auth.user.id))
 
     return (
         <section className='animate space-y-4 px-0 sm:px-1 md:px-2 lg:px-0'>
@@ -186,9 +187,9 @@ const WriteupEditor = ({ routeParams = {} }: RouteProps) => {
                     </div>
 
                     {!auth.user ? <div className='rounded-xl bg-warning/10 p-4 text-sm text-warning'>{t('writeup.loginRequired')}</div> : null}
-                    {auth.user && !summaryChallenge.is_solved ? <div className='rounded-xl bg-warning/10 p-4 text-sm text-warning'>{t('writeup.hiddenUntilSolved')}</div> : null}
+                    {auth.user && !canWriteWriteup ? <div className='rounded-xl bg-warning/10 p-4 text-sm text-warning'>{t('writeup.hiddenUntilSolved')}</div> : null}
 
-                    {auth.user && summaryChallenge.is_solved ? (
+                    {canWriteWriteup ? (
                         <div className='min-w-0 border-t border-border/70 pt-8 sm:pt-10'>
                             <div className='rounded-2xl bg-surface/70 p-4 sm:p-5'>
                                 <MonacoEditor value={content} onChange={setContent} language='markdown' height='420px' />
