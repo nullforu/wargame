@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -30,11 +31,17 @@ type Handler struct {
 	affiliations *service.AffiliationService
 	score        *service.ScoreboardService
 	stacks       *service.StackService
+	vms          *service.VMService
 	redis        *redis.Client
 }
 
-func New(cfg config.Config, auth *service.AuthService, wargame *service.WargameService, users *service.UserService, affiliations *service.AffiliationService, score *service.ScoreboardService, stacks *service.StackService, redis *redis.Client) *Handler {
-	return &Handler{cfg: cfg, auth: auth, wargame: wargame, users: users, affiliations: affiliations, score: score, stacks: stacks, redis: redis}
+func New(cfg config.Config, auth *service.AuthService, wargame *service.WargameService, users *service.UserService, affiliations *service.AffiliationService, score *service.ScoreboardService, stacks *service.StackService, redis *redis.Client, vmServices ...*service.VMService) *Handler {
+	var vms *service.VMService
+	if len(vmServices) > 0 {
+		vms = vmServices[0]
+	}
+
+	return &Handler{cfg: cfg, auth: auth, wargame: wargame, users: users, affiliations: affiliations, score: score, stacks: stacks, vms: vms, redis: redis}
 }
 
 func (h *Handler) respondFromCache(ctx *gin.Context, cacheKey string) bool {
@@ -77,6 +84,20 @@ func (h *Handler) notifyScoreboardChanged(ctx context.Context, reason string) {
 	}
 
 	_ = h.redis.Publish(ctx, "scoreboard.events", payload).Err()
+}
+
+func (h *Handler) userMe(ctx context.Context, user *models.User) userMeResponse {
+	stackCount, stackLimit := 0, 0
+	if h.stacks != nil {
+		stackCount, stackLimit, _ = h.stacks.UserStackSummary(ctx, user.ID)
+	}
+
+	vmCount, vmLimit := 0, 0
+	if h.vms != nil {
+		vmCount, vmLimit, _ = h.vms.UserVMSummary(ctx, user.ID)
+	}
+
+	return newUserMeResponse(user, stackCount, stackLimit, vmCount, vmLimit)
 }
 
 func parseIDParam(ctx *gin.Context, name string) (int64, bool) {
@@ -268,8 +289,7 @@ func (h *Handler) Login(ctx *gin.Context) {
 		writeError(ctx, err)
 		return
 	}
-	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
-	ctx.JSON(http.StatusOK, loginResponse{User: newUserMeResponse(user, stackCount, stackLimit)})
+	ctx.JSON(http.StatusOK, loginResponse{User: h.userMe(ctx.Request.Context(), user)})
 }
 
 func (h *Handler) Refresh(ctx *gin.Context) {
@@ -312,8 +332,7 @@ func (h *Handler) Me(ctx *gin.Context) {
 		return
 	}
 
-	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
-	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
+	ctx.JSON(http.StatusOK, h.userMe(ctx.Request.Context(), user))
 }
 
 func (h *Handler) MyWriteups(ctx *gin.Context) {
@@ -349,8 +368,7 @@ func (h *Handler) UpdateMe(ctx *gin.Context) {
 		return
 	}
 
-	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
-	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
+	ctx.JSON(http.StatusOK, h.userMe(ctx.Request.Context(), user))
 }
 
 func (h *Handler) RequestProfileImageUpload(ctx *gin.Context) {
@@ -366,9 +384,8 @@ func (h *Handler) RequestProfileImageUpload(ctx *gin.Context) {
 		return
 	}
 
-	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
 	ctx.JSON(http.StatusOK, profileImageUploadResponse{
-		User: newUserMeResponse(user, stackCount, stackLimit),
+		User: h.userMe(ctx.Request.Context(), user),
 		Upload: presignedUploadResponse{
 			URL:       upload.URL,
 			Method:    upload.Method,
@@ -386,8 +403,7 @@ func (h *Handler) DeleteProfileImage(ctx *gin.Context) {
 		return
 	}
 
-	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
-	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
+	ctx.JSON(http.StatusOK, h.userMe(ctx.Request.Context(), user))
 }
 
 func (h *Handler) FinalizeProfileImageUpload(ctx *gin.Context) {
@@ -403,8 +419,7 @@ func (h *Handler) FinalizeProfileImageUpload(ctx *gin.Context) {
 		return
 	}
 
-	stackCount, stackLimit, _ := h.stacks.UserStackSummary(ctx.Request.Context(), user.ID)
-	ctx.JSON(http.StatusOK, newUserMeResponse(user, stackCount, stackLimit))
+	ctx.JSON(http.StatusOK, h.userMe(ctx.Request.Context(), user))
 }
 
 func (h *Handler) ListChallenges(ctx *gin.Context) {
@@ -833,9 +848,15 @@ func (h *Handler) SubmitFlag(ctx *gin.Context) {
 	}
 
 	if correct {
+		userID := middleware.UserID(ctx)
 		h.notifyScoreboardChanged(ctx.Request.Context(), "submission_correct")
 		if h.stacks != nil {
-			_ = h.stacks.DeleteStackByUserAndChallenge(ctx.Request.Context(), middleware.UserID(ctx), challengeID)
+			_ = h.stacks.DeleteStackByUserAndChallenge(ctx.Request.Context(), userID, challengeID)
+		}
+		if h.vms != nil {
+			if err := h.vms.DeleteVM(ctx.Request.Context(), userID, challengeID); err != nil && !errors.Is(err, service.ErrVMNotFound) {
+				slog.Warn("delete vm after solve failed", slog.Int64("user_id", userID), slog.Int64("challenge_id", challengeID), slog.Any("error", err))
+			}
 		}
 	}
 	ctx.JSON(http.StatusOK, gin.H{"correct": correct})
@@ -982,6 +1003,147 @@ func (h *Handler) AdminGetStack(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, newStackResponse(stackModel))
 }
 
+func (h *Handler) CreateVM(ctx *gin.Context) {
+	if h.vms == nil {
+		writeError(ctx, service.ErrVMDisabled)
+		return
+	}
+
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	vmModel, err := h.vms.GetOrCreateVM(ctx.Request.Context(), middleware.UserID(ctx), challengeID)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, newVMResponse(vmModel))
+}
+
+func (h *Handler) GetVM(ctx *gin.Context) {
+	if h.vms == nil {
+		writeError(ctx, service.ErrVMDisabled)
+		return
+	}
+
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	vmModel, err := h.vms.GetVM(ctx.Request.Context(), middleware.UserID(ctx), challengeID)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newVMResponse(vmModel))
+}
+
+func (h *Handler) DeleteVM(ctx *gin.Context) {
+	if h.vms == nil {
+		writeError(ctx, service.ErrVMDisabled)
+		return
+	}
+
+	challengeID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.vms.DeleteVM(ctx.Request.Context(), middleware.UserID(ctx), challengeID); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *Handler) ListVMs(ctx *gin.Context) {
+	if h.vms == nil {
+		writeError(ctx, service.ErrVMDisabled)
+		return
+	}
+
+	vms, err := h.vms.ListUserVMs(ctx.Request.Context(), middleware.UserID(ctx))
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]vmResponse, 0, len(vms))
+	for i := range vms {
+		vmModel := vms[i]
+		resp = append(resp, newVMResponse(&vmModel))
+	}
+
+	ctx.JSON(http.StatusOK, vmsListResponse{VMs: resp})
+}
+
+func (h *Handler) AdminListVMs(ctx *gin.Context) {
+	if h.vms == nil {
+		writeError(ctx, service.ErrVMDisabled)
+		return
+	}
+
+	vms, err := h.vms.ListAdminVMs(ctx.Request.Context())
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]adminVMResponse, 0, len(vms))
+	for i := range vms {
+		resp = append(resp, newAdminVMResponse(vms[i]))
+	}
+
+	ctx.JSON(http.StatusOK, adminVMsListResponse{VMs: resp})
+}
+
+func (h *Handler) AdminDeleteVM(ctx *gin.Context) {
+	if h.vms == nil {
+		writeError(ctx, service.ErrVMDisabled)
+		return
+	}
+
+	vmID := strings.TrimSpace(ctx.Param("vm_id"))
+	if vmID == "" {
+		writeError(ctx, service.NewValidationError(service.FieldError{Field: "vm_id", Reason: "required"}))
+		return
+	}
+
+	if err := h.vms.DeleteVMByVMID(ctx.Request.Context(), vmID); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"deleted": true, "vm_id": vmID})
+}
+
+func (h *Handler) AdminGetVM(ctx *gin.Context) {
+	if h.vms == nil {
+		writeError(ctx, service.ErrVMDisabled)
+		return
+	}
+
+	vmID := strings.TrimSpace(ctx.Param("vm_id"))
+	if vmID == "" {
+		writeError(ctx, service.NewValidationError(service.FieldError{Field: "vm_id", Reason: "required"}))
+		return
+	}
+
+	vmModel, err := h.vms.GetVMByVMID(ctx.Request.Context(), vmID)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newVMResponse(vmModel))
+}
+
 func (h *Handler) CreateChallenge(ctx *gin.Context) {
 	var req createChallengeRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -999,7 +1161,12 @@ func (h *Handler) CreateChallenge(ctx *gin.Context) {
 		stackEnabled = *req.StackEnabled
 	}
 
-	challenge, err := h.wargame.CreateChallenge(ctx.Request.Context(), req.Title, req.Description, req.Category, req.Points, req.Flag, active, stackEnabled, stack.TargetPortSpecs(req.StackTargetPorts), req.StackPodSpec, req.PreviousChallengeID)
+	vmEnabled := false
+	if req.VMEnabled != nil {
+		vmEnabled = *req.VMEnabled
+	}
+
+	challenge, err := h.wargame.CreateChallenge(ctx.Request.Context(), req.Title, req.Description, req.Category, req.Points, req.Flag, active, stackEnabled, stack.TargetPortSpecs(req.StackTargetPorts), req.StackPodSpec, req.PreviousChallengeID, service.VMChallengeSpec{Enabled: vmEnabled, Spec: req.VMSpec})
 	if err != nil {
 		writeError(ctx, err)
 		return
@@ -1060,13 +1227,14 @@ func (h *Handler) UpdateChallenge(ctx *gin.Context) {
 	}
 
 	stackPodSpec := optionalStringToPointer(req.StackPodSpec)
+	vmSpec := optionalStringToPointer(req.VMSpec)
 	previousChallengeID := (*int64)(nil)
 	previousChallengeSet := req.PreviousChallengeID.Set
 	if previousChallengeSet {
 		previousChallengeID = req.PreviousChallengeID.Value
 	}
 
-	challenge, err := h.wargame.UpdateChallenge(ctx.Request.Context(), challengeID, title, description, category, req.Points, flag, req.IsActive, req.StackEnabled, req.StackTargetPorts, stackPodSpec, previousChallengeID, previousChallengeSet)
+	challenge, err := h.wargame.UpdateChallenge(ctx.Request.Context(), challengeID, title, description, category, req.Points, flag, req.IsActive, req.StackEnabled, req.StackTargetPorts, stackPodSpec, previousChallengeID, previousChallengeSet, service.VMChallengeUpdate{Enabled: req.VMEnabled, Spec: vmSpec, SpecSet: req.VMSpec.Set})
 	if err != nil {
 		writeError(ctx, err)
 		return
@@ -1113,7 +1281,7 @@ func (h *Handler) AdminGetChallenge(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, adminChallengeResponse{challengeResponse: newChallengeResponse(challenge, false, nil), StackPodSpec: challenge.StackPodSpec})
+	ctx.JSON(http.StatusOK, adminChallengeResponse{challengeResponse: newChallengeResponse(challenge, false, nil), StackPodSpec: challenge.StackPodSpec, VMSpec: challenge.VMSpec})
 }
 
 func (h *Handler) DeleteChallenge(ctx *gin.Context) {

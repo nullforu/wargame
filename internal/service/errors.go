@@ -29,6 +29,13 @@ var (
 	ErrStackNotFound             = errors.New("stack not found")
 	ErrStackProvisionerDown      = errors.New("stack provisioner unavailable")
 	ErrStackInvalidSpec          = errors.New("stack spec invalid")
+	ErrVMDisabled                = errors.New("vm feature disabled")
+	ErrVMNotEnabled              = errors.New("vm not enabled for challenge")
+	ErrVMLimitReached            = errors.New("vm limit reached")
+	ErrVMNotFound                = errors.New("vm not found")
+	ErrVMOrchestratorDown        = errors.New("vm orchestrator unavailable")
+	ErrVMOrchestratorNotFound    = errors.New("vm missing in orchestrator")
+	ErrVMInvalidSpec             = errors.New("vm spec invalid")
 	ErrNotFound                  = errors.New("not found")
 )
 

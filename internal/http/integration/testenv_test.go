@@ -25,6 +25,7 @@ import (
 	"wargame/internal/stack"
 	"wargame/internal/storage"
 	"wargame/internal/utils"
+	"wargame/internal/vm"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
@@ -46,6 +47,7 @@ type testEnv struct {
 	authSvc         *service.AuthService
 	wargameSvc      *service.WargameService
 	stackSvc        *service.StackService
+	vmSvc           *service.VMService
 }
 
 type errorResp struct {
@@ -252,8 +254,9 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(testDB), repo.NewCommunityRepo(testDB), testRedis, fileStore)
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, testRedis)
+	vmSvc := service.NewVMService(cfg.VM, repo.NewVMRepo(testDB), challengeRepo, submissionRepo, &vm.MockClient{}, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, testRedis, testLogger)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, testRedis, testLogger)
 
 	env := testEnv{
 		cfg:             cfg,
@@ -266,6 +269,7 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 		authSvc:         authSvc,
 		wargameSvc:      wargameSvc,
 		stackSvc:        stackSvc,
+		vmSvc:           vmSvc,
 	}
 
 	return env
@@ -274,7 +278,7 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 func resetState(t *testing.T) {
 	t.Helper()
 
-	if _, err := testDB.ExecContext(context.Background(), "TRUNCATE TABLE community_comments, challenge_comments, challenge_votes, writeups, community_post_likes, community_posts, submissions, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := testDB.ExecContext(context.Background(), "TRUNCATE TABLE community_comments, challenge_comments, challenge_votes, writeups, community_post_likes, community_posts, submissions, vms, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
@@ -565,8 +569,9 @@ func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testE
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(testDB), repo.NewCommunityRepo(testDB), testRedis, fileStore)
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, mockClient, testRedis)
+	vmSvc := service.NewVMService(cfg.VM, repo.NewVMRepo(testDB), challengeRepo, submissionRepo, &vm.MockClient{}, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, testRedis, testLogger)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, testRedis, testLogger)
 
 	return testEnv{
 		cfg:             cfg,
@@ -579,6 +584,7 @@ func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testE
 		authSvc:         authSvc,
 		wargameSvc:      wargameSvc,
 		stackSvc:        stackSvc,
+		vmSvc:           vmSvc,
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 
 	"wargame/internal/models"
 	stackpkg "wargame/internal/stack"
+	vmpkg "wargame/internal/vm"
 )
 
 type optionalString struct {
@@ -86,6 +87,8 @@ type createChallengeRequest struct {
 	StackEnabled        *bool                     `json:"stack_enabled"`
 	StackTargetPorts    []stackpkg.TargetPortSpec `json:"stack_target_ports"`
 	StackPodSpec        *string                   `json:"stack_pod_spec"`
+	VMEnabled           *bool                     `json:"vm_enabled"`
+	VMSpec              *string                   `json:"vm_spec"`
 }
 
 type updateChallengeRequest struct {
@@ -99,6 +102,8 @@ type updateChallengeRequest struct {
 	StackEnabled        *bool                      `json:"stack_enabled"`
 	StackTargetPorts    *[]stackpkg.TargetPortSpec `json:"stack_target_ports"`
 	StackPodSpec        optionalString             `json:"stack_pod_spec"`
+	VMEnabled           *bool                      `json:"vm_enabled"`
+	VMSpec              optionalString             `json:"vm_spec"`
 }
 
 type challengeFileUploadRequest struct {
@@ -180,6 +185,8 @@ type userMeResponse struct {
 	ProfileImage  *string    `json:"profile_image"`
 	StackCount    int        `json:"stack_count"`
 	StackLimit    int        `json:"stack_limit"`
+	VMCount       int        `json:"vm_count"`
+	VMLimit       int        `json:"vm_limit"`
 	BlockedReason *string    `json:"blocked_reason"`
 	BlockedAt     *time.Time `json:"blocked_at"`
 }
@@ -229,6 +236,7 @@ type challengeResponse struct {
 	FileName            *string                   `json:"file_name,omitempty"`
 	StackEnabled        bool                      `json:"stack_enabled"`
 	StackTargetPorts    []stackpkg.TargetPortSpec `json:"stack_target_ports"`
+	VMEnabled           bool                      `json:"vm_enabled"`
 }
 
 type lockedChallengeResponse struct {
@@ -437,6 +445,7 @@ type communityLikeToggleResponse struct {
 type adminChallengeResponse struct {
 	challengeResponse
 	StackPodSpec *string `json:"stack_pod_spec,omitempty"`
+	VMSpec       *string `json:"vm_spec,omitempty"`
 }
 
 type presignedUploadResponse struct {
@@ -527,12 +536,57 @@ type adminStacksListResponse struct {
 	Stacks []adminStackResponse `json:"stacks,omitempty"`
 }
 
+type vmResponse struct {
+	VMID              string              `json:"vm_id"`
+	ChallengeID       int64               `json:"challenge_id"`
+	Status            string              `json:"status"`
+	NodeName          *string             `json:"node_name,omitempty"`
+	ExternalIP        *string             `json:"external_ip,omitempty"`
+	Ports             []vmpkg.PortMapping `json:"ports,omitempty"`
+	TTLExpiresAt      *time.Time          `json:"ttl_expires_at,omitempty"`
+	LastError         *string             `json:"last_error,omitempty"`
+	CreatedAt         time.Time           `json:"created_at"`
+	UpdatedAt         time.Time           `json:"updated_at"`
+	CreatedByUserID   int64               `json:"created_by_user_id"`
+	CreatedByUsername string              `json:"created_by_username"`
+	ChallengeTitle    string              `json:"challenge_title"`
+}
+
+type vmsListResponse struct {
+	VMs []vmResponse `json:"vms,omitempty"`
+}
+
+type adminVMResponse struct {
+	VMID              string     `json:"vm_id"`
+	TTLExpiresAt      *time.Time `json:"ttl_expires_at,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+	UserID            int64      `json:"user_id"`
+	Username          string     `json:"username"`
+	Email             string     `json:"email"`
+	ChallengeID       int64      `json:"challenge_id"`
+	ChallengeTitle    string     `json:"challenge_title"`
+	ChallengeCategory string     `json:"challenge_category"`
+}
+
+type adminVMsListResponse struct {
+	VMs []adminVMResponse `json:"vms,omitempty"`
+}
+
 func newStackResponse(stack *models.Stack) stackResponse {
 	return stackResponse{StackID: stack.StackID, ChallengeID: stack.ChallengeID, Status: stack.Status, NodePublicIP: stack.NodePublicIP, Ports: []stackpkg.PortMapping(stack.Ports), TTLExpiresAt: stack.TTLExpiresAt, CreatedAt: stack.CreatedAt.UTC(), UpdatedAt: stack.UpdatedAt.UTC(), CreatedByUserID: stack.UserID, CreatedByUsername: stack.Username, ChallengeTitle: stack.ChallengeTitle}
 }
 
 func newAdminStackResponse(stack models.AdminStackSummary) adminStackResponse {
 	return adminStackResponse{StackID: stack.StackID, TTLExpiresAt: timePtrUTC(stack.TTLExpiresAt), CreatedAt: stack.CreatedAt.UTC(), UpdatedAt: stack.UpdatedAt.UTC(), UserID: stack.UserID, Username: stack.Username, Email: stack.Email, ChallengeID: stack.ChallengeID, ChallengeTitle: stack.ChallengeTitle, ChallengeCategory: stack.ChallengeCategory}
+}
+
+func newVMResponse(vmModel *models.VM) vmResponse {
+	return vmResponse{VMID: vmModel.VMID, ChallengeID: vmModel.ChallengeID, Status: vmModel.Status, NodeName: vmModel.NodeName, ExternalIP: vmModel.ExternalIP, Ports: []vmpkg.PortMapping(vmModel.Ports), TTLExpiresAt: vmModel.TTLExpiresAt, LastError: vmModel.LastError, CreatedAt: vmModel.CreatedAt.UTC(), UpdatedAt: vmModel.UpdatedAt.UTC(), CreatedByUserID: vmModel.UserID, CreatedByUsername: vmModel.Username, ChallengeTitle: vmModel.ChallengeTitle}
+}
+
+func newAdminVMResponse(vmModel models.AdminVMSummary) adminVMResponse {
+	return adminVMResponse{VMID: vmModel.VMID, TTLExpiresAt: timePtrUTC(vmModel.TTLExpiresAt), CreatedAt: vmModel.CreatedAt.UTC(), UpdatedAt: vmModel.UpdatedAt.UTC(), UserID: vmModel.UserID, Username: vmModel.Username, Email: vmModel.Email, ChallengeID: vmModel.ChallengeID, ChallengeTitle: vmModel.ChallengeTitle, ChallengeCategory: vmModel.ChallengeCategory}
 }
 
 func timePtrUTC(value *time.Time) *time.Time {
@@ -543,7 +597,14 @@ func timePtrUTC(value *time.Time) *time.Time {
 	return &utc
 }
 
-func newUserMeResponse(user *models.User, stackCount, stackLimit int) userMeResponse {
+func newUserMeResponse(user *models.User, stackCount, stackLimit int, vmSummary ...int) userMeResponse {
+	vmCount := 0
+	vmLimit := 0
+	if len(vmSummary) >= 2 {
+		vmCount = vmSummary[0]
+		vmLimit = vmSummary[1]
+	}
+
 	return userMeResponse{
 		ID:            user.ID,
 		Email:         user.Email,
@@ -555,6 +616,8 @@ func newUserMeResponse(user *models.User, stackCount, stackLimit int) userMeResp
 		ProfileImage:  user.ProfileImage,
 		StackCount:    stackCount,
 		StackLimit:    stackLimit,
+		VMCount:       vmCount,
+		VMLimit:       vmLimit,
 		BlockedReason: user.BlockedReason,
 		BlockedAt:     user.BlockedAt,
 	}
@@ -617,6 +680,7 @@ func newChallengeResponse(challenge *models.Challenge, isSolved bool, firstBlood
 		FileName:            challenge.FileName,
 		StackEnabled:        challenge.StackEnabled,
 		StackTargetPorts:    []stackpkg.TargetPortSpec(challenge.StackTargetPorts),
+		VMEnabled:           challenge.VMEnabled,
 	}
 }
 

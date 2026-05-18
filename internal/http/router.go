@@ -15,7 +15,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, userSvc *service.UserService, affiliationSvc *service.AffiliationService, scoreSvc *service.ScoreboardService, stackSvc *service.StackService, redis *redis.Client, logger *logging.Logger) *gin.Engine {
+func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, userSvc *service.UserService, affiliationSvc *service.AffiliationService, scoreSvc *service.ScoreboardService, stackSvc *service.StackService, vmSvc *service.VMService, redis *redis.Client, logger *logging.Logger) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -26,7 +26,7 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 	r.Use(middleware.CORS(cfg.AppEnv == "local", cfg.CORS.AllowedOrigins))
 	r.Use(middleware.CSRF())
 
-	h := handlers.New(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, redis)
+	h := handlers.New(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, redis, vmSvc)
 
 	r.GET("/healthz", func(ctx *gin.Context) { ctx.JSON(nethttp.StatusOK, gin.H{"status": "ok"}) })
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
@@ -70,7 +70,9 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		auth.GET("/me/writeups", h.MyWriteups)
 		auth.GET("/challenges/:id/my-writeup", h.MyChallengeWriteup)
 		auth.GET("/stacks", h.ListStacks)
+		auth.GET("/vms", h.ListVMs)
 		auth.GET("/challenges/:id/stack", h.GetStack)
+		auth.GET("/challenges/:id/vm", h.GetVM)
 		auth.GET("/challenges/:id/my-vote", h.ChallengeMyVote)
 
 		unblocked := auth.Group("")
@@ -97,6 +99,8 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		unblocked.POST("/challenges/:id/file/download", h.RequestChallengeFileDownload)
 		unblocked.POST("/challenges/:id/stack", h.CreateStack)
 		unblocked.DELETE("/challenges/:id/stack", h.DeleteStack)
+		unblocked.POST("/challenges/:id/vm", h.CreateVM)
+		unblocked.DELETE("/challenges/:id/vm", h.DeleteVM)
 
 		admin := api.Group("/admin")
 		admin.Use(middleware.Auth(cfg.JWT), middleware.RequireActiveUser(userSvc), middleware.RequireRole(models.AdminRole))
@@ -109,6 +113,9 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		admin.GET("/stacks", h.AdminListStacks)
 		admin.GET("/stacks/:stack_id", h.AdminGetStack)
 		admin.DELETE("/stacks/:stack_id", h.AdminDeleteStack)
+		admin.GET("/vms", h.AdminListVMs)
+		admin.GET("/vms/:vm_id", h.AdminGetVM)
+		admin.DELETE("/vms/:vm_id", h.AdminDeleteVM)
 		admin.POST("/users/:id/block", h.AdminBlockUser)
 		admin.POST("/users/:id/unblock", h.AdminUnblockUser)
 		admin.POST("/affiliations", h.AdminCreateAffiliation)

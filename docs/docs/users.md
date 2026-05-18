@@ -31,6 +31,8 @@ Response 200
     "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
     "stack_count": 0,
     "stack_limit": 3,
+    "vm_count": 0,
+    "vm_limit": 3,
     "blocked_reason": null,
     "blocked_at": null
 }
@@ -76,6 +78,8 @@ Response 200
     "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
     "stack_count": 0,
     "stack_limit": 3,
+    "vm_count": 0,
+    "vm_limit": 3,
     "blocked_reason": null,
     "blocked_at": null
 }
@@ -123,6 +127,8 @@ Response 200
         "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.jpg",
         "stack_count": 0,
         "stack_limit": 3,
+        "vm_count": 0,
+        "vm_limit": 3,
         "blocked_reason": null,
         "blocked_at": null
     },
@@ -192,6 +198,8 @@ Response 200
     "profile_image": "profiles/550e8400-e29b-41d4-a716-446655440000.png",
     "stack_count": 0,
     "stack_limit": 3,
+    "vm_count": 0,
+    "vm_limit": 3,
     "blocked_reason": null,
     "blocked_at": null
 }
@@ -236,6 +244,8 @@ Response 200
     "profile_image": null,
     "stack_count": 0,
     "stack_limit": 3,
+    "vm_count": 0,
+    "vm_limit": 3,
     "blocked_reason": null,
     "blocked_at": null
 }
