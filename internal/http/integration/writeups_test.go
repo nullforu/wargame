@@ -227,3 +227,110 @@ func TestWriteupFlowAndVisibility(t *testing.T) {
 		t.Fatalf("expected 404 for deleted writeup, got %d body=%s", deletedDetailRec.Code, deletedDetailRec.Body.String())
 	}
 }
+
+func TestChallengeCreatorWriteupAccess(t *testing.T) {
+	env := setupTest(t, testCfg)
+	_ = createUser(t, env, "author-admin@example.com", "author_admin", "adminpass", "admin")
+	writer := createUser(t, env, "author-writer@example.com", "author_writer", "pass", "user")
+
+	adminAccess, _, _ := loginUser(t, env.router, "author-admin@example.com", "adminpass")
+	writerAccess, _, _ := loginUser(t, env.router, writer.Email, "pass")
+
+	createChallengeRec := doRequest(t, env.router, http.MethodPost, "/api/admin/challenges", map[string]any{
+		"title":       "Author Writeup Target",
+		"description": "desc",
+		"category":    "Web",
+		"points":      400,
+		"flag":        "flag{author-writeup-target}",
+		"is_active":   true,
+	}, authHeader(adminAccess))
+	if createChallengeRec.Code != http.StatusCreated {
+		t.Fatalf("create challenge status %d: %s", createChallengeRec.Code, createChallengeRec.Body.String())
+	}
+
+	var createdChallenge struct {
+		ID int64 `json:"id"`
+	}
+	decodeJSON(t, createChallengeRec, &createdChallenge)
+
+	createAuthorWriteupRec := doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(createdChallenge.ID)+"/writeups", map[string]any{
+		"content": "Author-side writeup",
+	}, authHeader(adminAccess))
+	if createAuthorWriteupRec.Code != http.StatusCreated {
+		t.Fatalf("expected challenge creator to write before solve, got %d body=%s", createAuthorWriteupRec.Code, createAuthorWriteupRec.Body.String())
+	}
+
+	submitRec := doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(createdChallenge.ID)+"/submit", map[string]any{
+		"flag": "flag{author-writeup-target}",
+	}, authHeader(writerAccess))
+	if submitRec.Code != http.StatusOK {
+		t.Fatalf("writer submit status %d: %s", submitRec.Code, submitRec.Body.String())
+	}
+
+	createWriterWriteupRec := doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(createdChallenge.ID)+"/writeups", map[string]any{
+		"content": "Solver-side writeup",
+	}, authHeader(writerAccess))
+	if createWriterWriteupRec.Code != http.StatusCreated {
+		t.Fatalf("writer create writeup status %d: %s", createWriterWriteupRec.Code, createWriterWriteupRec.Body.String())
+	}
+
+	var writerWriteup struct {
+		ID int64 `json:"id"`
+	}
+	decodeJSON(t, createWriterWriteupRec, &writerWriteup)
+
+	listByAuthorRec := doRequest(t, env.router, http.MethodGet, "/api/challenges/"+itoa(createdChallenge.ID)+"/writeups?page=1&page_size=10", nil, authHeader(adminAccess))
+	if listByAuthorRec.Code != http.StatusOK {
+		t.Fatalf("author list status %d: %s", listByAuthorRec.Code, listByAuthorRec.Body.String())
+	}
+
+	var authorList struct {
+		Writeups []struct {
+			Content *string `json:"content"`
+		} `json:"writeups"`
+		CanViewContent bool `json:"can_view_content"`
+	}
+	decodeJSON(t, listByAuthorRec, &authorList)
+	if !authorList.CanViewContent || len(authorList.Writeups) != 2 {
+		t.Fatalf("unexpected author list response: %+v", authorList)
+	}
+
+	for _, writeup := range authorList.Writeups {
+		if writeup.Content == nil || *writeup.Content == "" {
+			t.Fatalf("expected author to see all writeup content: %+v", authorList)
+		}
+	}
+
+	detailByAuthorRec := doRequest(t, env.router, http.MethodGet, "/api/writeups/"+itoa(writerWriteup.ID), nil, authHeader(adminAccess))
+	if detailByAuthorRec.Code != http.StatusOK {
+		t.Fatalf("author detail status %d: %s", detailByAuthorRec.Code, detailByAuthorRec.Body.String())
+	}
+
+	var authorDetail struct {
+		CanViewContent bool `json:"can_view_content"`
+		Writeup        struct {
+			Content *string `json:"content"`
+		} `json:"writeup"`
+	}
+
+	decodeJSON(t, detailByAuthorRec, &authorDetail)
+	if !authorDetail.CanViewContent || authorDetail.Writeup.Content == nil || *authorDetail.Writeup.Content != "Solver-side writeup" {
+		t.Fatalf("unexpected author detail response: %+v", authorDetail)
+	}
+
+	userWriteupsByAuthorRec := doRequest(t, env.router, http.MethodGet, "/api/users/"+itoa(writer.ID)+"/writeups?page=1&page_size=10", nil, authHeader(adminAccess))
+	if userWriteupsByAuthorRec.Code != http.StatusOK {
+		t.Fatalf("author user writeups status %d: %s", userWriteupsByAuthorRec.Code, userWriteupsByAuthorRec.Body.String())
+	}
+
+	var userWriteupsByAuthor struct {
+		Writeups []struct {
+			Content *string `json:"content"`
+		} `json:"writeups"`
+	}
+
+	decodeJSON(t, userWriteupsByAuthorRec, &userWriteupsByAuthor)
+	if len(userWriteupsByAuthor.Writeups) != 1 || userWriteupsByAuthor.Writeups[0].Content == nil || *userWriteupsByAuthor.Writeups[0].Content != "Solver-side writeup" {
+		t.Fatalf("unexpected author user writeups response: %+v", userWriteupsByAuthor)
+	}
+}

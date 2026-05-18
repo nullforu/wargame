@@ -1031,6 +1031,74 @@ func TestWargameServiceWriteupLifecycle(t *testing.T) {
 	}
 }
 
+func TestWargameServiceChallengeCreatorWriteupAccess(t *testing.T) {
+	env := setupServiceTest(t)
+	creator := createUser(t, env, "writeup-creator@example.com", "writeup_creator", "pass", models.UserRole)
+	writer := createUser(t, env, "writeup-solver@example.com", "writeup_solver", "pass", models.UserRole)
+	challenge := createChallenge(t, env, "Creator Writeup Challenge", 300, "flag{creator}", true)
+
+	if err := env.wargameSvc.UpdateChallengeCreator(context.Background(), challenge.ID, creator.ID); err != nil {
+		t.Fatalf("UpdateChallengeCreator: %v", err)
+	}
+
+	creatorWriteup, err := env.wargameSvc.CreateWriteup(context.Background(), creator.ID, challenge.ID, "Author notes")
+	if err != nil {
+		t.Fatalf("creator CreateWriteup without solve: %v", err)
+	}
+
+	if creatorWriteup.Content != "Author notes" {
+		t.Fatalf("unexpected creator writeup: %+v", creatorWriteup)
+	}
+
+	createSubmission(t, env, writer.ID, challenge.ID, true, time.Now().UTC())
+	writerWriteup, err := env.wargameSvc.CreateWriteup(context.Background(), writer.ID, challenge.ID, "Solver notes")
+	if err != nil {
+		t.Fatalf("writer CreateWriteup: %v", err)
+	}
+
+	rows, pagination, canView, err := env.wargameSvc.ChallengeWriteupsPage(context.Background(), challenge.ID, creator.ID, 1, 10)
+	if err != nil {
+		t.Fatalf("ChallengeWriteupsPage creator: %v", err)
+	}
+
+	if !canView || len(rows) != 2 || pagination.TotalCount != 2 {
+		t.Fatalf("unexpected creator challenge writeups view: canView=%v rows=%+v pagination=%+v", canView, rows, pagination)
+	}
+
+	for _, row := range rows {
+		if row.Content == "" {
+			t.Fatalf("expected creator to see all writeup content, got rows=%+v", rows)
+		}
+	}
+
+	row, canView, err := env.wargameSvc.GetWriteupByID(context.Background(), writerWriteup.ID, creator.ID)
+	if err != nil {
+		t.Fatalf("GetWriteupByID creator: %v", err)
+	}
+
+	if !canView || row.Content != "Solver notes" {
+		t.Fatalf("expected creator to see solver writeup, canView=%v row=%+v", canView, row)
+	}
+
+	userRows, userPagination, err := env.wargameSvc.UserWriteupsPage(context.Background(), writer.ID, creator.ID, 1, 10)
+	if err != nil {
+		t.Fatalf("UserWriteupsPage creator: %v", err)
+	}
+
+	if len(userRows) != 1 || userRows[0].Content != "Solver notes" || userPagination.TotalCount != 1 {
+		t.Fatalf("unexpected creator user writeups view: rows=%+v pagination=%+v", userRows, userPagination)
+	}
+
+	anonymousRow, anonymousCanView, err := env.wargameSvc.GetWriteupByID(context.Background(), writerWriteup.ID, 0)
+	if err != nil {
+		t.Fatalf("GetWriteupByID anonymous: %v", err)
+	}
+
+	if anonymousCanView || anonymousRow.Content != "" {
+		t.Fatalf("expected anonymous viewer content to be hidden, canView=%v row=%+v", anonymousCanView, anonymousRow)
+	}
+}
+
 func TestWargameServiceWriteupValidationAndLookupErrors(t *testing.T) {
 	env := setupServiceTest(t)
 	user := createUser(t, env, "writeup-validate@example.com", "writeup_validate", "pass", models.UserRole)
@@ -1117,6 +1185,39 @@ func TestWargameServiceWriteupValidationAndLookupErrors(t *testing.T) {
 
 	if _, _, err := env.wargameSvc.UserWriteupsPage(context.Background(), 0, user.ID, 1, 10); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("expected invalid input for target user_id=0, got %v", err)
+	}
+}
+
+func TestWargameServiceWriteupAccessRepoFailures(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "writeup-access-fail@example.com", "writeup_access_fail", "pass", models.UserRole)
+	writer := createUser(t, env, "writeup-access-writer@example.com", "writeup_access_writer", "pass", models.UserRole)
+	challenge := createChallenge(t, env, "Writeup Access Failure", 200, "flag{waf}", true)
+	createSubmission(t, env, writer.ID, challenge.ID, true, time.Now().UTC())
+	created, err := env.wargameSvc.CreateWriteup(context.Background(), writer.ID, challenge.ID, "body")
+	if err != nil {
+		t.Fatalf("seed writeup: %v", err)
+	}
+
+	closedDB := newClosedServiceDB(t)
+	brokenSubmissions := repo.NewSubmissionRepo(closedDB)
+	origSvc := env.wargameSvc
+	env.wargameSvc = NewWargameService(env.cfg, env.challengeRepo, brokenSubmissions, repo.NewChallengeVoteRepo(env.db), repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), repo.NewCommunityRepo(env.db), env.redis, origSvc.fileStore)
+
+	if _, err := env.wargameSvc.CreateWriteup(context.Background(), user.ID, challenge.ID, "blocked"); err == nil {
+		t.Fatalf("expected create writeup access check failure")
+	}
+
+	if _, _, _, err := env.wargameSvc.ChallengeWriteupsPage(context.Background(), challenge.ID, user.ID, 1, 10); err == nil {
+		t.Fatalf("expected challenge writeups access check failure")
+	}
+
+	if _, _, err := env.wargameSvc.GetWriteupByID(context.Background(), created.ID, user.ID); err == nil {
+		t.Fatalf("expected get writeup access check failure")
+	}
+
+	if _, _, err := env.wargameSvc.UserWriteupsPage(context.Background(), writer.ID, user.ID, 1, 10); err == nil {
+		t.Fatalf("expected user writeups access check failure")
 	}
 }
 
