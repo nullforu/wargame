@@ -542,7 +542,7 @@ type vmResponse struct {
 	Status            string              `json:"status"`
 	NodeName          *string             `json:"node_name,omitempty"`
 	ExternalIP        *string             `json:"external_ip,omitempty"`
-	Ports             []vmpkg.PortMapping `json:"ports,omitempty"`
+	Ports             []vmpkg.PortMapping `json:"ports"`
 	TTLExpiresAt      *time.Time          `json:"ttl_expires_at,omitempty"`
 	LastError         *string             `json:"last_error,omitempty"`
 	CreatedAt         time.Time           `json:"created_at"`
@@ -582,7 +582,11 @@ func newAdminStackResponse(stack models.AdminStackSummary) adminStackResponse {
 }
 
 func newVMResponse(vmModel *models.VM) vmResponse {
-	return vmResponse{VMID: vmModel.VMID, ChallengeID: vmModel.ChallengeID, Status: vmModel.Status, NodeName: vmModel.NodeName, ExternalIP: vmModel.ExternalIP, Ports: []vmpkg.PortMapping(vmModel.Ports), TTLExpiresAt: vmModel.TTLExpiresAt, LastError: vmModel.LastError, CreatedAt: vmModel.CreatedAt.UTC(), UpdatedAt: vmModel.UpdatedAt.UTC(), CreatedByUserID: vmModel.UserID, CreatedByUsername: vmModel.Username, ChallengeTitle: vmModel.ChallengeTitle}
+	ports := []vmpkg.PortMapping(vmModel.Ports)
+	if ports == nil {
+		ports = []vmpkg.PortMapping{}
+	}
+	return vmResponse{VMID: vmModel.VMID, ChallengeID: vmModel.ChallengeID, Status: vmModel.Status, NodeName: vmModel.NodeName, ExternalIP: vmModel.ExternalIP, Ports: ports, TTLExpiresAt: vmModel.TTLExpiresAt, LastError: vmModel.LastError, CreatedAt: vmModel.CreatedAt.UTC(), UpdatedAt: vmModel.UpdatedAt.UTC(), CreatedByUserID: vmModel.UserID, CreatedByUsername: vmModel.Username, ChallengeTitle: vmModel.ChallengeTitle}
 }
 
 func newAdminVMResponse(vmModel models.AdminVMSummary) adminVMResponse {

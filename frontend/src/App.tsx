@@ -162,17 +162,7 @@ const App = () => {
         return <RouteComponent routeParams={routeParams} />
     }, [RouteComponent, booting, routeParams, t])
 
-    return false ? (
-        <div>
-            <div className='flex min-h-screen items-center justify-center bg-black px-4'>
-                <div className='w-full max-w-md rounded-2xl border border-slate-700 bg-gray-900 px-8 py-10 text-center shadow-2xl'>
-                    <h1 className='text-2xl font-bold text-white'>서버 운영 시간이 아닙니다.</h1>
-
-                    <p className='mt-4 text-sm text-slate-400'>나중에 다시 접속해주세요. (새벽엔 주인장 서버 컴퓨터도 자야합니다.)</p>
-                </div>
-            </div>
-        </div>
-    ) : (
+    return (
         <>
             <div className='min-h-screen bg-background flex flex-col overflow-x-hidden'>
                 <Header user={auth.user} />

@@ -434,6 +434,7 @@
     "challenge.vmCopyNC": "Copy nc",
     "challenge.vmHTTPAccess": "HTTP Access",
     "challenge.vmNCAccess": "Netcat Access",
+    "challenge.vmNoHTTPForProtocol": "HTTP link is not available for this protocol.",
     "challenge.vmTtl": "TTL:",
     "challenge.vmPending": "Pending",
     "challenge.vmNoActive": "No active VM. Create one to get your instance details.",

@@ -19,29 +19,25 @@ console.log('This is a code block.')
 
 > Please note that not all Markdown features may be supported.
 `,
-    yaml: `# Must provide a valid Kubernetes Pod specification in YAML format.
-# For more details, please refer to the documentation: https://github.com/nullforu/wargame-docs
-
-apiVersion: v1
-kind: Pod
-metadata:
-  name: challenge
+    yaml: `apiVersion: sandboxd.o/v1
+kind: Sandbox
+id: pwntools-recvsend-drill
 spec:
+  egress: false
+  ttl_seconds: 3600
+  ports:
+    - host_port: 0
+      container_port: 31337
+      protocol: tcp
   containers:
-    - name: nginx
-      image: nginx:stable
-      ports:
-        - containerPort: 80
-          protocol: TCP
-        - containerPort: 443
-          protocol: TCP
-      resources:
-        requests:
-          cpu: "50m"
-          memory: "64Mi"
-        limits:
-          cpu: "50m"
-          memory: "64Mi"
+    - name: app
+      image: pwntools_practice_1:latest
+      args: []
+      env: []
+      workDir: ""
+      resource:
+        cpu: 50m
+        memory: 64Mi
 `,
 }
 

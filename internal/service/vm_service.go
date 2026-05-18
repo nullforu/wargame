@@ -317,6 +317,14 @@ func (s *VMService) createVM(ctx context.Context, userID, challengeID int64, spe
 	}
 
 	if err := s.vmRepo.Create(ctx, model); err != nil {
+		// If concurrent requests race on the unique (user_id, challenge_id) constraint,
+		// delete the just-created sandbox and return the winner row.
+		if isUniqueVMConflict(err) {
+			_ = s.client.DeleteSandbox(ctx, vmID)
+			if existing, getErr := s.vmRepo.GetByUserAndChallenge(ctx, userID, challengeID); getErr == nil {
+				return existing, nil
+			}
+		}
 		return nil, fmt.Errorf("vm.GetOrCreateVM create: %w", err)
 	}
 
@@ -411,4 +419,12 @@ func vmStringPtr(value string) *string {
 	}
 
 	return &value
+}
+
+func isUniqueVMConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique constraint")
 }

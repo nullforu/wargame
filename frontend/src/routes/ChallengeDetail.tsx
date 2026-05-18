@@ -789,6 +789,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                         {stackInfo.ports.map((port, index) => {
                                                             const protocol = vmProtocol(port.protocol)
                                                             const isUDP = protocol === 'UDP'
+                                                            const isTCP = protocol === 'TCP'
 
                                                             const httpURL = `http://${stackInfo.external_ip}:${port.host_port}`
                                                             const nc = `nc${isUDP ? ' -u' : ''} ${stackInfo.external_ip} ${port.host_port}`
@@ -813,14 +814,20 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                                         <div>
                                                                             <p className='mb-1 text-xs font-medium uppercase tracking-wide text-text-muted'>{t('challenge.vmHTTPAccess')}</p>
 
-                                                                            <a
-                                                                                href={httpURL}
-                                                                                target='_blank'
-                                                                                rel='noreferrer'
-                                                                                className='block break-all rounded-lg border border-border/40 bg-surface px-3 py-2 font-mono text-sm text-accent transition-colors hover:bg-surface-subtle hover:underline'
-                                                                            >
-                                                                                {httpURL}
-                                                                            </a>
+                                                                            {isTCP ? (
+                                                                                <a
+                                                                                    href={httpURL}
+                                                                                    target='_blank'
+                                                                                    rel='noreferrer'
+                                                                                    className='block break-all rounded-lg border border-border/40 bg-surface px-3 py-2 font-mono text-sm text-accent transition-colors hover:bg-surface-subtle hover:underline'
+                                                                                >
+                                                                                    {httpURL}
+                                                                                </a>
+                                                                            ) : (
+                                                                                <div className='block break-all rounded-lg border border-border/40 bg-surface px-3 py-2 font-mono text-sm text-text-subtle'>
+                                                                                    {t('challenge.vmNoHTTPForProtocol')}
+                                                                                </div>
+                                                                            )}
                                                                         </div>
 
                                                                         <div>

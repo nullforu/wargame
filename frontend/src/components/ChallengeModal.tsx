@@ -358,6 +358,7 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
                                             stackInfo.external_ip && stackInfo.ports.length > 0
                                                 ? stackInfo.ports.map((port, index) => {
                                                       const protocol = vmProtocol(port.protocol)
+                                                      const isTCP = protocol === 'TCP'
                                                       const httpURL = `http://${stackInfo.external_ip}:${port.host_port}`
                                                       const nc = `nc${protocol === 'UDP' ? ' -u' : ''} ${stackInfo.external_ip} ${port.host_port}`
                                                       return (
@@ -365,9 +366,13 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
                                                               <p className='font-medium text-text'>
                                                                   {protocol} {port.host_port} -&gt; {port.container_port}
                                                               </p>
-                                                              <a className='break-all font-mono text-accent underline' href={httpURL} target='_blank' rel='noreferrer'>
-                                                                  {httpURL}
-                                                              </a>
+                                                              {isTCP ? (
+                                                                  <a className='break-all font-mono text-accent underline' href={httpURL} target='_blank' rel='noreferrer'>
+                                                                      {httpURL}
+                                                                  </a>
+                                                              ) : (
+                                                                  <p className='break-all font-mono text-text-subtle'>{t('challenge.vmNoHTTPForProtocol')}</p>
+                                                              )}
                                                               <div className='flex flex-wrap items-center gap-2'>
                                                                   <code className='break-all rounded bg-surface-muted px-2 py-1 font-mono text-text'>{nc}</code>
                                                                   <button className='rounded border border-border px-2 py-1 text-[11px] text-text hover:bg-surface-subtle' type='button' onClick={() => copyText(nc)}>
