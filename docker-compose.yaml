@@ -37,6 +37,8 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     environment:
@@ -53,6 +55,7 @@ services:
       DB_PORT: 5432
       REDIS_ADDR: redis:6379
       HTTP_ADDR: ":8080"
+      VM_ORCH_BASE_URL: http://host.docker.internal:8082
     ports:
       - "8080:8080"
     depends_on:

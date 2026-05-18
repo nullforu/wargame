@@ -164,6 +164,24 @@ func mapError(err error) (int, errorResponse, map[string]string) {
 	case errors.Is(err, service.ErrStackInvalidSpec):
 		status = http.StatusBadRequest
 		resp.Error = service.ErrStackInvalidSpec.Error()
+	case errors.Is(err, service.ErrVMDisabled):
+		status = http.StatusServiceUnavailable
+		resp.Error = service.ErrVMDisabled.Error()
+	case errors.Is(err, service.ErrVMNotEnabled):
+		status = http.StatusBadRequest
+		resp.Error = service.ErrVMNotEnabled.Error()
+	case errors.Is(err, service.ErrVMLimitReached):
+		status = http.StatusConflict
+		resp.Error = service.ErrVMLimitReached.Error()
+	case errors.Is(err, service.ErrVMNotFound):
+		status = http.StatusNotFound
+		resp.Error = service.ErrVMNotFound.Error()
+	case errors.Is(err, service.ErrVMOrchestratorDown):
+		status = http.StatusServiceUnavailable
+		resp.Error = service.ErrVMOrchestratorDown.Error()
+	case errors.Is(err, service.ErrVMInvalidSpec):
+		status = http.StatusBadRequest
+		resp.Error = service.ErrVMInvalidSpec.Error()
 	case errors.Is(err, service.ErrNotFound):
 		status = http.StatusNotFound
 		resp.Error = "not found"

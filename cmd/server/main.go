@@ -19,6 +19,7 @@ import (
 	"wargame/internal/service"
 	"wargame/internal/stack"
 	"wargame/internal/storage"
+	"wargame/internal/vm"
 )
 
 func main() {
@@ -73,6 +74,7 @@ func main() {
 	communityRepo := repo.NewCommunityRepo(database)
 	scoreRepo := repo.NewScoreboardRepo(database)
 	stackRepo := repo.NewStackRepo(database)
+	vmRepo := repo.NewVMRepo(database)
 
 	var fileStore storage.ChallengeFileStore
 	if cfg.S3.Enabled {
@@ -118,6 +120,8 @@ func main() {
 	}
 
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, stackClient, redisClient)
+	vmClient := vm.NewClient(cfg.VM.OrchestratorBaseURL, cfg.VM.OrchestratorTimeout)
+	vmSvc := service.NewVMService(cfg.VM, vmRepo, challengeRepo, submissionRepo, vmClient, redisClient)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -125,7 +129,7 @@ func main() {
 	leaderboardBus := realtime.NewScoreboardBus(redisClient, cfg, scoreSvc, logger)
 	leaderboardBus.Start(ctx)
 
-	router := httpserver.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, redisClient, logger)
+	router := httpserver.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, redisClient, logger)
 	srv := &nethttp.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           router,

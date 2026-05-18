@@ -79,6 +79,17 @@ func normalizeStackTargetPorts(ports stack.TargetPortSpecs, validator *fieldVali
 	return normalized
 }
 
+type VMChallengeSpec struct {
+	Enabled bool
+	Spec    *string
+}
+
+type VMChallengeUpdate struct {
+	Enabled *bool
+	Spec    *string
+	SpecSet bool
+}
+
 type WargameService struct {
 	cfg                  config.Config
 	challengeRepo        *repo.ChallengeRepo
@@ -206,7 +217,7 @@ func (s *WargameService) GetChallengeByID(ctx context.Context, id int64) (*model
 	return challenge, nil
 }
 
-func (s *WargameService) CreateChallenge(ctx context.Context, title, description, category string, points int, flag string, active bool, stackEnabled bool, stackTargetPorts stack.TargetPortSpecs, stackPodSpec *string, previousChallengeID *int64) (*models.Challenge, error) {
+func (s *WargameService) CreateChallenge(ctx context.Context, title, description, category string, points int, flag string, active bool, stackEnabled bool, stackTargetPorts stack.TargetPortSpecs, stackPodSpec *string, previousChallengeID *int64, vmOptions ...VMChallengeSpec) (*models.Challenge, error) {
 	title = normalizeTrim(title)
 	description = normalizeTrim(description)
 	category = normalizeTrim(category)
@@ -233,6 +244,19 @@ func (s *WargameService) CreateChallenge(ctx context.Context, title, description
 		}
 	}
 
+	vmEnabled := false
+	var vmSpec *string
+	if len(vmOptions) > 0 {
+		vmEnabled = vmOptions[0].Enabled
+		vmSpec = vmOptions[0].Spec
+	}
+
+	if vmEnabled {
+		if vmSpec == nil || normalizeTrim(*vmSpec) == "" {
+			validator.fields = append(validator.fields, FieldError{Field: "vm_spec", Reason: "required"})
+		}
+	}
+
 	if err := validator.Error(); err != nil {
 		return nil, err
 	}
@@ -255,6 +279,12 @@ func (s *WargameService) CreateChallenge(ctx context.Context, title, description
 		stackTargetPorts = nil
 	}
 
+	normalizedVMSpec := (*string)(nil)
+	if vmEnabled && vmSpec != nil {
+		trimmed := normalizeTrim(*vmSpec)
+		normalizedVMSpec = &trimmed
+	}
+
 	challenge := &models.Challenge{
 		Title:               title,
 		Description:         description,
@@ -264,6 +294,8 @@ func (s *WargameService) CreateChallenge(ctx context.Context, title, description
 		StackEnabled:        stackEnabled,
 		StackTargetPorts:    stackTargetPorts,
 		StackPodSpec:        podSpec,
+		VMEnabled:           vmEnabled,
+		VMSpec:              normalizedVMSpec,
 		IsActive:            active,
 		CreatedAt:           time.Now().UTC(),
 	}
@@ -286,7 +318,7 @@ func (s *WargameService) CreateChallenge(ctx context.Context, title, description
 	return challenge, nil
 }
 
-func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, description, category *string, points *int, flag *string, active *bool, stackEnabled *bool, stackTargetPorts *[]stack.TargetPortSpec, stackPodSpec *string, previousChallengeID *int64, previousChallengeSet bool) (*models.Challenge, error) {
+func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, description, category *string, points *int, flag *string, active *bool, stackEnabled *bool, stackTargetPorts *[]stack.TargetPortSpec, stackPodSpec *string, previousChallengeID *int64, previousChallengeSet bool, vmOptions ...VMChallengeUpdate) (*models.Challenge, error) {
 	validator := newFieldValidator()
 	validator.PositiveID("id", id)
 
@@ -328,6 +360,17 @@ func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, d
 	if stackPodSpec != nil {
 		value := strings.TrimSpace(*stackPodSpec)
 		normalizedPodSpec = &value
+	}
+
+	vmUpdate := VMChallengeUpdate{}
+	if len(vmOptions) > 0 {
+		vmUpdate = vmOptions[0]
+	}
+
+	var normalizedVMSpec *string
+	if vmUpdate.SpecSet && vmUpdate.Spec != nil {
+		value := strings.TrimSpace(*vmUpdate.Spec)
+		normalizedVMSpec = &value
 	}
 
 	if points != nil {
@@ -388,6 +431,13 @@ func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, d
 		challenge.IsActive = *active
 	}
 
+	if vmUpdate.Enabled != nil {
+		challenge.VMEnabled = *vmUpdate.Enabled
+		if !*vmUpdate.Enabled {
+			challenge.VMSpec = nil
+		}
+	}
+
 	if stackEnabled != nil {
 		challenge.StackEnabled = *stackEnabled
 		if !*stackEnabled {
@@ -422,6 +472,18 @@ func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, d
 		}
 	}
 
+	if vmUpdate.SpecSet {
+		if !challenge.VMEnabled {
+			return nil, NewValidationError(FieldError{Field: "vm_spec", Reason: "vm disabled"})
+		}
+
+		if normalizedVMSpec == nil || *normalizedVMSpec == "" {
+			challenge.VMSpec = nil
+		} else {
+			challenge.VMSpec = normalizedVMSpec
+		}
+	}
+
 	if normalizedFlag != nil {
 		flagHash, err := utils.HashFlag(*normalizedFlag, s.cfg.BcryptCost)
 		if err != nil {
@@ -438,6 +500,11 @@ func (s *WargameService) UpdateChallenge(ctx context.Context, id int64, title, d
 
 		if challenge.StackPodSpec == nil || normalizeTrim(*challenge.StackPodSpec) == "" {
 			return nil, NewValidationError(FieldError{Field: "stack_pod_spec", Reason: "required"})
+		}
+	}
+	if challenge.VMEnabled {
+		if challenge.VMSpec == nil || normalizeTrim(*challenge.VMSpec) == "" {
+			return nil, NewValidationError(FieldError{Field: "vm_spec", Reason: "required"})
 		}
 	}
 

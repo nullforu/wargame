@@ -11,6 +11,7 @@ import (
 	"wargame/internal/models"
 	"wargame/internal/stack"
 	"wargame/internal/utils"
+	"wargame/internal/vm"
 )
 
 func TestAdminCreateChallenge(t *testing.T) {
@@ -510,5 +511,127 @@ func TestAdminStackEndpointsAuth(t *testing.T) {
 	rec = doRequest(t, env.router, http.MethodDelete, "/api/admin/stacks/stack-missing", nil, authHeader(accessUser))
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("admin stack delete forbidden status %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestVMManagementAndAuth(t *testing.T) {
+	cfg := testCfg
+	cfg.VM = config.VMConfig{
+		Enabled:             true,
+		MaxPer:              3,
+		OrchestratorBaseURL: "http://localhost:8082",
+		OrchestratorTimeout: 5 * time.Second,
+		CreateWindow:        time.Minute,
+		CreateMax:           5,
+	}
+	mock := &vm.MockClient{
+		CreateSandboxFn: func(ctx context.Context, id string, specYAML string) (*vm.Sandbox, error) {
+			exp := time.Now().UTC().Add(time.Hour)
+			return &vm.Sandbox{ID: id, Status: vm.SandboxStatus{Phase: "Pending", ExpireAt: &exp}}, nil
+		},
+		GetSandboxFn: func(ctx context.Context, id string) (*vm.Sandbox, error) {
+			exp := time.Now().UTC().Add(time.Hour)
+			return &vm.Sandbox{ID: id, Status: vm.SandboxStatus{Phase: "Running", ExternalIP: "127.0.0.1", AssignedPorts: []vm.PortMapping{{HostPort: 31000, ContainerPort: 31337, Protocol: "tcp"}}, ExpireAt: &exp}}, nil
+		},
+		DeleteSandboxFn: func(ctx context.Context, id string) error { return nil },
+	}
+	env := setupVMTest(t, cfg, mock)
+
+	_ = createUser(t, env, "admin@example.com", models.AdminRole, "adminpass", models.AdminRole)
+	adminAccess, _, _ := loginUser(t, env.router, "admin@example.com", "adminpass")
+	userAccess, _, _ := registerAndLogin(t, env, "user@example.com", models.UserRole, "strong-pass")
+	challenge := createVMChallenge(t, env, "VMChal")
+
+	// Unauth/forbidden checks for admin VM endpoints.
+	rec := doRequest(t, env.router, http.MethodGet, "/api/admin/vms", nil, nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("admin vms unauth status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/admin/vms/vm-missing", nil, authHeader(userAccess))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("admin vm detail forbidden status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Create and get VM (user).
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/vm", nil, authHeader(userAccess))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create vm status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var created struct {
+		VMID string `json:"vm_id"`
+	}
+	decodeJSON(t, rec, &created)
+	if created.VMID == "" {
+		t.Fatalf("expected vm id")
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges/"+itoa(challenge.ID)+"/vm", nil, authHeader(userAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get vm status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/vms", nil, authHeader(userAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list my vms status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Admin list/get/delete VM.
+	rec = doRequest(t, env.router, http.MethodGet, "/api/admin/vms", nil, authHeader(adminAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("admin list vms status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/admin/vms/"+created.VMID, nil, authHeader(adminAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("admin get vm status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodDelete, "/api/admin/vms/"+created.VMID, nil, authHeader(adminAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("admin delete vm status %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestVMBlockedUserBehavior(t *testing.T) {
+	cfg := testCfg
+	cfg.VM.Enabled = true
+	mock := &vm.MockClient{
+		CreateSandboxFn: func(ctx context.Context, id string, specYAML string) (*vm.Sandbox, error) {
+			exp := time.Now().UTC().Add(time.Hour)
+			return &vm.Sandbox{ID: id, Status: vm.SandboxStatus{Phase: "Pending", ExpireAt: &exp}}, nil
+		},
+		GetSandboxFn: func(ctx context.Context, id string) (*vm.Sandbox, error) {
+			exp := time.Now().UTC().Add(time.Hour)
+			return &vm.Sandbox{ID: id, Status: vm.SandboxStatus{Phase: "Running", ExpireAt: &exp}}, nil
+		},
+		DeleteSandboxFn: func(ctx context.Context, id string) error { return nil },
+	}
+	env := setupVMTest(t, cfg, mock)
+	challenge := createVMChallenge(t, env, "VMBlocked")
+
+	_ = createUser(t, env, "admin@example.com", "admin", "adminpass", models.AdminRole)
+	adminAccess, _, _ := loginUser(t, env.router, "admin@example.com", "adminpass")
+	userAccess, _, userID := registerAndLogin(t, env, "blocked-user@example.com", models.UserRole, "strong-pass")
+	blockRec := doRequest(t, env.router, http.MethodPost, "/api/admin/users/"+itoa(userID)+"/block", map[string]any{"reason": "blocked for test"}, authHeader(adminAccess))
+	if blockRec.Code != http.StatusOK {
+		t.Fatalf("block user status %d: %s", blockRec.Code, blockRec.Body.String())
+	}
+
+	// blocked user: write endpoints should be forbidden
+	rec := doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/vm", nil, authHeader(userAccess))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("blocked create vm status %d: %s", rec.Code, rec.Body.String())
+	}
+	rec = doRequest(t, env.router, http.MethodDelete, "/api/challenges/"+itoa(challenge.ID)+"/vm", nil, authHeader(userAccess))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("blocked delete vm status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// blocked user: read endpoint is allowed (may be 404 if vm absent).
+	rec = doRequest(t, env.router, http.MethodGet, "/api/vms", nil, authHeader(userAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("blocked list vms status %d: %s", rec.Code, rec.Body.String())
 	}
 }

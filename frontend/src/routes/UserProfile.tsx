@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
 import 'react-easy-crop/react-easy-crop.css'
-import type { Affiliation, PaginationMeta, Stack, UserDetail, SolvedChallenge, Writeup } from '../lib/types'
+import type { Affiliation, PaginationMeta, VM, UserDetail, SolvedChallenge, Writeup } from '../lib/types'
 import { formatApiError, formatDateTime, parseRouteId } from '../lib/utils'
 import { navigate } from '../lib/router'
 import { uploadPresignedPost } from '../lib/api'
@@ -46,7 +46,7 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     const [writeupPagination, setWriteupPagination] = useState({ page: 1, page_size: 10, total_count: 0, total_pages: 0, has_prev: false, has_next: false })
     const [loading, setLoading] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
-    const [stacks, setStacks] = useState<Stack[]>([])
+    const [stacks, setStacks] = useState<VM[]>([])
     const [stacksLoading, setStacksLoading] = useState(false)
     const [stacksError, setStacksError] = useState('')
     const [stackDeletingId, setStackDeletingId] = useState<number | null>(null)
@@ -83,7 +83,7 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
     const routeUserId = useMemo(() => parseRouteId(routeParams.id), [routeParams.id])
     const isOwnProfile = useMemo(() => (auth.user ? !routeUserId || routeUserId === auth.user.id : false), [auth.user, routeUserId])
     const showBackButton = !!routeParams.id
-    const activeStacks = useMemo(() => stacks.filter((stack) => !['stopped', 'failed', 'node_deleted'].includes(stack.status)), [stacks])
+    const activeStacks = useMemo(() => stacks, [stacks])
     const targetUserId = routeUserId ?? auth.user?.id ?? null
     const totalSolvedPoints = useMemo(() => solved.reduce((sum, item) => sum + item.points, 0), [solved])
     const canViewProfile = routeUserId !== null || auth.user !== null
@@ -126,8 +126,8 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
         setStacksError('')
 
         try {
-            const response = await api.stacks()
-            setStacks(response.stacks)
+            const response = await api.vms()
+            setStacks(response.vms)
         } catch (error) {
             setStacksError(formatApiError(error, t).message)
         } finally {
@@ -143,7 +143,7 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
             setStacksError('')
 
             try {
-                await api.deleteStack(challengeId)
+                await api.deleteVM(challengeId)
                 await loadStacks()
             } catch (error) {
                 setStacksError(formatApiError(error, t).message)

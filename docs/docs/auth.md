@@ -66,6 +66,8 @@ Response 200
         "profile_image": null,
         "stack_count": 0,
         "stack_limit": 3,
+        "vm_count": 0,
+        "vm_limit": 3,
         "blocked_reason": null,
         "blocked_at": null
     }
@@ -79,7 +81,7 @@ Errors:
 
 Notes:
 
-- `stack_count` and `stack_limit` are calculated per user.
+- `stack_count`, `stack_limit`, `vm_count`, and `vm_limit` are calculated per user.
 - `access_token` and `refresh_token` are issued as `HttpOnly` cookies.
 - `csrf_token` is issued as a readable cookie for double-submit CSRF protection.
 

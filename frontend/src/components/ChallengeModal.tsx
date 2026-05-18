@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ApiError } from '../lib/api'
 import { formatApiError, formatDateTime } from '../lib/utils'
-import type { Challenge, Stack } from '../lib/types'
+import type { Challenge, VM } from '../lib/types'
 import { getCategoryKey, getLocaleTag, useLocale, useT } from '../lib/i18n'
 import { navigate } from '../lib/router'
 import { useAuth } from '../lib/auth'
@@ -22,6 +22,13 @@ interface ChallengeModalProps {
 
 const STACK_POLL_FAST_MS = 10000
 const STACK_POLL_SLOW_MS = 60000
+const vmPollInterval = (status?: string | null) => (status?.toLowerCase() === 'running' ? STACK_POLL_SLOW_MS : STACK_POLL_FAST_MS)
+const vmProtocol = (protocol?: string | null) => (protocol || 'tcp').toUpperCase()
+const copyText = (value: string) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        void navigator.clipboard.writeText(value)
+    }
+}
 
 const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeModalProps) => {
     const t = useT()
@@ -33,7 +40,7 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
     const [submission, setSubmission] = useState<SubmissionState>({ status: 'idle' })
     const [downloadLoading, setDownloadLoading] = useState(false)
     const [downloadMessage, setDownloadMessage] = useState('')
-    const [stackInfo, setStackInfo] = useState<Stack | null>(null)
+    const [stackInfo, setStackInfo] = useState<VM | null>(null)
     const [stackLoading, setStackLoading] = useState(false)
     const [stackMessage, setStackMessage] = useState('')
     const [stackPolling, setStackPolling] = useState(false)
@@ -48,7 +55,7 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
     const hasDescription = !!detail?.description
     const solveCount = 'solve_count' in challenge ? challenge.solve_count : null
     const hasFile = !!detail?.has_file
-    const stackEnabled = !!detail?.stack_enabled
+    const stackEnabled = !!detail?.vm_enabled
     const previousChallengeId = isLocked ? (challenge.previous_challenge_id ?? null) : (detail?.previous_challenge_id ?? null)
     const previousChallengeTitle = isLocked ? (challenge.previous_challenge_title ?? null) : null
     const previousChallengeCategory = isLocked ? (challenge.previous_challenge_category ?? null) : null
@@ -73,6 +80,7 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
             if (result.correct) {
                 setSubmission({ status: 'success', message: t('challenge.correct') })
                 setFlagInput('')
+                setStackInfo(null)
                 onSolved()
             } else {
                 setSubmission({ status: 'error', message: t('challenge.incorrect') })
@@ -81,6 +89,7 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
             if (error instanceof ApiError && error.status === 409) {
                 setSubmission({ status: 'success', message: t('challenge.correct') })
                 setFlagInput('')
+                setStackInfo(null)
                 onSolved()
                 return
             }
@@ -116,9 +125,9 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
         if (!auth.user || !stackEnabled) return
 
         try {
-            const result = await api.getStack(challenge.id)
+            const result = await api.getVM(challenge.id)
             setStackInfo(result)
-            setStackNextInterval(result?.status === 'running' ? STACK_POLL_SLOW_MS : STACK_POLL_FAST_MS)
+            setStackNextInterval(vmPollInterval(result?.status))
             setStackMessage('')
         } catch (error) {
             if (error instanceof ApiError && error.status === 404) {
@@ -142,8 +151,9 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
         setStackMessage('')
 
         try {
-            const created = await api.createStack(challenge.id)
+            const created = await api.createVM(challenge.id)
             setStackInfo(created)
+            setStackNextInterval(vmPollInterval(created.status))
         } catch (error) {
             const formatted = formatApiError(error, t)
             setStackMessage(formatted.message)
@@ -158,7 +168,7 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
         setStackMessage('')
 
         try {
-            await api.deleteStack(challenge.id)
+            await api.deleteVM(challenge.id)
             setStackInfo(null)
         } catch (error) {
             const formatted = formatApiError(error, t)
@@ -294,8 +304,8 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
                         <div className='rounded-xl border border-border bg-surface-muted p-4 text-sm text-text'>
                             <div className='flex flex-wrap items-center justify-between gap-3'>
                                 <div>
-                                    <p className='font-medium'>{t('challenge.stackInstance')}</p>
-                                    <p className='text-xs text-text-subtle'>{stackPolling ? (stackNextInterval === 60000 ? t('challenge.stackRefreshing60') : t('challenge.stackRefreshing10')) : t('challenge.stackRefreshPaused')}</p>
+                                    <p className='font-medium'>{t('challenge.vmInstance')}</p>
+                                    <p className='text-xs text-text-subtle'>{stackPolling ? (stackNextInterval === 60000 ? t('challenge.vmRefreshing60') : t('challenge.vmRefreshing10')) : t('challenge.vmRefreshPaused')}</p>
                                 </div>
                                 {auth.user ? (
                                     <div className='flex flex-wrap items-center gap-2'>
@@ -315,7 +325,7 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
                                                     onClick={deleteStack}
                                                     disabled={stackLoading}
                                                 >
-                                                    {stackLoading ? t('challenge.stackWorking') : t('challenge.deleteStack')}
+                                                    {stackLoading ? t('challenge.vmWorking') : t('challenge.deleteVM')}
                                                 </button>
                                             </>
                                         ) : (
@@ -325,7 +335,7 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
                                                 onClick={createStack}
                                                 disabled={stackLoading || isSolved}
                                             >
-                                                {stackLoading ? t('auth.creating') : t('challenge.createStack')}
+                                                {stackLoading ? t('auth.creating') : t('challenge.createVM')}
                                             </button>
                                         )}
                                     </div>
@@ -334,65 +344,71 @@ const ChallengeModal = ({ challenge, isSolved, onClose, onSolved }: ChallengeMod
 
                             {!auth.user ? (
                                 <div className='mt-2 text-xs text-warning'>
-                                    <p>{t('challenge.stackLoginRequired')}</p>
+                                    <p>{t('challenge.vmLoginRequired')}</p>
                                     <a className='mt-1 inline-block underline' href='/login' onClick={(e) => navigate('/login', e)}>
                                         {t('auth.loginLink')}
                                     </a>
                                 </div>
                             ) : isSolved ? (
-                                <p className='mt-2 text-xs text-text-subtle'>{t('challenge.stackSolvedNoNew')}</p>
+                                <p className='mt-2 text-xs text-text-subtle'>{t('challenge.vmSolvedNoNew')}</p>
                             ) : stackInfo ? (
                                 <div className='mt-3 grid gap-2 text-xs text-text-muted'>
                                     {(() => {
                                         const endpoints =
-                                            stackInfo.node_public_ip && stackInfo.ports.length > 0
+                                            stackInfo.external_ip && stackInfo.ports.length > 0
                                                 ? stackInfo.ports.map((port, index) => {
-                                                      const endpoint = `${port.protocol} ${port.container_port} / ${stackInfo.node_public_ip}:${port.node_port}`
-                                                      const nc = `nc${port.protocol === 'UDP' ? ' -u' : ''} ${stackInfo.node_public_ip} ${port.node_port}`
+                                                      const protocol = vmProtocol(port.protocol)
+                                                      const isTCP = protocol === 'TCP'
+                                                      const httpURL = `http://${stackInfo.external_ip}:${port.host_port}`
+                                                      const nc = `nc${protocol === 'UDP' ? ' -u' : ''} ${stackInfo.external_ip} ${port.host_port}`
                                                       return (
                                                           <div key={`${port.container_port}-${port.protocol}-${index}`} className='space-y-1'>
-                                                              <div>
-                                                                  <span className='font-medium text-text'>{t('challenge.stackEndpoint')}</span>
-                                                                  <span className='ml-2'>
-                                                                      {t('challenge.stackPortIndex', {
-                                                                          index: index + 1,
-                                                                      })}
-                                                                      : {endpoint}
-                                                                  </span>
-                                                              </div>
-                                                              <div>
-                                                                  <span className='font-medium text-text'>{t('challenge.stackNCEndpoint')}</span>
-                                                                  <span className='ml-2 font-mono'>{nc}</span>
+                                                              <p className='font-medium text-text'>
+                                                                  {protocol} {port.host_port} -&gt; {port.container_port}
+                                                              </p>
+                                                              {isTCP ? (
+                                                                  <a className='break-all font-mono text-accent underline' href={httpURL} target='_blank' rel='noreferrer'>
+                                                                      {httpURL}
+                                                                  </a>
+                                                              ) : (
+                                                                  <p className='break-all font-mono text-text-subtle'>{t('challenge.vmNoHTTPForProtocol')}</p>
+                                                              )}
+                                                              <div className='flex flex-wrap items-center gap-2'>
+                                                                  <code className='break-all rounded bg-surface-muted px-2 py-1 font-mono text-text'>{nc}</code>
+                                                                  <button className='rounded border border-border px-2 py-1 text-[11px] text-text hover:bg-surface-subtle' type='button' onClick={() => copyText(nc)}>
+                                                                      {t('challenge.vmCopyNC')}
+                                                                  </button>
                                                               </div>
                                                           </div>
                                                       )
                                                   })
-                                                : t('challenge.stackPending')
+                                                : t('challenge.vmPending')
 
                                         return (
                                             <>
                                                 <div className='flex flex-wrap items-center gap-2'>
-                                                    <span className='font-medium text-text'>{t('challenge.stackStatus')}</span>
+                                                    <span className='font-medium text-text'>{t('challenge.vmStatus')}</span>
                                                     <span className='rounded-full bg-surface-subtle px-2 py-0.5 text-[11px]'>{stackInfo.status}</span>
                                                 </div>
                                                 <div>
-                                                    <span className='font-medium text-text'>{t('challenge.stackCreatedBy')}</span>
+                                                    <span className='font-medium text-text'>{t('challenge.vmCreatedBy')}</span>
                                                     <span className='ml-2'>{stackInfo.created_by_username}</span>
                                                 </div>
                                                 <div>
-                                                    <span className='font-medium text-text'>{t('challenge.stackPorts')}</span>
+                                                    <span className='font-medium text-text'>{t('challenge.vmPorts')}</span>
                                                     {typeof endpoints === 'string' ? <span className='ml-2'>{endpoints}</span> : <div className='mt-2 grid gap-2'>{endpoints}</div>}
                                                 </div>
                                                 <div>
-                                                    <span className='font-medium text-text'>{t('challenge.stackTtl')}</span>
+                                                    <span className='font-medium text-text'>{t('challenge.vmTtl')}</span>
                                                     <span className='ml-2'>{formatTimestamp(stackInfo.ttl_expires_at)}</span>
                                                 </div>
+                                                {stackInfo.last_error ? <p className='text-danger'>{stackInfo.last_error}</p> : null}
                                             </>
                                         )
                                     })()}
                                 </div>
                             ) : (
-                                <p className='mt-2 text-xs text-text-subtle'>{t('challenge.stackNoActive')}</p>
+                                <p className='mt-2 text-xs text-text-subtle'>{t('challenge.vmNoActive')}</p>
                             )}
 
                             {stackMessage ? <p className='mt-2 text-xs text-danger'>{stackMessage}</p> : null}

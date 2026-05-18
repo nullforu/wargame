@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ApiError } from '../lib/api'
-import type { Challenge, ChallengeCommentItem, ChallengeSolver, ChallengeVote, LevelVoteCount, PaginationMeta, Stack, Writeup } from '../lib/types'
+import type { Challenge, ChallengeCommentItem, ChallengeSolver, ChallengeVote, LevelVoteCount, PaginationMeta, VM, Writeup } from '../lib/types'
 import { formatApiError, formatDateTime, parseRouteId } from '../lib/utils'
 import { getLocaleTag, useLocale, useTemplate, useT } from '../lib/i18n'
 import { navigate } from '../lib/router'
@@ -30,7 +30,17 @@ const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: 5, total_count: 0
 const EMPTY_VOTE_PAGINATION: PaginationMeta = { page: 1, page_size: 3, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
 const EMPTY_WRITEUP_PAGINATION: PaginationMeta = { page: 1, page_size: 5, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
 const EMPTY_COMMENT_PAGINATION: PaginationMeta = { page: 1, page_size: 5, total_count: 0, total_pages: 0, has_prev: false, has_next: false }
+const VM_POLL_FAST_MS = 2000
+const VM_POLL_SLOW_MS = 60000
 type FirstBloodDurationUnit = 'minute' | 'hour' | 'day' | 'month' | 'year'
+
+const vmPollInterval = (status?: string | null) => (status?.toLowerCase() === 'running' ? VM_POLL_SLOW_MS : VM_POLL_FAST_MS)
+const vmProtocol = (protocol?: string | null) => (protocol || 'tcp').toUpperCase()
+const copyText = (value: string) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        void navigator.clipboard.writeText(value)
+    }
+}
 
 const calculateFirstBloodDuration = (createdAt: string, solvedAt: string): { unit: FirstBloodDurationUnit; count: number } | null => {
     const created = new Date(createdAt)
@@ -88,9 +98,10 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
 
     const [downloadLoading, setDownloadLoading] = useState(false)
     const [downloadMessage, setDownloadMessage] = useState('')
-    const [stackInfo, setStackInfo] = useState<Stack | null>(null)
+    const [stackInfo, setStackInfo] = useState<VM | null>(null)
     const [stackLoading, setStackLoading] = useState(false)
     const [stackMessage, setStackMessage] = useState('')
+    const [stackNextInterval, setStackNextInterval] = useState(VM_POLL_FAST_MS)
     const [votes, setVotes] = useState<ChallengeVote[]>([])
     const [votePage, setVotePage] = useState(1)
     const [votePagination, setVotePagination] = useState<PaginationMeta>(EMPTY_VOTE_PAGINATION)
@@ -118,6 +129,8 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const [commentSubmitting, setCommentSubmitting] = useState(false)
     const [editingCommentID, setEditingCommentID] = useState<number | null>(null)
     const [editingCommentContent, setEditingCommentContent] = useState('')
+    const [copiedValue, setCopiedValue] = useState<string | null>(null)
+    const stackEnabled = Boolean(challenge && !challenge.is_locked && !challenge.is_solved && 'vm_enabled' in challenge && challenge.vm_enabled === true)
 
     const pushSolverPageQuery = (nextPage: number) => {
         if (typeof window === 'undefined') return
@@ -252,15 +265,17 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }, [challengeId])
 
     const loadStack = async () => {
-        if (!challengeId || !challenge || challenge.is_locked || challenge.is_solved || !('stack_enabled' in challenge) || challenge.stack_enabled !== true) return
+        if (!challengeId || !stackEnabled) return
         setStackLoading(true)
         setStackMessage('')
         try {
-            const stack = await api.getStack(challengeId)
+            const stack = await api.getVM(challengeId)
             setStackInfo(stack)
+            setStackNextInterval(vmPollInterval(stack.status))
         } catch (error) {
             if (error instanceof ApiError && error.status === 404) {
                 setStackInfo(null)
+                setStackNextInterval(VM_POLL_FAST_MS)
             } else {
                 setStackMessage(formatApiError(error, t).message)
             }
@@ -321,9 +336,22 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }, [challengeId])
 
     useEffect(() => {
-        if (!auth.user || !challengeId || !challenge || challenge.is_locked || challenge.is_solved || !('stack_enabled' in challenge) || challenge.stack_enabled !== true) return
+        if (!auth.user || !challengeId || !stackEnabled) return
         void loadStack()
-    }, [auth.user?.id, challengeId, challenge?.id, challenge?.is_locked])
+    }, [auth.user?.id, challengeId, stackEnabled])
+
+    useEffect(() => {
+        if (!auth.user || !challengeId || !stackEnabled || !stackInfo) return
+
+        let timeoutId: ReturnType<typeof setTimeout>
+        const poll = async () => {
+            await loadStack()
+            timeoutId = setTimeout(poll, stackNextInterval)
+        }
+
+        timeoutId = setTimeout(poll, stackNextInterval)
+        return () => clearTimeout(timeoutId)
+    }, [auth.user?.id, challengeId, stackEnabled, stackInfo, stackNextInterval])
 
     useEffect(() => {
         const onPopState = () => {
@@ -371,6 +399,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         const handleSolveSuccess = async () => {
             setSubmission({ status: 'success', message: t('challenge.correct') })
             setFlagInput('')
+            setStackInfo(null)
             setChallenge((prev) => (prev ? { ...prev, is_solved: true } : prev))
             setCanViewWriteupContent(true)
             await Promise.all([loadChallenge(), loadSolvers(solverPage), loadWriteups(writeupPage)])
@@ -431,12 +460,13 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }
 
     const createStack = async () => {
-        if (!challengeId || !challenge || challenge.is_locked || !('stack_enabled' in challenge) || challenge.stack_enabled !== true || stackLoading || !auth.user) return
+        if (!challengeId || !challenge || challenge.is_locked || !('vm_enabled' in challenge) || challenge.vm_enabled !== true || stackLoading || !auth.user) return
         setStackLoading(true)
         setStackMessage('')
         try {
-            const created = await api.createStack(challengeId)
+            const created = await api.createVM(challengeId)
             setStackInfo(created)
+            setStackNextInterval(vmPollInterval(created.status))
         } catch (error) {
             setStackMessage(formatApiError(error, t).message)
         } finally {
@@ -445,11 +475,11 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }
 
     const deleteStack = async () => {
-        if (!challengeId || !challenge || challenge.is_locked || !('stack_enabled' in challenge) || challenge.stack_enabled !== true || stackLoading || !auth.user) return
+        if (!challengeId || !challenge || challenge.is_locked || !('vm_enabled' in challenge) || challenge.vm_enabled !== true || stackLoading || !auth.user) return
         setStackLoading(true)
         setStackMessage('')
         try {
-            await api.deleteStack(challengeId)
+            await api.deleteVM(challengeId)
             setStackInfo(null)
         } catch (error) {
             setStackMessage(formatApiError(error, t).message)
@@ -626,6 +656,17 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const isSubmissionDisabled = !auth.user || !isChallengeActive || challenge.is_solved || submission.status === 'loading'
     const createdSummary = challenge.created_at ? formatCompactDateTime(challenge.created_at) : t('common.na')
     const voteSubmittedMessage = t('challenge.voteSubmitted')
+
+    const handleCopy = async (value: string) => {
+        copyText(value)
+
+        setCopiedValue(value)
+
+        setTimeout(() => {
+            setCopiedValue((current) => (current === value ? null : current))
+        }, 2000)
+    }
+
     return (
         <section className='animate space-y-4 px-0 sm:px-1 md:px-2 lg:px-0'>
             <div className='grid items-start gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(320px,0.92fr)]'>
@@ -722,10 +763,10 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                             </div>
                         )}
 
-                        {!challenge.is_locked && !challenge.is_solved && 'stack_enabled' in challenge && challenge.stack_enabled ? (
+                        {!challenge.is_locked && !challenge.is_solved && 'vm_enabled' in challenge && challenge.vm_enabled ? (
                             <div className='rounded-md border border-border/30 bg-surface p-4 sm:p-5 shadow-sm mt-8'>
                                 <div className='flex items-center justify-between gap-2'>
-                                    <h2 className='text-base font-semibold text-text'>{t('challenge.stackInstance')}</h2>
+                                    <h2 className='text-base font-semibold text-text'>{t('challenge.vmInstance')}</h2>
                                     {auth.user ? (
                                         <button className='rounded-lg bg-surface-muted px-3 py-1.5 text-xs text-text hover:bg-surface-subtle disabled:opacity-60' onClick={() => void loadStack()} disabled={stackLoading}>
                                             {t('common.refresh')}
@@ -737,28 +778,90 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                     stackInfo ? (
                                         <div className='mt-3 space-y-1.5 text-sm text-text-muted'>
                                             <p>
-                                                {t('challenge.stackStatus')} <span className='text-text'>{stackInfo.status}</span>
+                                                {t('challenge.vmStatus')} <span className='text-text'>{stackInfo.status}</span>
                                             </p>
                                             <p>
-                                                {t('challenge.stackEndpoint')}{' '}
-                                                <span className='break-all text-text'>
-                                                    {stackInfo.node_public_ip && stackInfo.ports.length > 0 ? stackInfo.ports.map((port) => `${port.protocol} ${stackInfo.node_public_ip}:${port.node_port}`).join(', ') : t('common.pending')}
-                                                </span>
+                                                {t('challenge.vmTtl')} <span className='text-text'>{stackInfo.ttl_expires_at ? formatTimestamp(stackInfo.ttl_expires_at) : t('common.pending')}</span>
                                             </p>
-                                            <p>
-                                                {t('challenge.stackPorts')}{' '}
-                                                <span className='text-text'>{stackInfo.ports.length > 0 ? stackInfo.ports.map((port) => `${port.container_port}/${port.protocol}`).join(', ') : t('common.pending')}</span>
-                                            </p>
-                                            <p>
-                                                {t('challenge.stackTtl')} <span className='text-text'>{stackInfo.ttl_expires_at ? formatTimestamp(stackInfo.ttl_expires_at) : t('common.pending')}</span>
-                                            </p>
+                                            <div>
+                                                {stackInfo.external_ip && stackInfo.ports?.length > 0 ? (
+                                                    <div className='mt-3 space-y-3'>
+                                                        {stackInfo.ports.map((port, index) => {
+                                                            const protocol = vmProtocol(port.protocol)
+                                                            const isUDP = protocol === 'UDP'
+                                                            const isTCP = protocol === 'TCP'
+
+                                                            const httpURL = `http://${stackInfo.external_ip}:${port.host_port}`
+                                                            const nc = `nc${isUDP ? ' -u' : ''} ${stackInfo.external_ip} ${port.host_port}`
+
+                                                            return (
+                                                                <div key={`${port.container_port}-${port.protocol}-${index}`} className='py-4'>
+                                                                    <div className='flex flex-wrap items-center justify-between gap-2'>
+                                                                        <div className='flex items-center gap-2'>
+                                                                            <span className={`rounded-md px-2 py-1 text-xs font-semibold ${isUDP ? 'bg-orange-500/10 text-orange-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                                                                                {protocol}
+                                                                            </span>
+
+                                                                            <code className='font-mono text-sm text-text'>{port.host_port}</code>
+
+                                                                            <span className='text-text-muted'>→</span>
+
+                                                                            <code className='font-mono text-sm text-text-muted'>{port.container_port}</code>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className='mt-4 space-y-3'>
+                                                                        <div>
+                                                                            <p className='mb-1 text-xs font-medium uppercase tracking-wide text-text-muted'>{t('challenge.vmHTTPAccess')}</p>
+
+                                                                            {isTCP ? (
+                                                                                <a
+                                                                                    href={httpURL}
+                                                                                    target='_blank'
+                                                                                    rel='noreferrer'
+                                                                                    className='block break-all rounded-lg border border-border/40 bg-surface px-3 py-2 font-mono text-sm text-accent transition-colors hover:bg-surface-subtle hover:underline'
+                                                                                >
+                                                                                    {httpURL}
+                                                                                </a>
+                                                                            ) : (
+                                                                                <div className='block break-all rounded-lg border border-border/40 bg-surface px-3 py-2 font-mono text-sm text-text-subtle'>
+                                                                                    {t('challenge.vmNoHTTPForProtocol')}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+
+                                                                        <div>
+                                                                            <p className='mb-1 text-xs font-medium uppercase tracking-wide text-text-muted'>{t('challenge.vmNCAccess')}</p>
+
+                                                                            <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
+                                                                                <code className='flex-1 break-all rounded-lg border border-border/40 bg-surface px-3 py-2 font-mono text-sm text-text'>{nc}</code>
+
+                                                                                <button
+                                                                                    type='button'
+                                                                                    onClick={() => handleCopy(nc)}
+                                                                                    className='rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:bg-surface-subtle'
+                                                                                >
+                                                                                    {copiedValue === nc ? 'Copied' : 'Copy'}
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                ) : (
+                                                    <div className='mt-2 inline-flex items-center rounded-lg border border-border/40 bg-surface-muted px-3 py-2 text-sm text-text-muted'>{t('common.pending')}</div>
+                                                )}
+                                            </div>
+                                            {stackInfo.last_error ? <p className='text-danger'>{stackInfo.last_error}</p> : null}
                                         </div>
                                     ) : (
-                                        <p className='mt-3 text-sm text-text-muted'>{t('challenge.stackNoActive')}</p>
+                                        <p className='mt-3 text-sm text-text-muted'>{t('challenge.vmNoActive')}</p>
                                     )
                                 ) : (
                                     <p className='mt-3 text-sm text-warning'>
-                                        {t('challenge.stackLoginRequired')}{' '}
+                                        {t('challenge.vmLoginRequired')}{' '}
                                         <a className='underline cursor-pointer' href='/login' onClick={(e) => navigate('/login', e)}>
                                             {t('auth.loginLink')}
                                         </a>
@@ -769,11 +872,11 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                     <div className='mt-4 flex flex-wrap gap-2'>
                                         {stackInfo ? (
                                             <button className='rounded-lg border border-danger/20 px-3 py-2 text-sm text-danger hover:border-danger/40 disabled:opacity-60' onClick={deleteStack} disabled={stackLoading}>
-                                                {stackLoading ? t('challenge.stackWorking') : t('challenge.deleteStack')}
+                                                {stackLoading ? t('challenge.vmWorking') : t('challenge.deleteVM')}
                                             </button>
                                         ) : (
                                             <button className='rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent-strong disabled:opacity-60' onClick={createStack} disabled={stackLoading || challenge.is_solved}>
-                                                {stackLoading ? t('challenge.stackWorking') : t('challenge.createStack')}
+                                                {stackLoading ? t('challenge.vmWorking') : t('challenge.createVM')}
                                             </button>
                                         )}
                                     </div>

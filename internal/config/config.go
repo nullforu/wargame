@@ -30,6 +30,7 @@ type Config struct {
 	S3       S3Config
 	S3Media  S3Config
 	Stack    StackConfig
+	VM       VMConfig
 }
 
 type DBConfig struct {
@@ -99,6 +100,15 @@ type StackConfig struct {
 	ProvisionerUseGRPC  bool
 	ProvisionerAPIKey   string
 	ProvisionerTimeout  time.Duration
+	CreateWindow        time.Duration
+	CreateMax           int
+}
+
+type VMConfig struct {
+	Enabled             bool
+	MaxPer              int
+	OrchestratorBaseURL string
+	OrchestratorTimeout time.Duration
 	CreateWindow        time.Duration
 	CreateMax           int
 }
@@ -263,6 +273,31 @@ func Load() (Config, error) {
 		errs = append(errs, err)
 	}
 
+	vmEnabled, err := getEnvBool("VM_ENABLED", true)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	vmMaxPer, err := getEnvInt("VM_MAX_PER", 3)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	vmTimeout, err := getDuration("VM_ORCH_TIMEOUT", 5*time.Second)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	vmCreateWindow, err := getDuration("VM_CREATE_WINDOW", time.Minute)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	vmCreateMax, err := getEnvInt("VM_CREATE_MAX", 1)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
 	cfg := Config{
 		AppEnv:          appEnv,
 		HTTPAddr:        httpAddr,
@@ -342,6 +377,14 @@ func Load() (Config, error) {
 			ProvisionerTimeout:  stackTimeout,
 			CreateWindow:        stackCreateWindow,
 			CreateMax:           stackCreateMax,
+		},
+		VM: VMConfig{
+			Enabled:             vmEnabled,
+			MaxPer:              vmMaxPer,
+			OrchestratorBaseURL: getEnv("VM_ORCH_BASE_URL", "http://localhost:8082"),
+			OrchestratorTimeout: vmTimeout,
+			CreateWindow:        vmCreateWindow,
+			CreateMax:           vmCreateMax,
 		},
 	}
 
@@ -533,6 +576,23 @@ func validateConfig(cfg Config) error {
 			errs = append(errs, errors.New("STACKS_CREATE_MAX must be positive"))
 		}
 	}
+	if cfg.VM.Enabled {
+		if cfg.VM.MaxPer <= 0 {
+			errs = append(errs, errors.New("VM_MAX_PER must be positive"))
+		}
+		if cfg.VM.OrchestratorBaseURL == "" {
+			errs = append(errs, errors.New("VM_ORCH_BASE_URL must not be empty"))
+		}
+		if cfg.VM.OrchestratorTimeout <= 0 {
+			errs = append(errs, errors.New("VM_ORCH_TIMEOUT must be positive"))
+		}
+		if cfg.VM.CreateWindow <= 0 {
+			errs = append(errs, errors.New("VM_CREATE_WINDOW must be positive"))
+		}
+		if cfg.VM.CreateMax <= 0 {
+			errs = append(errs, errors.New("VM_CREATE_MAX must be positive"))
+		}
+	}
 
 	if len(errs) == 0 {
 		return nil
@@ -666,6 +726,14 @@ func FormatForLog(cfg Config) map[string]any {
 			"provisioner_timeout":   seconds(cfg.Stack.ProvisionerTimeout),
 			"create_window":         seconds(cfg.Stack.CreateWindow),
 			"create_max":            cfg.Stack.CreateMax,
+		},
+		"vm": map[string]any{
+			"enabled":               cfg.VM.Enabled,
+			"max_per":               cfg.VM.MaxPer,
+			"orchestrator_base_url": cfg.VM.OrchestratorBaseURL,
+			"orchestrator_timeout":  seconds(cfg.VM.OrchestratorTimeout),
+			"create_window":         seconds(cfg.VM.CreateWindow),
+			"create_max":            cfg.VM.CreateMax,
 		},
 	}
 }

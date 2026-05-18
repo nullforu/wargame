@@ -30,6 +30,8 @@ type Challenge struct {
 	StackEnabled           bool                  `bun:"stack_enabled,notnull,default:false"`
 	StackTargetPorts       stack.TargetPortSpecs `bun:"stack_target_ports,type:jsonb,nullzero"`
 	StackPodSpec           *string               `bun:"stack_pod_spec,nullzero"`
+	VMEnabled              bool                  `bun:"vm_enabled,notnull,default:false"`
+	VMSpec                 *string               `bun:"vm_spec,nullzero"`
 	IsActive               bool                  `bun:"is_active,notnull"`
 	CreatedAt              time.Time             `bun:"created_at,nullzero,notnull,default:current_timestamp"`
 	SolveCount             int                   `bun:"-"`

@@ -25,6 +25,7 @@ import (
 	"wargame/internal/stack"
 	"wargame/internal/storage"
 	"wargame/internal/utils"
+	"wargame/internal/vm"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
@@ -46,6 +47,7 @@ type testEnv struct {
 	authSvc         *service.AuthService
 	wargameSvc      *service.WargameService
 	stackSvc        *service.StackService
+	vmSvc           *service.VMService
 }
 
 type errorResp struct {
@@ -252,8 +254,9 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(testDB), repo.NewCommunityRepo(testDB), testRedis, fileStore)
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, testRedis)
+	vmSvc := service.NewVMService(cfg.VM, repo.NewVMRepo(testDB), challengeRepo, submissionRepo, &vm.MockClient{}, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, testRedis, testLogger)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, testRedis, testLogger)
 
 	env := testEnv{
 		cfg:             cfg,
@@ -266,6 +269,7 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 		authSvc:         authSvc,
 		wargameSvc:      wargameSvc,
 		stackSvc:        stackSvc,
+		vmSvc:           vmSvc,
 	}
 
 	return env
@@ -274,7 +278,7 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 func resetState(t *testing.T) {
 	t.Helper()
 
-	if _, err := testDB.ExecContext(context.Background(), "TRUNCATE TABLE community_comments, challenge_comments, challenge_votes, writeups, community_post_likes, community_posts, submissions, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := testDB.ExecContext(context.Background(), "TRUNCATE TABLE community_comments, challenge_comments, challenge_votes, writeups, community_post_likes, community_posts, submissions, vms, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
@@ -543,6 +547,49 @@ func createStackChallenge(t *testing.T, env testEnv, title string) *models.Chall
 	return challenge
 }
 
+func createVMChallenge(t *testing.T, env testEnv, title string) *models.Challenge {
+	t.Helper()
+	spec := `apiVersion: sandboxd.o/v1
+kind: Sandbox
+id: placeholder
+spec:
+  egress: true
+  ttl_seconds: 3600
+  ports:
+    - host_port: 0
+      container_port: 31337
+      protocol: tcp
+  containers:
+    - name: app
+      image: nginx:stable
+      resource:
+        cpu: 50m
+        memory: 64Mi
+`
+	challenge := &models.Challenge{
+		Title:       title,
+		Description: "vm desc",
+		Category:    "Web",
+		Points:      100,
+		VMEnabled:   true,
+		VMSpec:      &spec,
+		IsActive:    true,
+		CreatedAt:   time.Now().UTC(),
+	}
+
+	hash, err := utils.HashFlag("flag{vm}", bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("hash flag: %v", err)
+	}
+
+	challenge.FlagHash = hash
+	if err := env.challengeRepo.Create(context.Background(), challenge); err != nil {
+		t.Fatalf("create challenge: %v", err)
+	}
+
+	return challenge
+}
+
 func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testEnv {
 	t.Helper()
 	skipIfIntegrationDisabled(t)
@@ -565,8 +612,9 @@ func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testE
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(testDB), repo.NewCommunityRepo(testDB), testRedis, fileStore)
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, mockClient, testRedis)
+	vmSvc := service.NewVMService(cfg.VM, repo.NewVMRepo(testDB), challengeRepo, submissionRepo, &vm.MockClient{}, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, testRedis, testLogger)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, testRedis, testLogger)
 
 	return testEnv{
 		cfg:             cfg,
@@ -579,6 +627,48 @@ func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testE
 		authSvc:         authSvc,
 		wargameSvc:      wargameSvc,
 		stackSvc:        stackSvc,
+		vmSvc:           vmSvc,
+	}
+}
+
+func setupVMTest(t *testing.T, cfg config.Config, mockClient vm.API) testEnv {
+	t.Helper()
+	skipIfIntegrationDisabled(t)
+	resetState(t)
+
+	userRepo := repo.NewUserRepo(testDB)
+	affiliationRepo := repo.NewAffiliationRepo(testDB)
+	challengeRepo := repo.NewChallengeRepo(testDB)
+	submissionRepo := repo.NewSubmissionRepo(testDB)
+	voteRepo := repo.NewChallengeVoteRepo(testDB)
+	writeupRepo := repo.NewWriteupRepo(testDB)
+	scoreRepo := repo.NewScoreboardRepo(testDB)
+	stackRepo := repo.NewStackRepo(testDB)
+
+	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
+
+	authSvc := service.NewAuthService(cfg, userRepo, testRedis)
+	userSvc := service.NewUserService(userRepo, affiliationRepo, storage.NewMemoryProfileImageStore(10*time.Minute))
+	affiliationSvc := service.NewAffiliationService(affiliationRepo)
+	scoreSvc := service.NewScoreboardService(scoreRepo)
+	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(testDB), repo.NewCommunityRepo(testDB), testRedis, fileStore)
+	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, testRedis)
+	vmSvc := service.NewVMService(cfg.VM, repo.NewVMRepo(testDB), challengeRepo, submissionRepo, mockClient, testRedis)
+
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, testRedis, testLogger)
+
+	return testEnv{
+		cfg:             cfg,
+		router:          router,
+		userRepo:        userRepo,
+		affiliationRepo: affiliationRepo,
+		challengeRepo:   challengeRepo,
+		submissionRepo:  submissionRepo,
+		stackRepo:       stackRepo,
+		authSvc:         authSvc,
+		wargameSvc:      wargameSvc,
+		stackSvc:        stackSvc,
+		vmSvc:           vmSvc,
 	}
 }
 
