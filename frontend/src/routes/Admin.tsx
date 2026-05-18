@@ -12,10 +12,10 @@ interface RouteProps {
     routeParams?: Record<string, string>
 }
 
-type AdminTabId = 'challenge_create' | 'challenge_management' | 'users' | 'stacks' | 'affiliations'
+type AdminTabId = 'challenge_create' | 'challenge_management' | 'users' | 'vms' | 'affiliations'
 const TAB_PARAM = 'tab'
 const ADMIN_NOTICE_DISMISSED_KEY = 'admin_notice_dismissed'
-const ADMIN_TAB_IDS: AdminTabId[] = ['challenge_create', 'challenge_management', 'users', 'stacks', 'affiliations']
+const ADMIN_TAB_IDS: AdminTabId[] = ['challenge_create', 'challenge_management', 'users', 'vms', 'affiliations']
 
 const getTabFromUrl = (): AdminTabId | null => {
     const params = new URLSearchParams(window.location.search)
@@ -32,7 +32,7 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
             { id: 'challenge_create', label: t('admin.tab.createChallenge') },
             { id: 'challenge_management', label: t('admin.tab.challengeManagement') },
             { id: 'users', label: t('admin.tab.users') },
-            { id: 'stacks', label: t('admin.tab.stacks') },
+            { id: 'vms', label: t('admin.tab.vms') },
             { id: 'affiliations', label: t('admin.tab.affiliations') },
         ],
         [t],
@@ -100,7 +100,7 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
                                 <CreateChallenge />
                             ) : activeTab === 'challenge_management' ? (
                                 <ChallengeManagement />
-                            ) : activeTab === 'stacks' ? (
+                            ) : activeTab === 'vms' ? (
                                 <Stacks />
                             ) : activeTab === 'users' ? (
                                 <Users />

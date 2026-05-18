@@ -22,17 +22,17 @@ import type {
     CommunityPostsResponse,
     CommunityPostDetailResponse,
     AdminChallengeDetail,
-    AdminStackDeleteResponse,
-    AdminStackListItem,
-    AdminStacksResponse,
+    AdminVMDeleteResponse,
+    AdminVMListItem,
+    AdminVMsResponse,
     AffiliationRankingResponse,
     AffiliationsResponse,
     Affiliation,
     FlagSubmissionResult,
     LeaderboardResponse,
     PresignedURL,
-    Stack,
-    StacksResponse,
+    VM,
+    VMsResponse,
     LoginPayload,
     PaginationMeta,
     RegisterPayload,
@@ -576,23 +576,23 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
                 method: 'POST',
                 auth: true,
             }),
-        createStack: (challengeID: number) => request<Stack>(`/api/challenges/${challengeID}/stack`, { method: 'POST', auth: true }),
-        getStack: (challengeID: number) => request<Stack>(`/api/challenges/${challengeID}/stack`, { auth: true }),
-        deleteStack: (challengeID: number) => request<{ status?: string }>(`/api/challenges/${challengeID}/stack`, { method: 'DELETE', auth: true }),
-        stacks: async () => {
-            const data = await request<{ stacks?: Stack[] }>(`/api/stacks`, { auth: true })
+        createVM: (challengeID: number) => request<VM>(`/api/challenges/${challengeID}/vm`, { method: 'POST', auth: true }),
+        getVM: (challengeID: number) => request<VM>(`/api/challenges/${challengeID}/vm`, { auth: true }),
+        deleteVM: (challengeID: number) => request<{ status?: string }>(`/api/challenges/${challengeID}/vm`, { method: 'DELETE', auth: true }),
+        vms: async () => {
+            const data = await request<{ vms?: VM[] }>(`/api/vms`, { auth: true })
             return {
-                stacks: Array.isArray(data?.stacks) ? data.stacks : [],
-            } as StacksResponse
+                vms: Array.isArray(data?.vms) ? data.vms : [],
+            } as VMsResponse
         },
-        adminStacks: async () => {
-            const data = await request<{ stacks?: AdminStackListItem[] }>(`/api/admin/stacks`, { auth: true })
+        adminVMs: async () => {
+            const data = await request<{ vms?: AdminVMListItem[] }>(`/api/admin/vms`, { auth: true })
             return {
-                stacks: Array.isArray(data?.stacks) ? data.stacks : [],
-            } as AdminStacksResponse
+                vms: Array.isArray(data?.vms) ? data.vms : [],
+            } as AdminVMsResponse
         },
-        adminStack: (stackId: string) => request<Stack>(`/api/admin/stacks/${stackId}`, { auth: true }),
-        deleteAdminStack: (stackId: string) => request<AdminStackDeleteResponse>(`/api/admin/stacks/${stackId}`, { method: 'DELETE', auth: true }),
+        adminVM: (vmId: string) => request<VM>(`/api/admin/vms/${vmId}`, { auth: true }),
+        deleteAdminVM: (vmId: string) => request<AdminVMDeleteResponse>(`/api/admin/vms/${vmId}`, { method: 'DELETE', auth: true }),
         blockUser: (id: number, reason: string) => request<AuthUser>(`/api/admin/users/${id}/block`, { method: 'POST', body: { reason }, auth: true }),
         unblockUser: (id: number) => request<AuthUser>(`/api/admin/users/${id}/unblock`, { method: 'POST', auth: true }),
         users: async (page?: number, pageSize?: number) => {

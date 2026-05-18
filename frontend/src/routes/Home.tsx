@@ -183,12 +183,12 @@ const Home = ({ routeParams = {} }: RouteProps) => {
                                     <p className='truncate text-sm font-semibold text-text'>{displayProfile.affiliation?.trim() ? displayProfile.affiliation : t('profile.noAffiliation')}</p>
                                 </div>
                                 <div className='rounded-md border border-border/50 px-3 py-2'>
-                                    <p className='text-[11px] text-text-subtle'>Stack</p>
-                                    <p className='text-sm font-semibold text-text'>{displayProfile.stack_count}</p>
+                                    <p className='text-[11px] text-text-subtle'>VM</p>
+                                    <p className='text-sm font-semibold text-text'>{displayProfile.vm_count}</p>
                                 </div>
                                 <div className='rounded-md border border-border/50 px-3 py-2'>
-                                    <p className='text-[11px] text-text-subtle'>{t('home.stackLimitLabel')}</p>
-                                    <p className='text-sm font-semibold text-text'>{displayProfile.stack_limit}</p>
+                                    <p className='text-[11px] text-text-subtle'>{t('home.vmLimitLabel')}</p>
+                                    <p className='text-sm font-semibold text-text'>{displayProfile.vm_limit}</p>
                                 </div>
                             </div>
                         </div>

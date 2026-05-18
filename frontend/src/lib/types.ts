@@ -9,6 +9,8 @@ export interface AuthUser {
     profile_image: string | null
     stack_count: number
     stack_limit: number
+    vm_count: number
+    vm_limit: number
     blocked_reason: string | null
     blocked_at: string | null
 }
@@ -51,6 +53,7 @@ export interface ChallengeDetail {
     file_name?: string | null
     stack_enabled: boolean
     stack_target_ports: TargetPortSpec[]
+    vm_enabled: boolean
     previous_challenge_id?: number | null
     is_locked?: false
     is_solved: boolean
@@ -109,6 +112,7 @@ export interface ChallengeMyVoteResponse {
 
 export interface AdminChallengeDetail extends ChallengeDetail {
     stack_pod_spec?: string | null
+    vm_spec?: string | null
 }
 
 export type PortProtocol = 'TCP' | 'UDP'
@@ -133,6 +137,8 @@ export interface ChallengeCreatePayload {
     stack_enabled?: boolean
     stack_target_ports?: TargetPortSpec[]
     stack_pod_spec?: string
+    vm_enabled?: boolean
+    vm_spec?: string
 }
 
 export interface ChallengeCreateResponse extends ChallengeDetail {}
@@ -148,6 +154,8 @@ export interface ChallengeUpdatePayload {
     stack_enabled?: boolean
     stack_target_ports?: TargetPortSpec[]
     stack_pod_spec?: string
+    vm_enabled?: boolean
+    vm_spec?: string
 }
 
 export interface Stack {
@@ -162,6 +170,41 @@ export interface Stack {
     updated_at: string
     created_by_user_id: number
     created_by_username: string
+}
+
+export interface VMPortMapping {
+    host_port: number
+    container_port: number
+    protocol: string
+}
+
+export interface VM {
+    vm_id: string
+    challenge_id: number
+    challenge_title: string
+    status: string
+    node_name?: string | null
+    external_ip?: string | null
+    ports: VMPortMapping[]
+    ttl_expires_at?: string | null
+    last_error?: string | null
+    created_at: string
+    updated_at: string
+    created_by_user_id: number
+    created_by_username: string
+}
+
+export interface AdminVMListItem {
+    vm_id: string
+    ttl_expires_at?: string | null
+    created_at: string
+    updated_at: string
+    user_id: number
+    username: string
+    email: string
+    challenge_id: number
+    challenge_title: string
+    challenge_category: string
 }
 
 export interface AdminStackListItem {
@@ -215,13 +258,26 @@ export interface StacksResponse {
     stacks: Stack[]
 }
 
+export interface VMsResponse {
+    vms: VM[]
+}
+
 export interface AdminStacksResponse {
     stacks: AdminStackListItem[]
+}
+
+export interface AdminVMsResponse {
+    vms: AdminVMListItem[]
 }
 
 export interface AdminStackDeleteResponse {
     deleted: boolean
     stack_id: string
+}
+
+export interface AdminVMDeleteResponse {
+    deleted: boolean
+    vm_id: string
 }
 
 export interface FlagSubmissionResult {

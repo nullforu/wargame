@@ -1,10 +1,8 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { uploadPresignedFile } from '../../lib/api'
 import { CHALLENGE_CATEGORIES } from '../../lib/constants'
 import { formatApiError, isZipFile, trimToMaxUtf8Bytes, utf8ByteLength, type FieldErrors } from '../../lib/utils'
-import type { Challenge, ChallengeDetail, ChallengeUpdatePayload, TargetPortSpec } from '../../lib/types'
-
-type TargetPortRow = TargetPortSpec & { id: string }
+import type { Challenge, ChallengeDetail, ChallengeUpdatePayload } from '../../lib/types'
 import FormMessage from '../../components/FormMessage'
 import { getCategoryKey, useT } from '../../lib/i18n'
 import { useApi } from '../../lib/useApi'
@@ -34,13 +32,6 @@ const ChallengeManagement = () => {
     const [editFlag, setEditFlag] = useState('')
     const [editIsActive, setEditIsActive] = useState(true)
     const [editStackEnabled, setEditStackEnabled] = useState(false)
-    const portIdRef = useRef(0)
-    const newPortRow = (port?: TargetPortSpec): TargetPortRow => ({
-        id: `port-${portIdRef.current++}`,
-        container_port: port?.container_port ?? 80,
-        protocol: port?.protocol ?? 'TCP',
-    })
-    const [editStackTargetPorts, setEditStackTargetPorts] = useState<TargetPortRow[]>([newPortRow()])
     const [editStackPodSpec, setEditStackPodSpec] = useState('')
     const [loadedStackPodSpec, setLoadedStackPodSpec] = useState('')
     const [loadedPreviousChallengeId, setLoadedPreviousChallengeId] = useState<number | null>(null)
@@ -166,9 +157,7 @@ const ChallengeManagement = () => {
         setEditIsActive(challenge.is_active)
         setEditPreviousChallengeId('previous_challenge_id' in challenge && challenge.previous_challenge_id !== undefined ? (challenge.previous_challenge_id ?? '') : '')
         setLoadedPreviousChallengeId('previous_challenge_id' in challenge ? (challenge.previous_challenge_id ?? null) : null)
-        setEditStackEnabled('stack_enabled' in challenge ? challenge.stack_enabled : false)
-        const challengePorts = 'stack_target_ports' in challenge ? challenge.stack_target_ports : []
-        setEditStackTargetPorts(Array.isArray(challengePorts) && challengePorts.length > 0 ? challengePorts.map((port) => newPortRow(port)) : [newPortRow()])
+        setEditStackEnabled('vm_enabled' in challenge ? challenge.vm_enabled : false)
         setEditStackPodSpec('')
         setLoadedStackPodSpec('')
 
@@ -182,9 +171,8 @@ const ChallengeManagement = () => {
             setEditIsActive(detail.is_active)
             setEditPreviousChallengeId(detail.previous_challenge_id ?? '')
             setLoadedPreviousChallengeId(detail.previous_challenge_id ?? null)
-            setEditStackEnabled(detail.stack_enabled)
-            setEditStackTargetPorts(detail.stack_target_ports && detail.stack_target_ports.length > 0 ? detail.stack_target_ports.map((port) => newPortRow(port)) : [newPortRow()])
-            const podSpecValue = detail.stack_pod_spec ?? ''
+            setEditStackEnabled(detail.vm_enabled)
+            const podSpecValue = detail.vm_spec ?? ''
             setEditStackPodSpec(podSpecValue)
             setLoadedStackPodSpec(podSpecValue)
             setChallenges((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
@@ -218,8 +206,7 @@ const ChallengeManagement = () => {
         if (field === 'flag') setEditFlag('')
         if (field === 'is_active') setEditIsActive(detail?.is_active ?? true)
         if (field === 'stack') {
-            setEditStackEnabled(detail?.stack_enabled ?? false)
-            setEditStackTargetPorts(detail?.stack_target_ports && detail.stack_target_ports.length > 0 ? detail.stack_target_ports.map((port) => newPortRow(port)) : [newPortRow()])
+            setEditStackEnabled(detail?.vm_enabled ?? false)
             setEditStackPodSpec(loadedStackPodSpec)
         }
     }
@@ -302,26 +289,21 @@ const ChallengeManagement = () => {
         }
 
         if (field === 'stack') {
-            const normalizePorts = (ports: TargetPortRow[] | TargetPortSpec[]) => ports.map((port) => ({ container_port: port.container_port, protocol: port.protocol }))
-            const stackChanged = editStackEnabled !== (detail?.stack_enabled ?? false) || JSON.stringify(normalizePorts(editStackTargetPorts)) !== JSON.stringify(detail?.stack_target_ports ?? []) || editStackPodSpec !== loadedStackPodSpec
+            const stackChanged = editStackEnabled !== (detail?.vm_enabled ?? false) || editStackPodSpec !== loadedStackPodSpec
 
             if (!stackChanged) {
                 setEditingField(null)
                 return
             }
 
-            payload.stack_enabled = editStackEnabled
+            payload.vm_enabled = editStackEnabled
 
             if (editStackEnabled) {
                 if (!editStackPodSpec.trim()) {
-                    setManageFieldErrors({ stack_pod_spec: t('errors.required') })
+                    setManageFieldErrors({ vm_spec: t('errors.required') })
                     return
                 }
-                payload.stack_target_ports = editStackTargetPorts.map(({ container_port, protocol }) => ({
-                    container_port,
-                    protocol,
-                }))
-                payload.stack_pod_spec = editStackPodSpec
+                payload.vm_spec = editStackPodSpec
             }
         }
 
@@ -340,9 +322,8 @@ const ChallengeManagement = () => {
             setEditIsActive(updated.is_active)
             setEditPreviousChallengeId(updated.previous_challenge_id ?? '')
             setLoadedPreviousChallengeId(updated.previous_challenge_id ?? null)
-            setEditStackEnabled(updated.stack_enabled)
-            setEditStackTargetPorts(updated.stack_target_ports && updated.stack_target_ports.length > 0 ? updated.stack_target_ports.map((port) => newPortRow(port)) : [newPortRow()])
-            if (!updated.stack_enabled) {
+            setEditStackEnabled(updated.vm_enabled)
+            if (!updated.vm_enabled) {
                 setEditStackPodSpec('')
                 setLoadedStackPodSpec('')
             } else {
@@ -1051,7 +1032,7 @@ const ChallengeManagement = () => {
                                                     </div>
                                                     <div className='rounded-2xl border border-border bg-surface/60 p-4'>
                                                         <div className='flex items-center justify-between gap-4'>
-                                                            <p className='text-xs uppercase tracking-wide text-text-subtle'>{t('admin.create.provideStack')}</p>
+                                                            <p className='text-xs uppercase tracking-wide text-text-subtle'>{t('admin.create.provideVM')}</p>
                                                             {editingField !== 'stack' ? (
                                                                 <button
                                                                     className='text-xs text-accent hover:underline cursor-pointer disabled:opacity-60'
@@ -1078,88 +1059,13 @@ const ChallengeManagement = () => {
                                                                 {editStackEnabled ? (
                                                                     <div className='grid gap-4'>
                                                                         <div>
-                                                                            <div className='flex flex-wrap items-center justify-between gap-2'>
-                                                                                <label className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.create.targetPorts')}</label>
-                                                                                <button
-                                                                                    className='text-xs text-accent hover:underline disabled:opacity-60 cursor-pointer'
-                                                                                    type='button'
-                                                                                    onClick={() => setEditStackTargetPorts((prev) => (prev.length >= 24 ? prev : [...prev, newPortRow()]))}
-                                                                                    disabled={manageLoading || editStackTargetPorts.length >= 24}
-                                                                                >
-                                                                                    {t('common.add')}
-                                                                                </button>
-                                                                            </div>
-                                                                            <div className='mt-3 grid gap-3'>
-                                                                                {editStackTargetPorts.map((port, index) => (
-                                                                                    <div key={port.id} className='grid gap-3 sm:grid-cols-[1fr_120px_auto] items-center'>
-                                                                                        <input
-                                                                                            className='w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text focus:border-accent focus:outline-none'
-                                                                                            type='number'
-                                                                                            min={1}
-                                                                                            max={65535}
-                                                                                            value={port.container_port}
-                                                                                            onChange={(event) => {
-                                                                                                const value = Number(event.target.value)
-                                                                                                setEditStackTargetPorts((prev) =>
-                                                                                                    prev.map((item, idx) =>
-                                                                                                        idx === index
-                                                                                                            ? {
-                                                                                                                  ...item,
-                                                                                                                  container_port: value,
-                                                                                                              }
-                                                                                                            : item,
-                                                                                                    ),
-                                                                                                )
-                                                                                            }}
-                                                                                            disabled={manageLoading}
-                                                                                        />
-                                                                                        <select
-                                                                                            className='w-full min-w-22.5 rounded-xl border border-border bg-surface px-3 py-3 text-sm text-text focus:border-accent focus:outline-none'
-                                                                                            value={port.protocol}
-                                                                                            onChange={(event) => {
-                                                                                                const value = event.target.value as TargetPortSpec['protocol']
-                                                                                                setEditStackTargetPorts((prev) =>
-                                                                                                    prev.map((item, idx) =>
-                                                                                                        idx === index
-                                                                                                            ? {
-                                                                                                                  ...item,
-                                                                                                                  protocol: value,
-                                                                                                              }
-                                                                                                            : item,
-                                                                                                    ),
-                                                                                                )
-                                                                                            }}
-                                                                                            disabled={manageLoading}
-                                                                                        >
-                                                                                            <option value='TCP'>TCP</option>
-                                                                                            <option value='UDP'>UDP</option>
-                                                                                        </select>
-                                                                                        <button
-                                                                                            className='min-w-18 rounded-lg border border-border px-3 py-2 text-xs text-text transition hover:border-border disabled:opacity-60 cursor-pointer'
-                                                                                            type='button'
-                                                                                            onClick={() => setEditStackTargetPorts((prev) => prev.filter((_, idx) => idx !== index))}
-                                                                                            disabled={manageLoading || editStackTargetPorts.length <= 1}
-                                                                                        >
-                                                                                            {t('common.remove')}
-                                                                                        </button>
-                                                                                    </div>
-                                                                                ))}
-                                                                            </div>
-                                                                            {manageFieldErrors.stack_target_ports ? (
-                                                                                <p className='mt-2 text-xs text-danger'>
-                                                                                    {t('admin.create.targetPorts')}: {manageFieldErrors.stack_target_ports}
-                                                                                </p>
-                                                                            ) : null}
-                                                                            {editStackTargetPorts.length >= 24 ? <p className='mt-2 text-xs text-text-muted'>{t('admin.create.maxPorts')}</p> : null}
-                                                                        </div>
-                                                                        <div>
-                                                                            <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.create.podSpec')}</p>
+                                                                            <p className='text-xs uppercase tracking-wide text-text-muted'>{t('admin.create.vmSpec')}</p>
                                                                             <div className='mt-2 w-full rounded-xl border border-border bg-surface py-4 text-sm text-text focus-within:border-accent'>
                                                                                 <MonacoEditor language='yaml' value={editStackPodSpec} onChange={(value) => setEditStackPodSpec(value)} readonly={manageLoading} />
                                                                             </div>
-                                                                            {manageFieldErrors.stack_pod_spec ? (
+                                                                            {manageFieldErrors.vm_spec ? (
                                                                                 <p className='mt-2 text-xs text-danger'>
-                                                                                    {t('admin.create.podSpec')}: {manageFieldErrors.stack_pod_spec}
+                                                                                    {t('admin.create.vmSpec')}: {manageFieldErrors.vm_spec}
                                                                                 </p>
                                                                             ) : null}
                                                                         </div>
@@ -1190,11 +1096,7 @@ const ChallengeManagement = () => {
                                                                 {editStackEnabled ? (
                                                                     <>
                                                                         <p>
-                                                                            {t('admin.create.targetPorts')}:{' '}
-                                                                            {editStackTargetPorts.length > 0 ? editStackTargetPorts.map((port) => `${port.container_port}/${port.protocol}`).join(', ') : t('common.pending')}
-                                                                        </p>
-                                                                        <p>
-                                                                            {t('admin.create.podSpec')}: {loadedStackPodSpec ? t('admin.manage.podSpecConfigured') : t('admin.manage.podSpecMissing')}
+                                                                            {t('admin.create.vmSpec')}: {loadedStackPodSpec ? t('admin.manage.podSpecConfigured') : t('admin.manage.podSpecMissing')}
                                                                         </p>
                                                                     </>
                                                                 ) : null}

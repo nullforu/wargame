@@ -162,7 +162,7 @@ const Header = ({ user }: HeaderProps) => {
                         <div className='relative' ref={localeMenuRef}>
                             <button
                                 type='button'
-                                className='inline-flex min-w-28 items-center justify-between gap-2 rounded-md px-3 py-1.5 text-xs text-text transition hover:bg-surface-muted'
+                                className='inline-flex items-center justify-between gap-2 rounded-md px-3 py-1.5 text-xs text-text transition hover:bg-surface-muted'
                                 onClick={() => {
                                     setIsLocaleMenuOpen((prev) => !prev)
                                     setIsProfileMenuOpen(false)
@@ -203,50 +203,72 @@ const Header = ({ user }: HeaderProps) => {
                         </div>
 
                         {user ? (
-                            <div className='relative' ref={profileMenuRef}>
-                                <button
-                                    type='button'
-                                    className='inline-flex min-w-30 items-center justify-between gap-2.75 rounded-md px-3 py-1.5 text-xs text-text transition hover:bg-surface-muted'
-                                    onClick={() => {
-                                        setIsProfileMenuOpen((prev) => !prev)
-                                        setIsLocaleMenuOpen(false)
-                                    }}
-                                    aria-haspopup='menu'
-                                    aria-expanded={isProfileMenuOpen}
-                                >
-                                    <span className='inline-flex items-center gap-2.75'>
-                                        <UserAvatar username={user.username} profileImage={user.profile_image} size='sm' />
-                                        {user.username}
-                                    </span>
-                                    <svg className={`h-3 w-3 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-                                        <path d='m6 9 6 6 6-6' />
-                                    </svg>
-                                </button>
-
-                                {isProfileMenuOpen ? (
-                                    <div className='absolute right-0 top-full z-20 mt-1 min-w-36 rounded-md border border-border bg-surface p-1 shadow-lg'>
-                                        <button
-                                            type='button'
-                                            className='block w-full rounded px-2 py-1.5 text-left text-xs text-text-muted hover:bg-surface-muted hover:text-text'
-                                            onClick={() => {
-                                                navigate('/profile')
-                                                setIsProfileMenuOpen(false)
-                                            }}
-                                        >
-                                            {t('header.myProfile')}
-                                        </button>
-                                        <button
-                                            type='button'
-                                            className='block w-full rounded px-2 py-1.5 text-left text-xs bg-danger/10 text-danger hover:bg-danger/15 hover:text-danger-strong'
-                                            onClick={() => {
-                                                void logout(() => setIsProfileMenuOpen(false))
-                                            }}
-                                        >
-                                            {t('auth.logout')}
-                                        </button>
+                            <>
+                                <div className='flex items-center gap-2 px-2'>
+                                    <div className='flex h-7 w-7 items-center justify-center rounded-md bg-accent/10 text-accent'>
+                                        <svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+                                            <rect x='3' y='3' width='7' height='7' rx='1'></rect>
+                                            <rect x='14' y='3' width='7' height='7' rx='1'></rect>
+                                            <rect x='14' y='14' width='7' height='7' rx='1'></rect>
+                                            <rect x='3' y='14' width='7' height='7' rx='1'></rect>
+                                        </svg>
                                     </div>
-                                ) : null}
-                            </div>
+
+                                    <div className='flex flex-col leading-tight'>
+                                        <span className='text-[10px] font-medium uppercase tracking-wide text-text-subtle'>{t('header.vmUsage')}</span>
+
+                                        <span className='text-xs font-semibold text-text'>
+                                            {user.vm_count}
+                                            <span className='mx-1 text-text-subtle'>/</span>
+                                            {user.vm_limit}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className='relative' ref={profileMenuRef}>
+                                    <button
+                                        type='button'
+                                        className='inline-flex min-w-30 items-center justify-between gap-2.75 rounded-md px-3 py-1.5 text-xs text-text transition hover:bg-surface-muted'
+                                        onClick={() => {
+                                            setIsProfileMenuOpen((prev) => !prev)
+                                            setIsLocaleMenuOpen(false)
+                                        }}
+                                        aria-haspopup='menu'
+                                        aria-expanded={isProfileMenuOpen}
+                                    >
+                                        <span className='inline-flex items-center gap-2.75'>
+                                            <UserAvatar username={user.username} profileImage={user.profile_image} size='sm' />
+                                            {user.username}
+                                        </span>
+                                        <svg className={`h-3 w-3 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+                                            <path d='m6 9 6 6 6-6' />
+                                        </svg>
+                                    </button>
+
+                                    {isProfileMenuOpen ? (
+                                        <div className='absolute right-0 top-full z-20 mt-1 min-w-36 rounded-md border border-border bg-surface p-1 shadow-lg'>
+                                            <button
+                                                type='button'
+                                                className='block w-full rounded px-2 py-1.5 text-left text-xs text-text-muted hover:bg-surface-muted hover:text-text'
+                                                onClick={() => {
+                                                    navigate('/profile')
+                                                    setIsProfileMenuOpen(false)
+                                                }}
+                                            >
+                                                {t('header.myProfile')}
+                                            </button>
+                                            <button
+                                                type='button'
+                                                className='block w-full rounded px-2 py-1.5 text-left text-xs bg-danger/10 text-danger hover:bg-danger/15 hover:text-danger-strong'
+                                                onClick={() => {
+                                                    void logout(() => setIsProfileMenuOpen(false))
+                                                }}
+                                            >
+                                                {t('auth.logout')}
+                                            </button>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </>
                         ) : (
                             <>
                                 <a
@@ -326,14 +348,36 @@ const Header = ({ user }: HeaderProps) => {
                     </div>
                     <div className='mt-2 space-y-2'>
                         {user ? (
-                            <button
-                                className='w-full px-3 py-1.5 text-xs bg-danger/10 text-danger hover:bg-danger/15 hover:text-danger-strong'
-                                onClick={() => {
-                                    void logout(() => setMobileMenuOpen(false))
-                                }}
-                            >
-                                {t('auth.logout')}
-                            </button>
+                            <>
+                                <div className='flex items-center gap-2 my-4'>
+                                    <div className='flex h-8 w-8 items-center justify-center rounded-md bg-accent/10 text-accent'>
+                                        <svg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+                                            <rect x='3' y='3' width='7' height='7' rx='1'></rect>
+                                            <rect x='14' y='3' width='7' height='7' rx='1'></rect>
+                                            <rect x='14' y='14' width='7' height='7' rx='1'></rect>
+                                            <rect x='3' y='14' width='7' height='7' rx='1'></rect>
+                                        </svg>
+                                    </div>
+
+                                    <div className='flex flex-col leading-tight'>
+                                        <span className='text-[10px] font-medium uppercase tracking-wide text-text-subtle'>{t('header.vmUsage')}</span>
+
+                                        <span className='text-sm font-semibold text-text'>
+                                            {user.vm_count}
+                                            <span className='mx-1 text-text-subtle'>/</span>
+                                            {user.vm_limit}
+                                        </span>
+                                    </div>
+                                </div>
+                                <button
+                                    className='w-full px-3 py-1.5 text-xs bg-danger/10 text-danger hover:bg-danger/15 hover:text-danger-strong'
+                                    onClick={() => {
+                                        void logout(() => setMobileMenuOpen(false))
+                                    }}
+                                >
+                                    {t('auth.logout')}
+                                </button>
+                            </>
                         ) : (
                             <a
                                 href='/login'
