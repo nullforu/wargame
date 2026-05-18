@@ -919,7 +919,9 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                         {!challenge.is_locked ? (
                             <WriteupsSection
                                 challengeId={challengeId}
-                                challengeSolved={challenge.is_solved || isChallengeAuthor}
+                                challengeSolved={challenge.is_solved}
+                                canCreateWriteup={challenge.is_solved || isChallengeAuthor}
+                                isChallengeAuthor={isChallengeAuthor}
                                 hasMyWriteup={hasMyWriteup}
                                 writeups={writeups}
                                 writeupLoading={writeupLoading}

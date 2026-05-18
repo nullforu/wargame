@@ -460,6 +460,7 @@
     "writeup.deleting": "削除中...",
     "writeup.hiddenUntilSolved": "この問題を解くとWriteup本文を閲覧できます。作成者と時刻情報は表示されます。",
     "writeup.hint": "この問題を解いた後、Writeupを作成してみましょう。あなたのアプローチや解法を共有して、他の人の学習を助けましょう!",
+    "writeup.authorHint": "作問者は解答済みでなくてもこの問題のWriteupを作成でき、すべてのWriteupを閲覧できます。",
     "writeup.metaOnlyHint": "一覧では作成者と時刻のみ表示します。本文は権限がある場合に詳細ページで確認できます。",
     "writeup.alreadyExists": "この問題にはすでに自分のWriteupがあります。",
     "writeup.empty": "まだWriteupがありません。",

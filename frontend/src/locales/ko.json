@@ -448,6 +448,7 @@
     "writeup.deleting": "삭제 중...",
     "writeup.hiddenUntilSolved": "이 문제를 해결해야 Writeup 본문을 볼 수 있습니다. 작성자와 시각 정보는 표시됩니다.",
     "writeup.hint": "문제를 해결한 후 Writeup을 작성할 수 있습니다. 풀이 과정과 해결 방법을 공유해보세요!",
+    "writeup.authorHint": "출제자는 풀이 없이도 이 문제의 Writeup을 작성하고 모든 Writeup을 볼 수 있습니다.",
     "writeup.metaOnlyHint": "Writeup 목록에서는 작성자와 시각 정보만 표시됩니다. 본문은 상세 페이지에서 권한에 따라 확인할 수 있습니다.",
     "writeup.alreadyExists": "이 문제에는 이미 내 Writeup이 있습니다.",
     "writeup.empty": "아직 작성된 Writeup이 없습니다.",
