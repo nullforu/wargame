@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatApiError } from '../lib/utils'
-import type { Challenge, PaginationMeta, UserRankingEntry } from '../lib/types'
+import type { Challenge, ChallengeSeries, PaginationMeta, UserRankingEntry } from '../lib/types'
 import { getCategoryKey, useT } from '../lib/i18n'
 import { useApi } from '../lib/useApi'
 import { CHALLENGE_CATEGORIES } from '../lib/constants'
@@ -100,8 +100,8 @@ const LevelDistributionChart = ({ counts, hoveredLevel, setHoveredLevel }: { cou
 
     const width = 420
     const height = 220
-    const chartLeft = 14
-    const chartRight = 14
+    const chartLeft = 0
+    const chartRight = 0
     const chartTop = 16
     const chartBottom = 44
     const chartWidth = width - chartLeft - chartRight
@@ -112,8 +112,8 @@ const LevelDistributionChart = ({ counts, hoveredLevel, setHoveredLevel }: { cou
     const scaleY = (value: number) => (value / maxCount) * chartHeight
 
     return (
-        <div className='mt-2 w-full overflow-x-auto'>
-            <svg viewBox={`0 0 ${width} ${height}`} className='h-auto w-full min-w-105 overflow-visible'>
+        <div className='mt-2 w-full min-w-0 overflow-hidden'>
+            <svg viewBox={`0 0 ${width} ${height}`} className='h-auto w-full max-w-full overflow-visible'>
                 <line x1={chartLeft} y1={chartTop + chartHeight} x2={chartLeft + chartWidth} y2={chartTop + chartHeight} stroke='rgb(var(--color-border) / 0.7)' strokeWidth='1' />
                 {rows.map((row, index) => {
                     const centerX = chartLeft + slotWidth * index + slotWidth / 2
@@ -268,6 +268,12 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
     const [sortFilter, setSortFilter] = useState<SortFilter>(initialQueryState.sort)
 
     const [topUsers, setTopUsers] = useState<UserRankingEntry[]>([])
+    const [featuredSeries, setFeaturedSeries] = useState<(ChallengeSeries | null)[]>([null, null, null, null])
+    const featuredSeriesCardBackgrounds = [
+        'bg-amber-50 dark:bg-amber-400/10 border border-amber-300 dark:border-amber-500/20', 
+        'bg-violet-50 dark:bg-violet-400/10 border border-violet-200 dark:border-violet-300/20', 
+        'bg-sky-50 dark:bg-sky-400/10 border border-sky-200 dark:border-sky-500/20', 
+        'bg-emerald-50 dark:bg-emerald-400/10 border border-emerald-200 dark:border-emerald-500/20']
     const [categoryCounts, setCategoryCounts] = useState<{ category: string; count: number }[]>([])
     const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
     const [levelCounts, setLevelCounts] = useState<{ level: number; count: number }[]>([])
@@ -327,9 +333,26 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
         }
     }
 
+    const loadFeaturedSeries = async () => {
+        try {
+            const data = await api.challengeSeries(1, 4, { sort: 'oldest' })
+            const slots: (ChallengeSeries | null)[] = [null, null, null, null]
+            data.series.slice(0, 4).forEach((item, index) => {
+                slots[index] = item
+            })
+            setFeaturedSeries(slots)
+        } catch {
+            setFeaturedSeries([null, null, null, null])
+        }
+    }
+
     useEffect(() => {
         void Promise.all([loadChallenges(page), loadTopUsers()])
     }, [page, appliedSearch, categoryFilter, levelFilter, solveFilter, sortFilter])
+
+    useEffect(() => {
+        void loadFeaturedSeries()
+    }, [])
 
     useEffect(() => {
         const onPopState = () => {
@@ -396,10 +419,36 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
 
     return (
         <section className='animate space-y-4'>
-            <div className='grid gap-4 lg:grid-cols-[1.9fr_0.9fr]'>
+            <div className='grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,400px)]'>
                 <div className='space-y-3'>
-                    <div className='space-y-2 shadow-none md:p-3'>
-                        <div className='flex items-center gap-2 mb-4'>
+                    <div className='space-y-2 shadow-none md:px-3 md:pb-3'>
+                        <div className='space-y-2 mb-4'>
+                            <div className='grid grid-cols-2 gap-3 lg:grid-cols-4'>
+                                {featuredSeries.map((series, index) =>
+                                    series ? (
+                                        <button
+                                            key={series.id}
+                                            type='button'
+                                            onClick={() => navigate(`/series/${series.id}`)}
+                                            className={`${featuredSeriesCardBackgrounds[index % featuredSeriesCardBackgrounds.length]} group min-w-0 min-h-35 px-4 py-3 text-left transition duration-200 hover:shadow-sm rounded-lg`}
+                                        >
+                                            <img src='/seedling.svg' alt='' className='h-5 w-5 mb-2 opacity-60' />
+                                            <h3 className='text-sm font-semibold text-text break-keep'>{series.title}</h3>
+                                            <p className='mt-2 line-clamp-3 text-xs leading-relaxed text-text-muted'>{series.description}</p>
+                                        </button>
+                                    ) : (
+                                        <div key={`empty-series-slot-${index}`} className={`${featuredSeriesCardBackgrounds[index % featuredSeriesCardBackgrounds.length]} min-h-35 px-4 py-3 rounded-lg`} />
+                                    ),
+                                )}
+                            </div>
+
+                            <div className='flex justify-end mt-4'>
+                                <button type='button' className='text-xs opacity-70 transition hover:opacity-80' onClick={() => navigate('/series')}>
+                                    {t('challengeSeries.sidebarLink')}
+                                </button>
+                            </div>
+                        </div>
+                        <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-center'>
                             <div className='relative flex-1'>
                                 <span className='pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle dark:text-text-subtle'>⌕</span>
                                 <input
@@ -421,7 +470,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                             </div>
                             <button
                                 type='button'
-                                className='rounded-md border border-border/70 bg-surface-muted px-3 py-1 text-xs text-text transition hover:bg-surface-subtle dark:border-border/70 dark:text-text dark:hover:bg-surface-muted h-10'
+                                className='h-10 w-full rounded-md border border-border/70 bg-surface-muted px-3 py-1 text-xs text-text transition hover:bg-surface-subtle sm:w-auto dark:border-border/70 dark:text-text dark:hover:bg-surface-muted'
                                 onClick={() => {
                                     const nextQ = searchQuery.trim()
                                     setAppliedSearch(nextQ)
@@ -432,7 +481,6 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                                 {t('common.search')}
                             </button>
                         </div>
-                        {/* category counts moved to right sidebar */}
                         <div className='flex flex-wrap items-center gap-2'>
                             <span className='w-14 text-xs text-text-muted dark:text-text-muted'>{t('challenges.filterCategory')}</span>
                             <button
@@ -810,16 +858,8 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                     </div>
                 </div>
 
-                <aside className='space-y-3'>
-                    <div className='rounded-none bg-transparent p-0 shadow-none md:rounded-xl md:bg-surface-muted md:p-4 md:shadow-sm dark:bg-surface'>
-                        <p className='text-sm font-semibold text-text dark:text-text'>{t('challenges.sidebarIdeaTitle')}</p>
-                        <p className='mt-1 text-sm text-text-muted dark:text-text-muted'>{t('challenges.sidebarIdeaBody')}</p>
-                        <button type='button' className='mt-3 rounded-md text-xs text-accent'>
-                            {t('challenges.sidebarIdeaCta')}
-                        </button>
-                    </div>
-
-                    <div className='rounded-none bg-transparent p-0 shadow-none md:rounded-xl md:bg-surface md:p-4 md:shadow-sm dark:bg-surface'>
+                <aside className='min-w-0 space-y-3 lg:w-full'>
+                    <div className='min-w-0 rounded-lg bg-transparent p-4 shadow-none md:bg-surface md:shadow-sm dark:bg-surface'>
                         <p className='text-xl leading-none text-text dark:text-text'>
                             {t('challenges.sidebarTopUsersLine1Prefix')} <span className='text-accent'>{topUsers.length}</span> {t('challenges.sidebarTopUsersLine1Suffix')} {t('challenges.sidebarTopUsersLine2')}
                         </p>
@@ -863,7 +903,7 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
                     {displayCategoryCounts.length > 0 ? (
                         <div className='p-0 md:p-4'>
                             <p className='text-xl leading-none text-text dark:text-text'>{t('challenges.sidebarByCategory')}</p>
-                            <div className='mt-4 flex flex-col gap-2 lg:flex-col xl:grid xl:grid-cols-[130px_minmax(0,1fr)] xl:items-center xl:gap-3'>
+                            <div className='mt-4 flex min-w-0 flex-col gap-3'>
                                 <div className='flex items-center justify-center'>
                                     <CategoryDistributionChart counts={categoryCounts} hoveredCategory={hoveredCategory} setHoveredCategory={setHoveredCategory} />
                                 </div>

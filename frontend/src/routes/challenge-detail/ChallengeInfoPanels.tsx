@@ -75,9 +75,9 @@ const ChallengeInfoPanels = ({
             <section className='space-y-3 px-1'>
                 <h2 className='text-xl font-semibold text-text'>{t('challenges.tableAuthor')}</h2>
 
-                <div className='rounded-2xl bg-surface/70'>
+                <div>
                     {creatorName ? (
-                        <div className='flex items-start justify-between gap-4 py-2'>
+                        <div className='flex items-start justify-between gap-4 p-2'>
                             <div className='min-w-0 flex flex-1 items-center gap-3.75'>
                                 <UserAvatar username={creatorName} profileImage={challenge.created_by?.profile_image ?? null} size='md' />
                                 <div className='min-w-0'>
@@ -94,7 +94,7 @@ const ChallengeInfoPanels = ({
                             </div>
                         </div>
                     ) : (
-                        <div className='flex items-start justify-between gap-4 py-2'>
+                        <div className='flex items-start justify-between gap-4 p-2'>
                             <div className='min-w-0 flex-1'>
                                 <p className='text-lg font-semibold text-text'>{t('common.na')}</p>
                                 <p className='mt-1 text-sm text-text-subtle'></p>
@@ -120,8 +120,8 @@ const ChallengeInfoPanels = ({
                         {t('leaderboard.firstBlood')}
                     </h2>
 
-                    <div className='rounded-2xl bg-surface/70'>
-                        <div className='flex items-start justify-between gap-4 py-2'>
+                    <div>
+                        <div className='flex items-start justify-between gap-4 p-2'>
                             <div className='min-w-0 flex flex-1 items-center gap-3.75'>
                                 <UserAvatar username={firstBloodSolver.username} profileImage={firstBloodSolver.profile_image ?? null} size='md' />
                                 <div className='min-w-0'>
@@ -148,7 +148,7 @@ const ChallengeInfoPanels = ({
                         <p className='text-sm text-text-muted'>{t('challenge.noSolversYet')}</p>
                     ) : (
                         solvers.map((solver, index) => (
-                            <div key={`${solver.user_id}-${index}`} className='flex items-start justify-between gap-4 py-2'>
+                            <div key={`${solver.user_id}-${index}`} className='flex items-start justify-between gap-4 p-2'>
                                 <div className='min-w-0 flex flex-1 items-center gap-3.75'>
                                     <UserAvatar username={solver.username} profileImage={solver.profile_image ?? null} size='md' />
                                     <div className='min-w-0'>

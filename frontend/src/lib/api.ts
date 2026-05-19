@@ -11,6 +11,10 @@ import type {
     ProfileImageUploadResponse,
     ChallengeMyVoteResponse,
     ChallengeVotesResponse,
+    ChallengeSeriesListResponse,
+    ChallengeSeriesDetailResponse,
+    ChallengeSeriesCreatePayload,
+    ChallengeSeriesUpdatePayload,
     ChallengeWriteupsResponse,
     ChallengeCommentPageResponse,
     ChallengeCommentItem,
@@ -365,6 +369,49 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
             } as ChallengesResponse
         },
         challenge: (id: number) => request<Challenge>(`/api/challenges/${id}`, { auth: true }),
+        challengeSeries: async (page?: number, pageSize?: number, options?: { sort?: 'latest' | 'oldest' }) => {
+            const params = new URLSearchParams()
+            if (typeof page === 'number') params.set('page', String(page))
+            if (typeof pageSize === 'number') params.set('page_size', String(pageSize))
+            if (options?.sort) params.set('sort', options.sort)
+            const query = params.toString()
+            const path = query ? `/api/challenge-series?${query}` : `/api/challenge-series`
+            const data = await request<Partial<ChallengeSeriesListResponse>>(path, { auth: true })
+            return {
+                series: Array.isArray(data?.series) ? data.series : [],
+                pagination: normalizePagination(data?.pagination),
+            } as ChallengeSeriesListResponse
+        },
+        challengeSeriesDetail: async (id: number) => {
+            const data = await request<Partial<ChallengeSeriesDetailResponse>>(`/api/challenge-series/${id}`, { auth: true })
+            return {
+                series: data?.series as ChallengeSeriesDetailResponse['series'],
+                challenges: Array.isArray(data?.challenges) ? data.challenges : [],
+            } as ChallengeSeriesDetailResponse
+        },
+        createChallengeSeries: (payload: ChallengeSeriesCreatePayload) =>
+            request<ChallengeSeriesDetailResponse['series']>(`/api/admin/challenge-series`, {
+                method: 'POST',
+                body: payload,
+                auth: true,
+            }),
+        updateChallengeSeries: (id: number, payload: ChallengeSeriesUpdatePayload) =>
+            request<ChallengeSeriesDetailResponse['series']>(`/api/admin/challenge-series/${id}`, {
+                method: 'PUT',
+                body: payload,
+                auth: true,
+            }),
+        deleteChallengeSeries: (id: number) =>
+            request<{ status?: string }>(`/api/admin/challenge-series/${id}`, {
+                method: 'DELETE',
+                auth: true,
+            }),
+        replaceChallengeSeriesChallenges: (id: number, challengeIDs: number[]) =>
+            request<{ status?: string }>(`/api/admin/challenge-series/${id}/challenges`, {
+                method: 'PUT',
+                body: { challenge_ids: challengeIDs },
+                auth: true,
+            }),
         challengeSolvers: async (id: number, page?: number, pageSize?: number) => {
             const data = await request<Partial<ChallengeSolversResponse>>(withPagination(`/api/challenges/${id}/solvers`, page, pageSize))
             return {

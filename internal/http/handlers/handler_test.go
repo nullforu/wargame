@@ -158,6 +158,273 @@ func TestHandlerChallengeVotesValidation(t *testing.T) {
 	})
 }
 
+func TestHandlerListChallengeSeriesSort(t *testing.T) {
+	env := setupHandlerTest(t)
+	admin := createHandlerUser(t, env, "series-sort-admin@example.com", "series-sort-admin", "pass", models.AdminRole)
+
+	first, err := env.wargameSvc.CreateChallengeSeries(context.Background(), "Series First", "desc1", &admin.ID)
+	if err != nil {
+		t.Fatalf("CreateChallengeSeries first: %v", err)
+	}
+
+	second, err := env.wargameSvc.CreateChallengeSeries(context.Background(), "Series Second", "desc2", &admin.ID)
+	if err != nil {
+		t.Fatalf("CreateChallengeSeries second: %v", err)
+	}
+
+	t.Run("default latest", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenge-series?page=1&page_size=10", nil)
+		env.handler.ListChallengeSeries(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp challengeSeriesListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if len(resp.Series) < 2 {
+			t.Fatalf("expected at least 2 series, got %d", len(resp.Series))
+		}
+
+		if resp.Series[0].ID != second.ID || resp.Series[1].ID != first.ID {
+			t.Fatalf("expected latest order [%d, %d], got [%d, %d]", second.ID, first.ID, resp.Series[0].ID, resp.Series[1].ID)
+		}
+	})
+
+	t.Run("oldest sort", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenge-series?page=1&page_size=10&sort=oldest", nil)
+		env.handler.ListChallengeSeries(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp challengeSeriesListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if len(resp.Series) < 2 {
+			t.Fatalf("expected at least 2 series, got %d", len(resp.Series))
+		}
+
+		if resp.Series[0].ID != first.ID || resp.Series[1].ID != second.ID {
+			t.Fatalf("expected oldest order [%d, %d], got [%d, %d]", first.ID, second.ID, resp.Series[0].ID, resp.Series[1].ID)
+		}
+	})
+
+	t.Run("invalid sort", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenge-series?page=1&page_size=10&sort=random", nil)
+		env.handler.ListChallengeSeries(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+func TestHandlerChallengeSeriesCRUDAndDetailEndpoints(t *testing.T) {
+	env := setupHandlerTest(t)
+	admin := createHandlerUser(t, env, "series-admin@example.com", "series-admin", "pass", models.AdminRole)
+
+	base := createHandlerChallenge(t, env, "Series Base", 100, "FLAG{SB}", true)
+	locked := createHandlerChallenge(t, env, "Series Locked", 100, "FLAG{SL}", true)
+	locked.PreviousChallengeID = &base.ID
+	if err := env.challengeRepo.Update(context.Background(), locked); err != nil {
+		t.Fatalf("update locked challenge: %v", err)
+	}
+
+	var created challengeSeriesResponse
+	t.Run("create challenge series", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPost, "/api/admin/challenge-series", []byte(`{"title":"Handler Series","description":"handler-desc"}`))
+		ctx.Set("userID", admin.ID)
+		env.handler.CreateChallengeSeries(ctx)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if created.Title != "Handler Series" {
+			t.Fatalf("unexpected title: %+v", created)
+		}
+	})
+
+	t.Run("create challenge series invalid body", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPost, "/api/admin/challenge-series", []byte(`{"title":1}`))
+		ctx.Set("userID", admin.ID)
+		env.handler.CreateChallengeSeries(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("create challenge series duplicate title", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPost, "/api/admin/challenge-series", []byte(`{"title":"Handler Series","description":"dup"}`))
+		ctx.Set("userID", admin.ID)
+		env.handler.CreateChallengeSeries(ctx)
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("expected 409, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("replace series challenges invalid id", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPut, "/api/admin/challenge-series/bad/challenges", []byte(`{"challenge_ids":[1]}`))
+		ctx.Params = append(ctx.Params, ginParam("id", "bad"))
+		env.handler.ReplaceChallengeSeriesChallenges(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("replace series challenges invalid body", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPut, "/api/admin/challenge-series/"+toStringID(created.ID)+"/challenges", []byte(`{"challenge_ids":"bad"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(created.ID)))
+		env.handler.ReplaceChallengeSeriesChallenges(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("replace series challenges success", func(t *testing.T) {
+		body := []byte(`{"challenge_ids":[` + toStringID(locked.ID) + `,` + toStringID(base.ID) + `]}`)
+		ctx, rec := newJSONContext(t, http.MethodPut, "/api/admin/challenge-series/"+toStringID(created.ID)+"/challenges", body)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(created.ID)))
+		env.handler.ReplaceChallengeSeriesChallenges(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("replace series challenges not found", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPut, "/api/admin/challenge-series/999999/challenges", []byte(`{"challenge_ids":[1]}`))
+		ctx.Params = append(ctx.Params, ginParam("id", "999999"))
+		env.handler.ReplaceChallengeSeriesChallenges(ctx)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("get challenge series invalid id", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenge-series/bad", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "bad"))
+		env.handler.GetChallengeSeries(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("get challenge series success", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenge-series/"+toStringID(created.ID), nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(created.ID)))
+		env.handler.GetChallengeSeries(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp challengeSeriesDetailResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if resp.Series.ID != created.ID || len(resp.Challenges) != 2 {
+			t.Fatalf("unexpected series detail: %+v", resp)
+		}
+	})
+
+	t.Run("get challenge series not found", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenge-series/999999", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "999999"))
+		env.handler.GetChallengeSeries(ctx)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("update challenge series invalid id", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPut, "/api/admin/challenge-series/bad", []byte(`{"title":"x"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", "bad"))
+		env.handler.UpdateChallengeSeries(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("update challenge series invalid bind", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPut, "/api/admin/challenge-series/"+toStringID(created.ID), []byte(`{"title":1}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(created.ID)))
+		env.handler.UpdateChallengeSeries(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("update challenge series null title invalid", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPut, "/api/admin/challenge-series/"+toStringID(created.ID), []byte(`{"title":null}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(created.ID)))
+		env.handler.UpdateChallengeSeries(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("update challenge series success", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPut, "/api/admin/challenge-series/"+toStringID(created.ID), []byte(`{"title":"Handler Series Updated","description":"updated-desc"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(created.ID)))
+		env.handler.UpdateChallengeSeries(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp challengeSeriesResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if resp.Title != "Handler Series Updated" || resp.Description != "updated-desc" {
+			t.Fatalf("unexpected updated response: %+v", resp)
+		}
+	})
+
+	t.Run("update challenge series not found", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodPut, "/api/admin/challenge-series/999999", []byte(`{"title":"x"}`))
+		ctx.Params = append(ctx.Params, ginParam("id", "999999"))
+		env.handler.UpdateChallengeSeries(ctx)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("delete challenge series invalid id", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodDelete, "/api/admin/challenge-series/bad", nil)
+		ctx.Params = append(ctx.Params, ginParam("id", "bad"))
+		env.handler.DeleteChallengeSeries(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("delete challenge series success", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodDelete, "/api/admin/challenge-series/"+toStringID(created.ID), nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(created.ID)))
+		env.handler.DeleteChallengeSeries(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("delete challenge series not found", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodDelete, "/api/admin/challenge-series/"+toStringID(created.ID), nil)
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(created.ID)))
+		env.handler.DeleteChallengeSeries(ctx)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+}
+
 func TestHandlerChallengeMyVote(t *testing.T) {
 	env := setupHandlerTest(t)
 	user := createHandlerUser(t, env, "myvote-handler@example.com", "myvote-handler", "pass", models.UserRole)

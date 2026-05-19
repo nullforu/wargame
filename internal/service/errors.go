@@ -8,6 +8,8 @@ var (
 	ErrInvalidInput              = errors.New("invalid input")
 	ErrUserBlocked               = errors.New("user blocked")
 	ErrChallengeNotFound         = errors.New("challenge not found")
+	ErrChallengeSeriesNotFound   = errors.New("challenge series not found")
+	ErrChallengeSeriesExists     = errors.New("challenge series already exists")
 	ErrWriteupNotFound           = errors.New("writeup not found")
 	ErrWriteupExists             = errors.New("writeup already exists")
 	ErrWriteupForbidden          = errors.New("writeup access forbidden")

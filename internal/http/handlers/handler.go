@@ -560,6 +560,78 @@ func (h *Handler) SearchChallenges(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, challengesListResponse{Challenges: resp, Pagination: pagination, CategoryCounts: categoryCounts, LevelCounts: levelCounts})
 }
 
+func (h *Handler) ListChallengeSeries(ctx *gin.Context) {
+	page, pageSize, ok := parsePaginationParams(ctx)
+	if !ok {
+		return
+	}
+
+	sort := strings.TrimSpace(ctx.Query("sort"))
+	if sort != "" && sort != "latest" && sort != "oldest" {
+		ctx.JSON(http.StatusBadRequest, errorResponse{Error: service.ErrInvalidInput.Error(), Details: []service.FieldError{{Field: "sort", Reason: "invalid"}}})
+		return
+	}
+
+	rows, pagination, err := h.wargame.ListChallengeSeries(ctx.Request.Context(), page, pageSize, sort)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	resp := make([]challengeSeriesResponse, 0, len(rows))
+	for i := range rows {
+		resp = append(resp, newChallengeSeriesResponse(&rows[i]))
+	}
+
+	ctx.JSON(http.StatusOK, challengeSeriesListResponse{Series: resp, Pagination: pagination})
+}
+
+func (h *Handler) GetChallengeSeries(ctx *gin.Context) {
+	seriesID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	userID := h.optionalUserID(ctx)
+	solved := map[int64]struct{}{}
+	if userID > 0 {
+		var err error
+		solved, err = h.wargame.SolvedChallengeIDs(ctx.Request.Context(), userID)
+		if err != nil {
+			writeError(ctx, err)
+			return
+		}
+	}
+
+	detail, err := h.wargame.GetChallengeSeriesByIDWithSolved(ctx.Request.Context(), seriesID, userID, solved)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	byID := make(map[int64]*models.Challenge, len(detail.Challenges))
+	for i := range detail.Challenges {
+		byID[detail.Challenges[i].ID] = &detail.Challenges[i]
+	}
+
+	challenges := make([]any, 0, len(detail.Challenges))
+	for i := range detail.Challenges {
+		ch := detail.Challenges[i]
+		_, isSolved := solved[ch.ID]
+		if isChallengeLocked(ch, solved, userID) {
+			previous := h.previousChallengeForResponse(ctx.Request.Context(), byID, ch.PreviousChallengeID)
+			challenges = append(challenges, newLockedChallengeResponse(&ch, previous, isSolved, nil))
+			continue
+		}
+		challenges = append(challenges, newChallengeResponse(&ch, isSolved, nil))
+	}
+
+	ctx.JSON(http.StatusOK, challengeSeriesDetailResponse{
+		Series:     newChallengeSeriesResponse(detail.Series),
+		Challenges: challenges,
+	})
+}
+
 func (h *Handler) GetChallenge(ctx *gin.Context) {
 	challengeID, ok := parseIDParamOrError(ctx, "id")
 	if !ok {
@@ -1296,6 +1368,89 @@ func (h *Handler) DeleteChallenge(ctx *gin.Context) {
 	}
 
 	h.notifyScoreboardChanged(ctx.Request.Context(), "challenge_deleted")
+	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *Handler) CreateChallengeSeries(ctx *gin.Context) {
+	var req createChallengeSeriesRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	creatorID := middleware.UserID(ctx)
+	series, err := h.wargame.CreateChallengeSeries(ctx.Request.Context(), req.Title, req.Description, &creatorID)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, newChallengeSeriesResponse(series))
+}
+
+func (h *Handler) UpdateChallengeSeries(ctx *gin.Context) {
+	seriesID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req updateChallengeSeriesRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	title, err := requireNonNullOptionalString("title", req.Title)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+	description, err := requireNonNullOptionalString("description", req.Description)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	series, err := h.wargame.UpdateChallengeSeries(ctx.Request.Context(), seriesID, title, description)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newChallengeSeriesResponse(series))
+}
+
+func (h *Handler) DeleteChallengeSeries(ctx *gin.Context) {
+	seriesID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.wargame.DeleteChallengeSeries(ctx.Request.Context(), seriesID); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *Handler) ReplaceChallengeSeriesChallenges(ctx *gin.Context) {
+	seriesID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req replaceChallengeSeriesChallengesRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	if err := h.wargame.ReplaceChallengeSeriesChallenges(ctx.Request.Context(), seriesID, req.ChallengeIDs); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
 	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 

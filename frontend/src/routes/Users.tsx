@@ -86,7 +86,7 @@ const Users = ({ routeParams = {} }: RouteProps) => {
 
     return (
         <section className='animate space-y-4'>
-            <div className='space-y-2 bg-transparent shadow-none md:bg-surface dark:bg-surface'>
+            <div className='space-y-2'>
                 <h2 className='text-2xl font-semibold text-text dark:text-text'>{t('users.title')}</h2>
 
                 <div className='mt-1'>

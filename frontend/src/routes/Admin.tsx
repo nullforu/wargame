@@ -4,6 +4,7 @@ import ChallengeManagement from './admin/ChallengeManagement'
 import Users from './admin/Users'
 import Stacks from './admin/Stacks'
 import Affiliations from './admin/Affiliations'
+import ChallengeSeriesManagement from './admin/ChallengeSeriesManagement'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/auth'
 import DismissibleNotice from '../components/DismissibleNotice'
@@ -12,10 +13,10 @@ interface RouteProps {
     routeParams?: Record<string, string>
 }
 
-type AdminTabId = 'challenge_create' | 'challenge_management' | 'users' | 'vms' | 'affiliations'
+type AdminTabId = 'challenge_create' | 'challenge_management' | 'challenge_series' | 'users' | 'vms' | 'affiliations'
 const TAB_PARAM = 'tab'
 const ADMIN_NOTICE_DISMISSED_KEY = 'admin_notice_dismissed'
-const ADMIN_TAB_IDS: AdminTabId[] = ['challenge_create', 'challenge_management', 'users', 'vms', 'affiliations']
+const ADMIN_TAB_IDS: AdminTabId[] = ['challenge_create', 'challenge_management', 'challenge_series', 'users', 'vms', 'affiliations']
 
 const getTabFromUrl = (): AdminTabId | null => {
     const params = new URLSearchParams(window.location.search)
@@ -31,6 +32,7 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
         () => [
             { id: 'challenge_create', label: t('admin.tab.createChallenge') },
             { id: 'challenge_management', label: t('admin.tab.challengeManagement') },
+            { id: 'challenge_series', label: t('admin.tab.challengeSeries') },
             { id: 'users', label: t('admin.tab.users') },
             { id: 'vms', label: t('admin.tab.vms') },
             { id: 'affiliations', label: t('admin.tab.affiliations') },
@@ -100,6 +102,8 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
                                 <CreateChallenge />
                             ) : activeTab === 'challenge_management' ? (
                                 <ChallengeManagement />
+                            ) : activeTab === 'challenge_series' ? (
+                                <ChallengeSeriesManagement />
                             ) : activeTab === 'vms' ? (
                                 <Stacks />
                             ) : activeTab === 'users' ? (

@@ -254,6 +254,34 @@ export interface ChallengesResponse {
     level_counts?: { level: number; count: number }[]
 }
 
+export interface ChallengeSeries {
+    id: number
+    title: string
+    description: string
+    created_at: string
+    updated_at: string
+}
+
+export interface ChallengeSeriesListResponse {
+    series: ChallengeSeries[]
+    pagination: PaginationMeta
+}
+
+export interface ChallengeSeriesDetailResponse {
+    series: ChallengeSeries
+    challenges: Challenge[]
+}
+
+export interface ChallengeSeriesCreatePayload {
+    title: string
+    description: string
+}
+
+export interface ChallengeSeriesUpdatePayload {
+    title?: string
+    description?: string
+}
+
 export interface StacksResponse {
     stacks: Stack[]
 }

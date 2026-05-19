@@ -608,3 +608,90 @@ Errors:
 - 401 `invalid token` or `missing access_token cookie`
 - 403 `user blocked` or `comment access forbidden`
 - 404 `comment not found`
+
+---
+
+## List Challenge Series
+
+`GET /api/challenge-series`
+
+Query parameters:
+
+- `page` (optional, default `1`)
+- `page_size` (optional, default `20`, max `100`)
+- `sort` (optional, one of `latest`, `oldest`; default `latest`)
+
+Response 200
+
+```json
+{
+    "series": [
+        {
+            "id": 1,
+            "title": "Warmup Challenge Series",
+            "description": "Starter series",
+            "created_at": "2026-05-19T12:00:00Z",
+            "updated_at": "2026-05-19T12:00:00Z"
+        }
+    ],
+    "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total_count": 1,
+        "total_pages": 1,
+        "has_prev": false,
+        "has_next": false
+    }
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+
+---
+
+## Get Challenge Series Detail
+
+`GET /api/challenge-series/{id}`
+
+Response 200
+
+```json
+{
+    "series": {
+        "id": 1,
+        "title": "Warmup Challenge Series",
+        "description": "Starter series",
+        "created_at": "2026-05-19T12:00:00Z",
+        "updated_at": "2026-05-19T12:00:00Z"
+    },
+    "challenges": [
+        {
+            "id": 5,
+            "title": "Warmup 1",
+            "category": "Web",
+            "created_at": "2026-01-24T12:00:00Z",
+            "level": 0,
+            "points": 100,
+            "solve_count": 12,
+            "is_active": true,
+            "is_locked": false,
+            "is_solved": false,
+            "has_file": false,
+            "stack_enabled": false,
+            "stack_target_ports": []
+        }
+    ]
+}
+```
+
+Notes:
+
+- Series challenges are returned in admin-defined order.
+- If a challenge is progression-locked, it is returned in reduced form with `is_locked: true`.
+
+Errors:
+
+- 400 `invalid input`
+- 404 `challenge series not found`

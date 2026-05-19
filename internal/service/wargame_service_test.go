@@ -1300,3 +1300,223 @@ func TestChallengeCommentKoreanLengthLimit(t *testing.T) {
 		t.Fatalf("expected invalid input for 501 korean chars, got %v", err)
 	}
 }
+
+func TestWargameServiceChallengeSeriesLifecycle(t *testing.T) {
+	env := setupServiceTest(t)
+	admin := createUser(t, env, "svc-series-admin@example.com", "svcseriesadmin", "pass", models.AdminRole)
+	ch1 := createChallenge(t, env, "Svc Series One", 100, "FLAG{SS1}", true)
+	ch2 := createChallenge(t, env, "Svc Series Two", 100, "FLAG{SS2}", false)
+
+	series, err := env.wargameSvc.CreateChallengeSeries(context.Background(), "Service Series", "desc", &admin.ID)
+	if err != nil {
+		t.Fatalf("CreateChallengeSeries: %v", err)
+	}
+
+	if _, err := env.wargameSvc.CreateChallengeSeries(context.Background(), "Service Series", "dup", &admin.ID); !errors.Is(err, ErrChallengeSeriesExists) {
+		t.Fatalf("expected ErrChallengeSeriesExists, got %v", err)
+	}
+
+	second, err := env.wargameSvc.CreateChallengeSeries(context.Background(), "Service Series Two", "desc2", &admin.ID)
+	if err != nil {
+		t.Fatalf("CreateChallengeSeries second: %v", err)
+	}
+
+	if err := env.wargameSvc.ReplaceChallengeSeriesChallenges(context.Background(), series.ID, []int64{ch2.ID, ch1.ID}); err != nil {
+		t.Fatalf("ReplaceChallengeSeriesChallenges: %v", err)
+	}
+
+	listed, pagination, err := env.wargameSvc.ListChallengeSeries(context.Background(), 1, 20, "latest")
+	if err != nil {
+		t.Fatalf("ListChallengeSeries: %v", err)
+	}
+
+	if pagination.TotalCount != 2 || len(listed) != 2 {
+		t.Fatalf("unexpected list result: pagination=%+v listed=%+v", pagination, listed)
+	}
+
+	if listed[0].ID != second.ID {
+		t.Fatalf("expected latest sort to return newest first, got ids=%d then ...", listed[0].ID)
+	}
+
+	oldest, _, err := env.wargameSvc.ListChallengeSeries(context.Background(), 1, 20, "oldest")
+	if err != nil {
+		t.Fatalf("ListChallengeSeries oldest: %v", err)
+	}
+
+	if len(oldest) < 2 || oldest[0].ID != series.ID {
+		t.Fatalf("expected oldest sort to return oldest first, got %+v", oldest)
+	}
+
+	detail, err := env.wargameSvc.GetChallengeSeriesByID(context.Background(), series.ID, 0)
+	if err != nil {
+		t.Fatalf("GetChallengeSeriesByID: %v", err)
+	}
+
+	if len(detail.Challenges) != 2 || detail.Challenges[0].ID != ch2.ID || detail.Challenges[1].ID != ch1.ID {
+		t.Fatalf("unexpected ordered challenges: %+v", detail.Challenges)
+	}
+
+	if detail.Challenges[0].IsActive {
+		t.Fatalf("expected first challenge to remain inactive")
+	}
+
+	title := "Service Series Updated"
+	desc := "updated"
+	updated, err := env.wargameSvc.UpdateChallengeSeries(context.Background(), series.ID, &title, &desc)
+	if err != nil {
+		t.Fatalf("UpdateChallengeSeries: %v", err)
+	}
+
+	if updated.Title != title || updated.Description != desc {
+		t.Fatalf("unexpected updated series: %+v", updated)
+	}
+
+	if err := env.wargameSvc.DeleteChallengeSeries(context.Background(), series.ID); err != nil {
+		t.Fatalf("DeleteChallengeSeries: %v", err)
+	}
+
+	if err := env.wargameSvc.DeleteChallengeSeries(context.Background(), series.ID); !errors.Is(err, ErrChallengeSeriesNotFound) {
+		t.Fatalf("expected ErrChallengeSeriesNotFound, got %v", err)
+	}
+}
+
+func TestWargameServiceChallengeSeriesValidationAndNotFound(t *testing.T) {
+	env := setupServiceTest(t)
+
+	if _, err := env.wargameSvc.CreateChallengeSeries(context.Background(), "", "desc", nil); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for empty title, got %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.ListChallengeSeries(context.Background(), 1, 20, "bad-sort"); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for bad sort, got %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.ListChallengeSeries(context.Background(), -1, 20, "latest"); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for negative page, got %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.ListChallengeSeries(context.Background(), 1, -1, "latest"); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for negative page size, got %v", err)
+	}
+
+	if _, err := env.wargameSvc.CreateChallengeSeries(context.Background(), "Title", "", nil); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for empty description, got %v", err)
+	}
+
+	if _, err := env.wargameSvc.GetChallengeSeriesByID(context.Background(), 99999, 0); !errors.Is(err, ErrChallengeSeriesNotFound) {
+		t.Fatalf("expected ErrChallengeSeriesNotFound, got %v", err)
+	}
+
+	if _, err := env.wargameSvc.UpdateChallengeSeries(context.Background(), 99999, ptrString("x"), nil); !errors.Is(err, ErrChallengeSeriesNotFound) {
+		t.Fatalf("expected ErrChallengeSeriesNotFound update, got %v", err)
+	}
+
+	if err := env.wargameSvc.ReplaceChallengeSeriesChallenges(context.Background(), 99999, []int64{}); !errors.Is(err, ErrChallengeSeriesNotFound) {
+		t.Fatalf("expected ErrChallengeSeriesNotFound replace, got %v", err)
+	}
+
+	series, err := env.wargameSvc.CreateChallengeSeries(context.Background(), "Existing Series", "desc", nil)
+	if err != nil {
+		t.Fatalf("create series: %v", err)
+	}
+
+	if err := env.wargameSvc.ReplaceChallengeSeriesChallenges(context.Background(), series.ID, []int64{1, 1}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input duplicate challenge ids, got %v", err)
+	}
+
+	if err := env.wargameSvc.ReplaceChallengeSeriesChallenges(context.Background(), series.ID, []int64{999999}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input missing challenge id, got %v", err)
+	}
+
+	defaultSorted, _, err := env.wargameSvc.ListChallengeSeries(context.Background(), 1, 20, "")
+	if err != nil {
+		t.Fatalf("expected default latest sort with empty sort, got %v", err)
+	}
+
+	latestSorted, _, err := env.wargameSvc.ListChallengeSeries(context.Background(), 1, 20, "latest")
+	if err != nil {
+		t.Fatalf("expected latest sort, got %v", err)
+	}
+
+	if len(defaultSorted) != len(latestSorted) {
+		t.Fatalf("expected same item count for default/latest, got %d vs %d", len(defaultSorted), len(latestSorted))
+	}
+
+	for i := range defaultSorted {
+		if defaultSorted[i].ID != latestSorted[i].ID {
+			t.Fatalf("expected default sort order to match latest at index %d: %d != %d", i, defaultSorted[i].ID, latestSorted[i].ID)
+		}
+	}
+}
+
+func TestWargameServiceChallengeSeriesLockedWithUserContext(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "svc-series-user@example.com", "svcseriesuser", "pass", models.UserRole)
+
+	base := createChallenge(t, env, "Series Unlock Base", 100, "FLAG{SUB}", true)
+	locked := createChallenge(t, env, "Series Locked Child", 100, "FLAG{SUB2}", true)
+	locked.PreviousChallengeID = &base.ID
+	if err := env.challengeRepo.Update(context.Background(), locked); err != nil {
+		t.Fatalf("update locked challenge: %v", err)
+	}
+
+	series, err := env.wargameSvc.CreateChallengeSeries(context.Background(), "Series Lock Test", "desc", nil)
+	if err != nil {
+		t.Fatalf("CreateChallengeSeries: %v", err)
+	}
+
+	if err := env.wargameSvc.ReplaceChallengeSeriesChallenges(context.Background(), series.ID, []int64{locked.ID}); err != nil {
+		t.Fatalf("ReplaceChallengeSeriesChallenges: %v", err)
+	}
+
+	detail, err := env.wargameSvc.GetChallengeSeriesByID(context.Background(), series.ID, user.ID)
+	if err != nil {
+		t.Fatalf("GetChallengeSeriesByID before solve: %v", err)
+	}
+
+	if len(detail.Challenges) != 1 || detail.Challenges[0].Description != "" {
+		t.Fatalf("expected locked challenge description redacted, got %+v", detail.Challenges)
+	}
+
+	if _, err := env.wargameSvc.SubmitFlag(context.Background(), user.ID, base.ID, "FLAG{SUB}"); err != nil {
+		t.Fatalf("SubmitFlag base: %v", err)
+	}
+
+	detail, err = env.wargameSvc.GetChallengeSeriesByID(context.Background(), series.ID, user.ID)
+	if err != nil {
+		t.Fatalf("GetChallengeSeriesByID after solve: %v", err)
+	}
+
+	if len(detail.Challenges) != 1 || detail.Challenges[0].Description == "" {
+		t.Fatalf("expected unlocked challenge description, got %+v", detail.Challenges)
+	}
+}
+
+func TestWargameServiceChallengeSeriesRepoNil(t *testing.T) {
+	env := setupServiceTest(t)
+	svc := NewWargameService(env.cfg, env.challengeRepo, env.submissionRepo, repo.NewChallengeVoteRepo(env.db), repo.NewWriteupRepo(env.db), repo.NewChallengeCommentRepo(env.db), repo.NewCommunityRepo(env.db), env.redis, storage.NewMemoryChallengeFileStore(time.Minute))
+
+	if _, _, err := svc.ListChallengeSeries(context.Background(), 1, 20, "latest"); err == nil {
+		t.Fatalf("expected error when challengeSeriesRepo is nil")
+	}
+
+	if _, err := svc.GetChallengeSeriesByID(context.Background(), 1, 0); err == nil {
+		t.Fatalf("expected error when challengeSeriesRepo is nil")
+	}
+
+	if _, err := svc.CreateChallengeSeries(context.Background(), "x", "y", nil); err == nil {
+		t.Fatalf("expected error when challengeSeriesRepo is nil")
+	}
+
+	if _, err := svc.UpdateChallengeSeries(context.Background(), 1, ptrString("x"), nil); err == nil {
+		t.Fatalf("expected error when challengeSeriesRepo is nil")
+	}
+
+	if err := svc.DeleteChallengeSeries(context.Background(), 1); err == nil {
+		t.Fatalf("expected error when challengeSeriesRepo is nil")
+	}
+
+	if err := svc.ReplaceChallengeSeriesChallenges(context.Background(), 1, []int64{}); err == nil {
+		t.Fatalf("expected error when challengeSeriesRepo is nil")
+	}
+}

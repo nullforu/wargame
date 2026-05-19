@@ -227,8 +227,8 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
                     <section className='space-y-3 px-1 lg:hidden'>
                         <h2 className='text-xl font-semibold text-text'>{t('community.authorTitle')}</h2>
 
-                        <div className='rounded-2xl bg-surface/70'>
-                            <div className='flex items-start justify-between gap-4 py-2'>
+                        <div>
+                            <div className='flex items-start justify-between gap-4 p-2'>
                                 <div className='min-w-0 flex flex-1 items-center gap-3.75'>
                                     <UserAvatar username={post.author.username} profileImage={post.author.profile_image ?? null} size='md' />
                                     <div className='min-w-0'>
@@ -364,7 +364,7 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
                                     const isMine = auth.user?.id === item.author.user_id
                                     const isEditing = editingCommentID === item.id
                                     return (
-                                        <div key={item.id} className='rounded-lg bg-surface/50 px-2 py-3'>
+                                        <div key={item.id} className='rounded-lg px-2 py-3'>
                                             <div className='flex items-start justify-between gap-2'>
                                                 <div className='flex min-w-0 items-center gap-2'>
                                                     <UserAvatar username={item.author.username} profileImage={item.author.profile_image ?? null} size='sm' />
@@ -479,8 +479,8 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
                     <section className='space-y-3 px-1'>
                         <h2 className='hidden lg:block text-xl font-semibold text-text'>{t('community.authorTitle')}</h2>
 
-                        <div className='hidden lg:block rounded-2xl bg-surface/70'>
-                            <div className='flex items-start justify-between gap-4 py-2'>
+                        <div className='hidden lg:block'>
+                            <div className='flex items-start justify-between gap-4 p-2'>
                                 <div className='min-w-0 flex flex-1 items-center gap-3.75'>
                                     <UserAvatar username={post.author.username} profileImage={post.author.profile_image ?? null} size='md' />
                                     <div className='min-w-0'>
@@ -498,13 +498,13 @@ const CommunityDetail = ({ routeParams = {} }: RouteProps) => {
                     <section className='space-y-3 px-1'>
                         <h2 className='text-xl font-semibold text-text'>{t('community.likeUsers')}</h2>
 
-                        <div className='rounded-2xl bg-surface/70'>
+                        <div>
                             <div className='space-y-3'>
                                 {likes.length === 0 ? (
                                     <p className='text-sm text-text-muted'>{t('community.likeUsersEmpty')}</p>
                                 ) : (
                                     likes.map((like, index) => (
-                                        <div key={`${like.user_id}-${index}`} className='flex items-start justify-between gap-4 py-2'>
+                                        <div key={`${like.user_id}-${index}`} className='flex items-start justify-between gap-4 p-2'>
                                             <div className='min-w-0 flex flex-1 items-center gap-3.75'>
                                                 <UserAvatar username={like.username} profileImage={like.profile_image ?? null} size='md' />
                                                 <div className='min-w-0'>

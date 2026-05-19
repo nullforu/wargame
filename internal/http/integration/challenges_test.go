@@ -851,3 +851,156 @@ func TestChallengeCommentsKoreanLengthLimit(t *testing.T) {
 		t.Fatalf("expected 400 for 501 korean chars, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestChallengeSeriesCRUDAndOrder(t *testing.T) {
+	env := setupTest(t, testCfg)
+	admin := createUser(t, env, "admin-series@example.com", "adminseries", "pass", models.AdminRole)
+	adminAccess, _, _ := loginUser(t, env.router, admin.Email, "pass")
+	user := createUser(t, env, "user-series@example.com", "userseries", "pass", models.UserRole)
+	_, _, _ = loginUser(t, env.router, user.Email, "pass")
+
+	createChallengeReq := func(title, flag string, previousID *int64, active bool) int64 {
+		body := map[string]any{
+			"title":       title,
+			"description": "desc-" + title,
+			"category":    "Web",
+			"points":      100,
+			"flag":        flag,
+			"is_active":   active,
+		}
+		if previousID != nil {
+			body["previous_challenge_id"] = *previousID
+		}
+
+		rec := doRequest(t, env.router, http.MethodPost, "/api/admin/challenges", body, authHeader(adminAccess))
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create challenge status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var resp struct {
+			ID int64 `json:"id"`
+		}
+		decodeJSON(t, rec, &resp)
+
+		return resp.ID
+	}
+
+	baseID := createChallengeReq("Series Base", "flag{base}", nil, true)
+	lockedID := createChallengeReq("Series Locked", "flag{locked}", &baseID, true)
+	inactiveID := createChallengeReq("Series Inactive", "flag{inactive}", nil, false)
+
+	rec := doRequest(t, env.router, http.MethodPost, "/api/admin/challenge-series", map[string]any{
+		"title":       "Starter Challenge Series",
+		"description": "series desc",
+	}, authHeader(adminAccess))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create challenge series status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var created struct {
+		ID          int64  `json:"id"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+	}
+	decodeJSON(t, rec, &created)
+	if created.Title != "Starter Challenge Series" || created.Description != "series desc" {
+		t.Fatalf("unexpected create response: %+v", created)
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/admin/challenge-series", map[string]any{
+		"title":       "Starter Challenge Series",
+		"description": "dup",
+	}, authHeader(adminAccess))
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected conflict duplicate title, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPut, "/api/admin/challenge-series/"+itoa(created.ID)+"/challenges", map[string]any{
+		"challenge_ids": []int64{inactiveID, lockedID, baseID},
+	}, authHeader(adminAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("replace challenges status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenge-series?page=1&page_size=20", nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list series status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var listed struct {
+		Series []struct {
+			ID    int64  `json:"id"`
+			Title string `json:"title"`
+		} `json:"series"`
+	}
+	decodeJSON(t, rec, &listed)
+	if len(listed.Series) != 1 || listed.Series[0].ID != created.ID {
+		t.Fatalf("unexpected listed series: %+v", listed)
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenge-series/"+itoa(created.ID), nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("series detail status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var detail struct {
+		Challenges []map[string]any `json:"challenges"`
+	}
+	decodeJSON(t, rec, &detail)
+	if len(detail.Challenges) != 3 {
+		t.Fatalf("unexpected challenge count: %+v", detail)
+	}
+
+	if int64(detail.Challenges[0]["id"].(float64)) != inactiveID {
+		t.Fatalf("expected first item inactive challenge by order, got %+v", detail.Challenges)
+	}
+
+	if int64(detail.Challenges[1]["id"].(float64)) != lockedID {
+		t.Fatalf("expected second item locked challenge by order, got %+v", detail.Challenges)
+	}
+
+	if _, ok := detail.Challenges[1]["description"]; ok {
+		t.Fatalf("expected locked challenge to be summarized without description: %+v", detail.Challenges[1])
+	}
+
+	rec = doRequest(t, env.router, http.MethodPut, "/api/admin/challenge-series/"+itoa(created.ID), map[string]any{
+		"title": "Starter Challenge Series Updated",
+	}, authHeader(adminAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update challenge series status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodDelete, "/api/admin/challenge-series/"+itoa(created.ID), nil, authHeader(adminAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete challenge series status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenge-series/"+itoa(created.ID), nil, nil)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected not found after delete, got %d", rec.Code)
+	}
+}
+
+func TestChallengeSeriesAdminOnly(t *testing.T) {
+	env := setupTest(t, testCfg)
+	admin := createUser(t, env, "admin-series-auth@example.com", "adminseriesauth", "pass", models.AdminRole)
+	adminAccess, _, _ := loginUser(t, env.router, admin.Email, "pass")
+	user := createUser(t, env, "user-series-auth@example.com", "userseriesauth", "pass", models.UserRole)
+	userAccess, _, _ := loginUser(t, env.router, user.Email, "pass")
+
+	rec := doRequest(t, env.router, http.MethodPost, "/api/admin/challenge-series", map[string]any{
+		"title":       "Admin Only Series",
+		"description": "desc",
+	}, authHeader(adminAccess))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("admin create failed: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/admin/challenge-series", map[string]any{
+		"title":       "Should Fail",
+		"description": "desc",
+	}, authHeader(userAccess))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected forbidden for non-admin create, got %d", rec.Code)
+	}
+}

@@ -179,6 +179,30 @@ func (r *ChallengeRepo) ChallengePointsByIDs(ctx context.Context, challengeIDs [
 	return points, nil
 }
 
+func (r *ChallengeRepo) ExistingChallengeIDSet(ctx context.Context, challengeIDs []int64) (map[int64]struct{}, error) {
+	set := make(map[int64]struct{}, len(challengeIDs))
+	if len(challengeIDs) == 0 {
+		return set, nil
+	}
+
+	rows := make([]struct {
+		ID int64 `bun:"id"`
+	}, 0, len(challengeIDs))
+	if err := r.db.NewSelect().
+		Model((*models.Challenge)(nil)).
+		Column("id").
+		Where("id IN (?)", bun.In(challengeIDs)).
+		Scan(ctx, &rows); err != nil {
+		return nil, wrapError("challengeRepo.ExistingChallengeIDSet", err)
+	}
+
+	for _, row := range rows {
+		set[row.ID] = struct{}{}
+	}
+
+	return set, nil
+}
+
 func (r *ChallengeRepo) SolveCounts(ctx context.Context) (map[int64]int, error) {
 	counts, err := challengeSolveCounts(ctx, r.db)
 	if err != nil {
