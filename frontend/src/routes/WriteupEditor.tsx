@@ -169,8 +169,8 @@ const WriteupEditor = ({ routeParams = {} }: RouteProps) => {
                         <section className='space-y-3 px-1'>
                             <h2 className='text-xl font-semibold text-text'>{t('writeup.authorTitle')}</h2>
 
-                            <div className='rounded-2xl bg-surface/70'>
-                                <div className='flex items-start justify-between gap-4 py-2'>
+                            <div>
+                                <div className='flex items-start justify-between gap-4 p-2'>
                                     <div className='min-w-0 flex flex-1 items-center gap-3.75'>
                                         <UserAvatar username={authorName} profileImage={auth.user?.profile_image ?? null} size='md' />
                                         <div className='min-w-0'>
@@ -218,8 +218,8 @@ const WriteupEditor = ({ routeParams = {} }: RouteProps) => {
                         <section className='space-y-3 px-1'>
                             <h2 className='text-xl font-semibold text-text'>{t('writeup.authorTitle')}</h2>
 
-                            <div className='rounded-2xl bg-surface/70'>
-                                <div className='flex items-start justify-between gap-4 py-2'>
+                            <div>
+                                <div className='flex items-start justify-between gap-4 p-2'>
                                     <div className='min-w-0 flex flex-1 items-center gap-3.75'>
                                         <UserAvatar username={authorName} profileImage={auth.user?.profile_image ?? null} size='md' />
                                         <div className='min-w-0'>

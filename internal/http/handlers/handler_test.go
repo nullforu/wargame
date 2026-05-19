@@ -158,6 +158,71 @@ func TestHandlerChallengeVotesValidation(t *testing.T) {
 	})
 }
 
+func TestHandlerListChallengeSeriesSort(t *testing.T) {
+	env := setupHandlerTest(t)
+	admin := createHandlerUser(t, env, "series-sort-admin@example.com", "series-sort-admin", "pass", models.AdminRole)
+
+	first, err := env.wargameSvc.CreateChallengeSeries(context.Background(), "Series First", "desc1", &admin.ID)
+	if err != nil {
+		t.Fatalf("CreateChallengeSeries first: %v", err)
+	}
+
+	second, err := env.wargameSvc.CreateChallengeSeries(context.Background(), "Series Second", "desc2", &admin.ID)
+	if err != nil {
+		t.Fatalf("CreateChallengeSeries second: %v", err)
+	}
+
+	t.Run("default latest", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenge-series?page=1&page_size=10", nil)
+		env.handler.ListChallengeSeries(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp challengeSeriesListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if len(resp.Series) < 2 {
+			t.Fatalf("expected at least 2 series, got %d", len(resp.Series))
+		}
+
+		if resp.Series[0].ID != second.ID || resp.Series[1].ID != first.ID {
+			t.Fatalf("expected latest order [%d, %d], got [%d, %d]", second.ID, first.ID, resp.Series[0].ID, resp.Series[1].ID)
+		}
+	})
+
+	t.Run("oldest sort", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenge-series?page=1&page_size=10&sort=oldest", nil)
+		env.handler.ListChallengeSeries(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		var resp challengeSeriesListResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if len(resp.Series) < 2 {
+			t.Fatalf("expected at least 2 series, got %d", len(resp.Series))
+		}
+
+		if resp.Series[0].ID != first.ID || resp.Series[1].ID != second.ID {
+			t.Fatalf("expected oldest order [%d, %d], got [%d, %d]", first.ID, second.ID, resp.Series[0].ID, resp.Series[1].ID)
+		}
+	})
+
+	t.Run("invalid sort", func(t *testing.T) {
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenge-series?page=1&page_size=10&sort=random", nil)
+		env.handler.ListChallengeSeries(ctx)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+}
+
 func TestHandlerChallengeMyVote(t *testing.T) {
 	env := setupHandlerTest(t)
 	user := createHandlerUser(t, env, "myvote-handler@example.com", "myvote-handler", "pass", models.UserRole)

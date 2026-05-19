@@ -93,6 +93,7 @@ type VMChallengeUpdate struct {
 type WargameService struct {
 	cfg                  config.Config
 	challengeRepo        *repo.ChallengeRepo
+	challengeSeriesRepo  *repo.ChallengeSeriesRepo
 	submissionRepo       *repo.SubmissionRepo
 	voteRepo             *repo.ChallengeVoteRepo
 	writeupRepo          *repo.WriteupRepo
@@ -111,10 +112,16 @@ type ChallengeQueryFilter struct {
 	Sort     string
 }
 
-func NewWargameService(cfg config.Config, challengeRepo *repo.ChallengeRepo, submissionRepo *repo.SubmissionRepo, voteRepo *repo.ChallengeVoteRepo, writeupRepo *repo.WriteupRepo, challengeCommentRepo *repo.ChallengeCommentRepo, communityRepo *repo.CommunityRepo, redis *redis.Client, fileStore storage.ChallengeFileStore) *WargameService {
+func NewWargameService(cfg config.Config, challengeRepo *repo.ChallengeRepo, submissionRepo *repo.SubmissionRepo, voteRepo *repo.ChallengeVoteRepo, writeupRepo *repo.WriteupRepo, challengeCommentRepo *repo.ChallengeCommentRepo, communityRepo *repo.CommunityRepo, redis *redis.Client, fileStore storage.ChallengeFileStore, challengeSeriesRepos ...*repo.ChallengeSeriesRepo) *WargameService {
+	var challengeSeriesRepo *repo.ChallengeSeriesRepo
+	if len(challengeSeriesRepos) > 0 {
+		challengeSeriesRepo = challengeSeriesRepos[0]
+	}
+
 	return &WargameService{
 		cfg:                  cfg,
 		challengeRepo:        challengeRepo,
+		challengeSeriesRepo:  challengeSeriesRepo,
 		submissionRepo:       submissionRepo,
 		voteRepo:             voteRepo,
 		writeupRepo:          writeupRepo,
@@ -1593,4 +1600,275 @@ func (s *WargameService) applyChallengeLevelVoteCounts(ctx context.Context, chal
 	challenge.LevelVotes = counts
 
 	return nil
+}
+
+type ChallengeSeriesDetail struct {
+	Series     *models.ChallengeSeries
+	Challenges []models.Challenge
+}
+
+func (s *WargameService) ListChallengeSeries(ctx context.Context, page, pageSize int, sort string) ([]models.ChallengeSeries, models.Pagination, error) {
+	if s.challengeSeriesRepo == nil {
+		return nil, models.Pagination{}, fmt.Errorf("wargame.ListChallengeSeries: challenge series repo is nil")
+	}
+
+	params, err := NormalizePagination(page, pageSize)
+	if err != nil {
+		return nil, models.Pagination{}, err
+	}
+
+	sort = strings.TrimSpace(sort)
+	if sort == "" {
+		sort = "latest"
+	}
+
+	if sort != "latest" && sort != "oldest" {
+		return nil, models.Pagination{}, NewValidationError(FieldError{Field: "sort", Reason: "invalid"})
+	}
+
+	rows, totalCount, err := s.challengeSeriesRepo.List(ctx, params.Page, params.PageSize, sort)
+	if err != nil {
+		return nil, models.Pagination{}, fmt.Errorf("wargame.ListChallengeSeries: %w", err)
+	}
+
+	return rows, BuildPagination(params.Page, params.PageSize, totalCount), nil
+}
+
+func (s *WargameService) GetChallengeSeriesByID(ctx context.Context, id int64, userID int64) (*ChallengeSeriesDetail, error) {
+	if s.challengeSeriesRepo == nil {
+		return nil, fmt.Errorf("wargame.GetChallengeSeriesByID: challenge series repo is nil")
+	}
+
+	if id <= 0 {
+		return nil, ErrInvalidInput
+	}
+
+	series, err := s.challengeSeriesRepo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrChallengeSeriesNotFound
+		}
+		return nil, fmt.Errorf("wargame.GetChallengeSeriesByID: %w", err)
+	}
+
+	items, err := s.challengeSeriesRepo.DetailChallenges(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("wargame.GetChallengeSeriesByID list: %w", err)
+	}
+
+	challenges := make([]models.Challenge, 0, len(items))
+	ptrs := make([]*models.Challenge, 0, len(items))
+	for i := range items {
+		challenges = append(challenges, items[i].Challenge)
+		ptrs = append(ptrs, &challenges[i])
+	}
+
+	if err := s.applyChallengePoints(ctx, ptrs); err != nil {
+		return nil, fmt.Errorf("wargame.GetChallengeSeriesByID score: %w", err)
+	}
+
+	if err := s.applyChallengeLevels(ctx, ptrs); err != nil {
+		return nil, fmt.Errorf("wargame.GetChallengeSeriesByID level: %w", err)
+	}
+
+	if userID <= 0 {
+		for i := range challenges {
+			if challenges[i].PreviousChallengeID != nil {
+				challenges[i].Description = ""
+			}
+		}
+		return &ChallengeSeriesDetail{Series: series, Challenges: challenges}, nil
+	}
+
+	solved, err := s.SolvedChallengeIDs(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range challenges {
+		if isChallengeLockedForService(challenges[i], solved, userID) {
+			challenges[i].Description = ""
+		}
+	}
+
+	return &ChallengeSeriesDetail{Series: series, Challenges: challenges}, nil
+}
+
+func (s *WargameService) CreateChallengeSeries(ctx context.Context, title, description string, createdByUserID *int64) (*models.ChallengeSeries, error) {
+	if s.challengeSeriesRepo == nil {
+		return nil, fmt.Errorf("wargame.CreateChallengeSeries: challenge series repo is nil")
+	}
+
+	title = normalizeTrim(title)
+	description = normalizeTrim(description)
+	validator := newFieldValidator()
+	validator.Required("title", title)
+	validator.Required("description", description)
+	if err := validator.Error(); err != nil {
+		return nil, err
+	}
+
+	exists, err := s.challengeSeriesRepo.ExistsByTitle(ctx, title, nil)
+	if err != nil {
+		return nil, fmt.Errorf("wargame.CreateChallengeSeries title check: %w", err)
+	}
+
+	if exists {
+		return nil, ErrChallengeSeriesExists
+	}
+
+	now := time.Now().UTC()
+	series := &models.ChallengeSeries{Title: title, Description: description, CreatedByUserID: createdByUserID, CreatedAt: now, UpdatedAt: now}
+	if err := s.challengeSeriesRepo.Create(ctx, series); err != nil {
+		return nil, fmt.Errorf("wargame.CreateChallengeSeries: %w", err)
+	}
+
+	return series, nil
+}
+
+func (s *WargameService) UpdateChallengeSeries(ctx context.Context, id int64, title, description *string) (*models.ChallengeSeries, error) {
+	if s.challengeSeriesRepo == nil {
+		return nil, fmt.Errorf("wargame.UpdateChallengeSeries: challenge series repo is nil")
+	}
+
+	if id <= 0 {
+		return nil, ErrInvalidInput
+	}
+
+	series, err := s.challengeSeriesRepo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrChallengeSeriesNotFound
+		}
+
+		return nil, fmt.Errorf("wargame.UpdateChallengeSeries get: %w", err)
+	}
+
+	validator := newFieldValidator()
+	if title != nil {
+		trimmed := normalizeTrim(*title)
+		if trimmed == "" {
+			validator.fields = append(validator.fields, FieldError{Field: "title", Reason: "required"})
+		} else {
+			series.Title = trimmed
+		}
+	}
+
+	if description != nil {
+		trimmed := normalizeTrim(*description)
+		if trimmed == "" {
+			validator.fields = append(validator.fields, FieldError{Field: "description", Reason: "required"})
+		} else {
+			series.Description = trimmed
+		}
+	}
+
+	if err := validator.Error(); err != nil {
+		return nil, err
+	}
+
+	exists, err := s.challengeSeriesRepo.ExistsByTitle(ctx, series.Title, &series.ID)
+	if err != nil {
+		return nil, fmt.Errorf("wargame.UpdateChallengeSeries title check: %w", err)
+	}
+
+	if exists {
+		return nil, ErrChallengeSeriesExists
+	}
+
+	series.UpdatedAt = time.Now().UTC()
+	if err := s.challengeSeriesRepo.Update(ctx, series); err != nil {
+		return nil, fmt.Errorf("wargame.UpdateChallengeSeries update: %w", err)
+	}
+
+	return series, nil
+}
+
+func (s *WargameService) DeleteChallengeSeries(ctx context.Context, id int64) error {
+	if s.challengeSeriesRepo == nil {
+		return fmt.Errorf("wargame.DeleteChallengeSeries: challenge series repo is nil")
+	}
+
+	if id <= 0 {
+		return ErrInvalidInput
+	}
+
+	if _, err := s.challengeSeriesRepo.GetByID(ctx, id); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return ErrChallengeSeriesNotFound
+		}
+
+		return fmt.Errorf("wargame.DeleteChallengeSeries get: %w", err)
+	}
+
+	if err := s.challengeSeriesRepo.DeleteByID(ctx, id); err != nil {
+		return fmt.Errorf("wargame.DeleteChallengeSeries delete: %w", err)
+	}
+
+	return nil
+}
+
+func (s *WargameService) ReplaceChallengeSeriesChallenges(ctx context.Context, id int64, challengeIDs []int64) error {
+	if s.challengeSeriesRepo == nil {
+		return fmt.Errorf("wargame.ReplaceChallengeSeriesChallenges: challenge series repo is nil")
+	}
+
+	if id <= 0 {
+		return ErrInvalidInput
+	}
+
+	if _, err := s.challengeSeriesRepo.GetByID(ctx, id); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return ErrChallengeSeriesNotFound
+		}
+
+		return fmt.Errorf("wargame.ReplaceChallengeSeriesChallenges get: %w", err)
+	}
+
+	validator := newFieldValidator()
+	seen := make(map[int64]struct{}, len(challengeIDs))
+	for i, challengeID := range challengeIDs {
+		if challengeID <= 0 {
+			validator.fields = append(validator.fields, FieldError{Field: "challenge_ids", Reason: "invalid"})
+			continue
+		}
+
+		if _, ok := seen[challengeID]; ok {
+			validator.fields = append(validator.fields, FieldError{Field: "challenge_ids", Reason: "duplicate"})
+			continue
+		}
+
+		seen[challengeID] = struct{}{}
+		if _, err := s.challengeRepo.GetByID(ctx, challengeID); err != nil {
+			if errors.Is(err, repo.ErrNotFound) {
+				validator.fields = append(validator.fields, FieldError{Field: fmt.Sprintf("challenge_ids[%d]", i), Reason: "not_found"})
+				continue
+			}
+
+			return fmt.Errorf("wargame.ReplaceChallengeSeriesChallenges challenge: %w", err)
+		}
+	}
+
+	if err := validator.Error(); err != nil {
+		return err
+	}
+
+	if err := s.challengeSeriesRepo.ReplaceChallenges(ctx, id, challengeIDs); err != nil {
+		return fmt.Errorf("wargame.ReplaceChallengeSeriesChallenges replace: %w", err)
+	}
+
+	return nil
+}
+
+func isChallengeLockedForService(challenge models.Challenge, solved map[int64]struct{}, userID int64) bool {
+	if challenge.PreviousChallengeID == nil || *challenge.PreviousChallengeID <= 0 {
+		return false
+	}
+
+	if userID <= 0 {
+		return true
+	}
+
+	_, ok := solved[*challenge.PreviousChallengeID]
+	return !ok
 }

@@ -65,6 +65,20 @@ type adminAffiliationCreateRequest struct {
 	Name string `json:"name" binding:"required"`
 }
 
+type createChallengeSeriesRequest struct {
+	Title       string `json:"title" binding:"required"`
+	Description string `json:"description" binding:"required"`
+}
+
+type updateChallengeSeriesRequest struct {
+	Title       optionalString `json:"title"`
+	Description optionalString `json:"description"`
+}
+
+type replaceChallengeSeriesChallengesRequest struct {
+	ChallengeIDs []int64 `json:"challenge_ids"`
+}
+
 type registerRequest struct {
 	Email    string `json:"email" binding:"required"`
 	Username string `json:"username" binding:"required"`
@@ -280,6 +294,24 @@ type challengesListResponse struct {
 	Pagination     models.Pagination      `json:"pagination"`
 	CategoryCounts []models.CategoryCount `json:"category_counts,omitempty"`
 	LevelCounts    []models.LevelCount    `json:"level_counts,omitempty"`
+}
+
+type challengeSeriesResponse struct {
+	ID          int64     `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type challengeSeriesListResponse struct {
+	Series     []challengeSeriesResponse `json:"series,omitempty"`
+	Pagination models.Pagination         `json:"pagination"`
+}
+
+type challengeSeriesDetailResponse struct {
+	Series     challengeSeriesResponse `json:"series"`
+	Challenges []any                   `json:"challenges,omitempty"`
 }
 
 type usersListResponse struct {
@@ -743,6 +775,16 @@ func newChallengeSolverResponse(row models.ChallengeSolver) challengeSolverRespo
 		ProfileImage: row.ProfileImage,
 		SolvedAt:     row.SolvedAt.UTC(),
 		IsFirstBlood: row.IsFirstBlood,
+	}
+}
+
+func newChallengeSeriesResponse(series *models.ChallengeSeries) challengeSeriesResponse {
+	return challengeSeriesResponse{
+		ID:          series.ID,
+		Title:       series.Title,
+		Description: series.Description,
+		CreatedAt:   series.CreatedAt.UTC(),
+		UpdatedAt:   series.UpdatedAt.UTC(),
 	}
 }
 

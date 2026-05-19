@@ -101,6 +101,12 @@ func mapError(err error) (int, errorResponse, map[string]string) {
 	case errors.Is(err, service.ErrChallengeNotFound):
 		status = http.StatusNotFound
 		resp.Error = service.ErrChallengeNotFound.Error()
+	case errors.Is(err, service.ErrChallengeSeriesNotFound):
+		status = http.StatusNotFound
+		resp.Error = service.ErrChallengeSeriesNotFound.Error()
+	case errors.Is(err, service.ErrChallengeSeriesExists):
+		status = http.StatusConflict
+		resp.Error = service.ErrChallengeSeriesExists.Error()
 	case errors.Is(err, service.ErrWriteupNotFound):
 		status = http.StatusNotFound
 		resp.Error = service.ErrWriteupNotFound.Error()

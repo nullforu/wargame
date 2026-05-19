@@ -464,3 +464,115 @@ Errors:
 - 403 `forbidden`
 - 404 `challenge not found` or `challenge file not found`
 - 503 `storage unavailable`
+
+---
+
+## Create Challenge Series
+
+`POST /api/admin/challenge-series`
+
+Headers
+
+```
+Cookie: access_token=<jwt>
+```
+
+Request
+
+```json
+{
+    "title": "Warmup Challenge Series",
+    "description": "Starter set"
+}
+```
+
+Response 201
+
+```json
+{
+    "id": 1,
+    "title": "Warmup Challenge Series",
+    "description": "Starter set",
+    "created_at": "2026-05-19T12:00:00Z",
+    "updated_at": "2026-05-19T12:00:00Z"
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid token` or `missing access_token cookie`
+- 403 `forbidden`
+- 409 `challenge series already exists`
+
+---
+
+## Update Challenge Series
+
+`PUT /api/admin/challenge-series/{id}`
+
+Request fields are optional; omitted fields are unchanged.
+
+Response 200: same schema as create.
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid token` or `missing access_token cookie`
+- 403 `forbidden`
+- 404 `challenge series not found`
+- 409 `challenge series already exists`
+
+---
+
+## Delete Challenge Series
+
+`DELETE /api/admin/challenge-series/{id}`
+
+Response 200
+
+```json
+{
+    "status": "ok"
+}
+```
+
+Errors:
+
+- 401 `invalid token` or `missing access_token cookie`
+- 403 `forbidden`
+- 404 `challenge series not found`
+
+---
+
+## Replace Challenge Series Challenges
+
+`PUT /api/admin/challenge-series/{id}/challenges`
+
+Request
+
+```json
+{
+    "challenge_ids": [5, 3, 10]
+}
+```
+
+Notes:
+
+- Replaces the full series order atomically.
+- Includes inactive challenges.
+
+Response 200
+
+```json
+{
+    "status": "ok"
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid token` or `missing access_token cookie`
+- 403 `forbidden`
+- 404 `challenge series not found`

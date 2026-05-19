@@ -4,6 +4,8 @@ import Home from './routes/Home'
 import Login from './routes/Login'
 import Register from './routes/Register'
 import Challenges from './routes/Challenges'
+import ChallengeSeries from './routes/ChallengeSeries'
+import ChallengeSeriesDetail from './routes/ChallengeSeriesDetail'
 import ChallengeDetail from './routes/ChallengeDetail'
 import Scoreboard from './routes/Scoreboard'
 import Ranking from './routes/Ranking'
@@ -34,6 +36,7 @@ const routes: Record<string, RouteComponent> = {
     '/login': Login,
     '/register': Register,
     '/challenges': Challenges,
+    '/series': ChallengeSeries,
     '/ranking': Ranking,
     '/scoreboard': Scoreboard,
     '/profile': UserProfile,
@@ -48,6 +51,14 @@ const dynamicRoutes: Array<{
     component: RouteComponent
     extractParams: (path: string) => Record<string, string>
 }> = [
+    {
+        pattern: /^\/series\/(\d+)$/,
+        component: ChallengeSeriesDetail,
+        extractParams: (path) => {
+            const match = path.match(/^\/series\/(\d+)$/)
+            return match ? { id: match[1] } : { id: '' }
+        },
+    },
     {
         pattern: /^\/challenges\/(\d+)\/writeup$/,
         component: WriteupEditor,

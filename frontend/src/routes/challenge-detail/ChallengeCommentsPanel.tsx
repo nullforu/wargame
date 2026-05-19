@@ -78,7 +78,7 @@ const ChallengeCommentsPanel = ({
                 {commentLoading ? (
                     <div className='space-y-3'>
                         {[0, 1].map((idx) => (
-                            <div key={idx} className='rounded-lg bg-surface/50 p-3 animate-pulse'>
+                            <div key={idx} className='p-3 animate-pulse'>
                                 <div className='flex items-center justify-between'>
                                     <div className='h-4 w-24 rounded bg-surface-muted' />
                                     <div className='h-3 w-28 rounded bg-surface-muted' />
@@ -94,7 +94,7 @@ const ChallengeCommentsPanel = ({
                         const isMine = currentUserID === item.author.user_id
                         const isEditing = editingCommentID === item.id
                         return (
-                            <div key={item.id} className='rounded-lg bg-surface/50 p-3'>
+                            <div key={item.id} className='p-3'>
                                 <div className='flex items-start justify-between gap-2'>
                                     <div className='flex min-w-0 items-center gap-2'>
                                         <UserAvatar username={item.author.username} profileImage={item.author.profile_image ?? null} size='sm' />

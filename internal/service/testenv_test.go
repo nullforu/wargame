@@ -202,7 +202,7 @@ func setupServiceTest(t *testing.T) serviceEnv {
 	userSvc := NewUserService(userRepo, affiliationRepo, storage.NewMemoryProfileImageStore(10*time.Minute))
 	affiliationSvc := NewAffiliationService(affiliationRepo)
 	scoreSvc := NewScoreboardService(scoreRepo)
-	wargameSvc := NewWargameService(serviceCfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(serviceDB), repo.NewCommunityRepo(serviceDB), serviceRedis, fileStore)
+	wargameSvc := NewWargameService(serviceCfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(serviceDB), repo.NewCommunityRepo(serviceDB), serviceRedis, fileStore, repo.NewChallengeSeriesRepo(serviceDB))
 	stackSvc := NewStackService(serviceCfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, serviceRedis)
 
 	env := serviceEnv{
@@ -229,7 +229,7 @@ func setupServiceTest(t *testing.T) serviceEnv {
 func resetServiceState(t *testing.T) {
 	t.Helper()
 
-	if _, err := serviceDB.ExecContext(context.Background(), "TRUNCATE TABLE community_comments, challenge_comments, challenge_votes, writeups, community_post_likes, community_posts, submissions, vms, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := serviceDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_series_challenges, challenge_series, community_comments, challenge_comments, challenge_votes, writeups, community_post_likes, community_posts, submissions, vms, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
