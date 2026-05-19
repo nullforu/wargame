@@ -619,6 +619,7 @@ Query parameters:
 
 - `page` (optional, default `1`)
 - `page_size` (optional, default `20`, max `100`)
+- `sort` (optional, one of `latest`, `oldest`; default `latest`)
 
 Response 200
 
