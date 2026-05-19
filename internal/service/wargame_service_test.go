@@ -1391,6 +1391,14 @@ func TestWargameServiceChallengeSeriesValidationAndNotFound(t *testing.T) {
 		t.Fatalf("expected invalid input for bad sort, got %v", err)
 	}
 
+	if _, _, err := env.wargameSvc.ListChallengeSeries(context.Background(), -1, 20, "latest"); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for negative page, got %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.ListChallengeSeries(context.Background(), 1, -1, "latest"); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for negative page size, got %v", err)
+	}
+
 	if _, err := env.wargameSvc.CreateChallengeSeries(context.Background(), "Title", "", nil); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("expected invalid input for empty description, got %v", err)
 	}
@@ -1418,6 +1426,26 @@ func TestWargameServiceChallengeSeriesValidationAndNotFound(t *testing.T) {
 
 	if err := env.wargameSvc.ReplaceChallengeSeriesChallenges(context.Background(), series.ID, []int64{999999}); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("expected invalid input missing challenge id, got %v", err)
+	}
+
+	defaultSorted, _, err := env.wargameSvc.ListChallengeSeries(context.Background(), 1, 20, "")
+	if err != nil {
+		t.Fatalf("expected default latest sort with empty sort, got %v", err)
+	}
+
+	latestSorted, _, err := env.wargameSvc.ListChallengeSeries(context.Background(), 1, 20, "latest")
+	if err != nil {
+		t.Fatalf("expected latest sort, got %v", err)
+	}
+
+	if len(defaultSorted) != len(latestSorted) {
+		t.Fatalf("expected same item count for default/latest, got %d vs %d", len(defaultSorted), len(latestSorted))
+	}
+
+	for i := range defaultSorted {
+		if defaultSorted[i].ID != latestSorted[i].ID {
+			t.Fatalf("expected default sort order to match latest at index %d: %d != %d", i, defaultSorted[i].ID, latestSorted[i].ID)
+		}
 	}
 }
 
