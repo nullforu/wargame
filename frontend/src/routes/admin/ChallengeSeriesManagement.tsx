@@ -32,8 +32,20 @@ const ChallengeSeriesManagement = () => {
     const selectedSeries = useMemo(() => series.find((row) => row.id === selectedSeriesID) ?? null, [series, selectedSeriesID])
 
     const loadSeries = async () => {
-        const first = await api.challengeSeries(1, 10)
-        setSeries(first.series)
+        const pageSize = 50
+        const first = await api.challengeSeries(1, pageSize)
+        const allSeries = [...first.series]
+        let pagination = first.pagination
+        let nextPage = 2
+
+        while (pagination.has_next) {
+            const next = await api.challengeSeries(nextPage, pageSize)
+            allSeries.push(...next.series)
+            pagination = next.pagination
+            nextPage += 1
+        }
+
+        setSeries(allSeries)
     }
 
     const loadChallenges = async (page: number, q: string) => {

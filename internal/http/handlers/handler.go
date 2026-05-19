@@ -593,19 +593,20 @@ func (h *Handler) GetChallengeSeries(ctx *gin.Context) {
 	}
 
 	userID := h.optionalUserID(ctx)
-	detail, err := h.wargame.GetChallengeSeriesByID(ctx.Request.Context(), seriesID, userID)
-	if err != nil {
-		writeError(ctx, err)
-		return
-	}
-
 	solved := map[int64]struct{}{}
 	if userID > 0 {
+		var err error
 		solved, err = h.wargame.SolvedChallengeIDs(ctx.Request.Context(), userID)
 		if err != nil {
 			writeError(ctx, err)
 			return
 		}
+	}
+
+	detail, err := h.wargame.GetChallengeSeriesByIDWithSolved(ctx.Request.Context(), seriesID, userID, solved)
+	if err != nil {
+		writeError(ctx, err)
+		return
 	}
 
 	byID := make(map[int64]*models.Challenge, len(detail.Challenges))

@@ -1635,8 +1635,12 @@ func (s *WargameService) ListChallengeSeries(ctx context.Context, page, pageSize
 }
 
 func (s *WargameService) GetChallengeSeriesByID(ctx context.Context, id int64, userID int64) (*ChallengeSeriesDetail, error) {
+	return s.GetChallengeSeriesByIDWithSolved(ctx, id, userID, nil)
+}
+
+func (s *WargameService) GetChallengeSeriesByIDWithSolved(ctx context.Context, id int64, userID int64, solved map[int64]struct{}) (*ChallengeSeriesDetail, error) {
 	if s.challengeSeriesRepo == nil {
-		return nil, fmt.Errorf("wargame.GetChallengeSeriesByID: challenge series repo is nil")
+		return nil, fmt.Errorf("wargame.GetChallengeSeriesByIDWithSolved: challenge series repo is nil")
 	}
 
 	if id <= 0 {
@@ -1680,9 +1684,13 @@ func (s *WargameService) GetChallengeSeriesByID(ctx context.Context, id int64, u
 		return &ChallengeSeriesDetail{Series: series, Challenges: challenges}, nil
 	}
 
-	solved, err := s.SolvedChallengeIDs(ctx, userID)
-	if err != nil {
-		return nil, err
+	if solved == nil {
+		solvedIDs, solvedErr := s.SolvedChallengeIDs(ctx, userID)
+		if solvedErr != nil {
+			return nil, solvedErr
+		}
+
+		solved = solvedIDs
 	}
 
 	for i := range challenges {
@@ -1827,6 +1835,8 @@ func (s *WargameService) ReplaceChallengeSeriesChallenges(ctx context.Context, i
 
 	validator := newFieldValidator()
 	seen := make(map[int64]struct{}, len(challengeIDs))
+	validChallengeIDs := make([]int64, 0, len(challengeIDs))
+	validChallengeIndices := make(map[int64]int, len(challengeIDs))
 	for i, challengeID := range challengeIDs {
 		if challengeID <= 0 {
 			validator.fields = append(validator.fields, FieldError{Field: "challenge_ids", Reason: "invalid"})
@@ -1839,14 +1849,20 @@ func (s *WargameService) ReplaceChallengeSeriesChallenges(ctx context.Context, i
 		}
 
 		seen[challengeID] = struct{}{}
-		if _, err := s.challengeRepo.GetByID(ctx, challengeID); err != nil {
-			if errors.Is(err, repo.ErrNotFound) {
-				validator.fields = append(validator.fields, FieldError{Field: fmt.Sprintf("challenge_ids[%d]", i), Reason: "not_found"})
-				continue
-			}
+		validChallengeIDs = append(validChallengeIDs, challengeID)
+		validChallengeIndices[challengeID] = i
+	}
 
-			return fmt.Errorf("wargame.ReplaceChallengeSeriesChallenges challenge: %w", err)
+	existingIDs, err := s.challengeRepo.ExistingChallengeIDSet(ctx, validChallengeIDs)
+	if err != nil {
+		return fmt.Errorf("wargame.ReplaceChallengeSeriesChallenges challenge ids: %w", err)
+	}
+
+	for _, challengeID := range validChallengeIDs {
+		if _, ok := existingIDs[challengeID]; ok {
+			continue
 		}
+		validator.fields = append(validator.fields, FieldError{Field: fmt.Sprintf("challenge_ids[%d]", validChallengeIndices[challengeID]), Reason: "not_found"})
 	}
 
 	if err := validator.Error(); err != nil {
