@@ -70,7 +70,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const pluralRules = useMemo(() => new Intl.PluralRules(locale), [locale])
     const localeTag = useMemo(() => getLocaleTag(locale), [locale])
     const api = useApi()
-    const { state: auth } = useAuth()
+    const { state: auth, setAuthUser } = useAuth()
     const challengeId = useMemo(() => parseRouteId(routeParams.id), [routeParams.id])
 
     const [challenge, setChallenge] = useState<Challenge | null>(null)
@@ -131,6 +131,17 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const [editingCommentContent, setEditingCommentContent] = useState('')
     const [copiedValue, setCopiedValue] = useState<string | null>(null)
     const stackEnabled = Boolean(challenge && !challenge.is_locked && !challenge.is_solved && 'vm_enabled' in challenge && challenge.vm_enabled === true)
+    const isStackPending = stackInfo?.status?.toLowerCase() === 'pending'
+
+    const syncAuthUser = async () => {
+        if (!auth.user) return
+        try {
+            const me = await api.me()
+            setAuthUser(me)
+        } catch {
+            // keep existing auth state when sync fails
+        }
+    }
 
     const pushSolverPageQuery = (nextPage: number) => {
         if (typeof window === 'undefined') return
@@ -467,6 +478,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
             const created = await api.createVM(challengeId)
             setStackInfo(created)
             setStackNextInterval(vmPollInterval(created.status))
+            await syncAuthUser()
         } catch (error) {
             setStackMessage(formatApiError(error, t).message)
         } finally {
@@ -481,6 +493,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         try {
             await api.deleteVM(challengeId)
             setStackInfo(null)
+            await syncAuthUser()
         } catch (error) {
             setStackMessage(formatApiError(error, t).message)
         } finally {
@@ -765,11 +778,11 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                         )}
 
                         {!challenge.is_locked && !challenge.is_solved && 'vm_enabled' in challenge && challenge.vm_enabled ? (
-                            <div className='rounded-md border border-border/30 bg-surface p-4 sm:p-5 shadow-sm mt-8'>
+                            <div className='mt-8 rounded-md border border-border/50 bg-surface-muted/40 p-4 sm:p-5'>
                                 <div className='flex items-center justify-between gap-2'>
                                     <h2 className='text-base font-semibold text-text'>{t('challenge.vmInstance')}</h2>
-                                    {auth.user ? (
-                                        <button className='rounded-lg bg-surface-muted px-3 py-1.5 text-xs text-text hover:bg-surface-subtle disabled:opacity-60' onClick={() => void loadStack()} disabled={stackLoading}>
+                                    {auth.user && stackInfo ? (
+                                        <button className='rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs text-text hover:bg-surface-subtle disabled:opacity-60' onClick={() => void loadStack()} disabled={stackLoading}>
                                             {t('common.refresh')}
                                         </button>
                                     ) : null}
@@ -796,7 +809,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                             const nc = `nc${isUDP ? ' -u' : ''} ${stackInfo.external_ip} ${port.host_port}`
 
                                                             return (
-                                                                <div key={`${port.container_port}-${port.protocol}-${index}`} className='py-4'>
+                                                                <div key={`${port.container_port}-${port.protocol}-${index}`} className='rounded-md border border-border/40 bg-surface px-3 py-3'>
                                                                     <div className='flex flex-wrap items-center justify-between gap-2'>
                                                                         <div className='flex items-center gap-2'>
                                                                             <span className={`rounded-md px-2 py-1 text-xs font-semibold ${isUDP ? 'bg-orange-500/10 text-orange-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
@@ -811,7 +824,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                                         </div>
                                                                     </div>
 
-                                                                    <div className='mt-4 space-y-3'>
+                                                                    <div className='mt-3 space-y-3'>
                                                                         <div>
                                                                             <p className='mb-1 text-xs font-medium uppercase tracking-wide text-text-muted'>{t('challenge.vmHTTPAccess')}</p>
 
@@ -820,12 +833,12 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                                                     href={httpURL}
                                                                                     target='_blank'
                                                                                     rel='noreferrer'
-                                                                                    className='block break-all rounded-lg border border-border/40 bg-surface px-3 py-2 font-mono text-sm text-accent transition-colors hover:bg-surface-subtle hover:underline'
+                                                                                    className='block break-all rounded-md border border-border/50 bg-surface-muted/20 px-3 py-2 font-mono text-sm text-accent transition-colors hover:bg-surface-subtle hover:underline'
                                                                                 >
                                                                                     {httpURL}
                                                                                 </a>
                                                                             ) : (
-                                                                                <div className='block break-all rounded-lg border border-border/40 bg-surface px-3 py-2 font-mono text-sm text-text-subtle'>
+                                                                                <div className='block break-all rounded-md border border-border/50 bg-surface-muted/20 px-3 py-2 font-mono text-sm text-text-subtle'>
                                                                                     {t('challenge.vmNoHTTPForProtocol')}
                                                                                 </div>
                                                                             )}
@@ -835,12 +848,12 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                                             <p className='mb-1 text-xs font-medium uppercase tracking-wide text-text-muted'>{t('challenge.vmNCAccess')}</p>
 
                                                                             <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
-                                                                                <code className='flex-1 break-all rounded-lg border border-border/40 bg-surface px-3 py-2 font-mono text-sm text-text'>{nc}</code>
+                                                                                <code className='flex-1 break-all rounded-md border border-border/50 bg-surface-muted/20 px-3 py-2 font-mono text-sm text-text'>{nc}</code>
 
                                                                                 <button
                                                                                     type='button'
                                                                                     onClick={() => handleCopy(nc)}
-                                                                                    className='rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:bg-surface-subtle'
+                                                                                    className='rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:bg-surface-subtle'
                                                                                 >
                                                                                     {copiedValue === nc ? 'Copied' : 'Copy'}
                                                                                 </button>
@@ -852,7 +865,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                         })}
                                                     </div>
                                                 ) : (
-                                                    <div className='mt-2 inline-flex items-center rounded-lg border border-border/40 bg-surface-muted px-3 py-2 text-sm text-text-muted'>{t('common.pending')}</div>
+                                                    <div className='mt-2 inline-flex items-center rounded-md border border-border/50 bg-surface-muted px-3 py-2 text-sm text-text-muted'>{t('common.pending')}</div>
                                                 )}
                                             </div>
                                             {stackInfo.last_error ? <p className='text-danger'>{stackInfo.last_error}</p> : null}
@@ -872,11 +885,15 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                 {auth.user ? (
                                     <div className='mt-4 flex flex-wrap gap-2'>
                                         {stackInfo ? (
-                                            <button className='rounded-lg border border-danger/20 px-3 py-2 text-sm text-danger hover:border-danger/40 disabled:opacity-60' onClick={deleteStack} disabled={stackLoading}>
+                                            <button
+                                                className='rounded-md border border-danger/20 bg-surface px-3 py-2 text-sm text-danger hover:border-danger/40 disabled:cursor-not-allowed disabled:opacity-50'
+                                                onClick={deleteStack}
+                                                disabled={stackLoading || isStackPending}
+                                            >
                                                 {stackLoading ? t('challenge.vmWorking') : t('challenge.deleteVM')}
                                             </button>
                                         ) : (
-                                            <button className='rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent-strong disabled:opacity-60' onClick={createStack} disabled={stackLoading || challenge.is_solved}>
+                                            <button className='rounded-md bg-accent px-3 py-2 text-sm text-white hover:bg-accent-strong disabled:opacity-60' onClick={createStack} disabled={stackLoading || challenge.is_solved}>
                                                 {stackLoading ? t('challenge.vmWorking') : t('challenge.createVM')}
                                             </button>
                                         )}
