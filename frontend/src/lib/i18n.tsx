@@ -29,17 +29,18 @@ const normalizeLocale = (value?: string | null): Locale => {
         case 'ja':
             return 'ja'
         case 'en':
-        default:
             return 'en'
+        default:
+            return 'ko'
     }
 }
 
 const loadLocale = (): Locale => {
-    if (typeof localStorage === 'undefined') return 'en'
+    if (typeof localStorage === 'undefined') return 'ko'
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) return normalizeLocale(saved)
 
-    return 'en'
+    return 'ko'
 }
 
 const persistLocale = (locale: Locale) => {

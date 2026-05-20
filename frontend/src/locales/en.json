@@ -456,6 +456,7 @@
     "challenge.vmTtl": "TTL:",
     "challenge.vmPending": "Pending",
     "challenge.vmNoActive": "No active VM. Create one to get your instance details.",
+    "challenge.vmCreateNotice": "After creating a VM, it may take over a minute before it becomes accessible. If it remains inaccessible for more than 5 minutes, please contact the admins.",
     "challenge.loginToSubmitPrefix": "Please",
     "challenge.loginToSubmitSuffix": "to submit flags.",
     "challenge.correct": "Correct!",

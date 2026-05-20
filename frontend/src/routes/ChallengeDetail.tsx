@@ -900,7 +900,8 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                     </div>
                                 ) : null}
 
-                                {stackMessage ? <p className='mt-2 text-xs text-danger'>{stackMessage}</p> : null}
+                                {stackMessage ? <p className='mt-4 text-sm text-danger'>{stackMessage}</p> : null}
+                                {auth.user ? <p className='mt-4 text-sm text-warning'>{t('challenge.vmCreateNotice')}</p> : null}
                             </div>
                         ) : null}
 

@@ -456,6 +456,7 @@
     "challenge.vmTtl": "TTL:",
     "challenge.vmPending": "保留中",
     "challenge.vmNoActive": "アクティブなVMがありません。インスタンス情報を取得するには作成してください。",
+    "challenge.vmCreateNotice": "VM作成後、接続可能になるまでに1分以上かかる場合があります。5分以上接続できない状態が続く場合は、運営にお問い合わせください。",
     "challenge.loginToSubmitPrefix": "フラグを提出するには",
     "challenge.loginToSubmitSuffix": "してください。",
     "challenge.correct": "正解！",
