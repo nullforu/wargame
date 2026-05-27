@@ -9,7 +9,7 @@ Notes:
 - Legacy Stack APIs remain available, but VM APIs are independent.
 - For authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests, send both `csrf_token` cookie and matching `X-CSRF-Token` header.
 - VM row deletion from wargame DB is explicit through user/admin delete endpoints.
-- VM row deletion is also attempted automatically right after a correct flag submission for that challenge.
+- VM rows are not deleted automatically after a correct flag submission.
 - VM rows are not deleted automatically just because orchestrator status changed to error or missing.
 
 ## VM Response Schema
@@ -117,7 +117,7 @@ Errors:
 - 401 `invalid token` or `missing access_token cookie`
 - 403 `user blocked` or `challenge locked`
 - 404 `challenge not found`
-- 409 `vm limit reached` or `challenge already solved`
+- 409 `vm limit reached`
 - 429 `too many submissions`
 - 503 `vm feature disabled` or `vm orchestrator unavailable`
 - 500 internal error
@@ -125,6 +125,7 @@ Errors:
 Create behavior:
 
 - Challenge must have `vm_enabled=true` and non-empty `vm_spec` (YAML).
+- Solved users can still create or recreate VMs for the same challenge.
 - Wargame parses the YAML, rewrites `id` to generated `vm_id`, and sends the rewritten spec to orchestrator.
 - If an existing VM row already exists for `(user_id, challenge_id)`, create returns the existing VM instead of creating a second one.
 - User VM cap and VM creation rate limit are enforced server-side.
@@ -212,7 +213,7 @@ Delete behavior:
 
 - Wargame requests sandbox deletion in orchestrator first.
 - If orchestrator returns `404`, DB row deletion still continues.
-- DB row is removed only by explicit delete (or solve-triggered cleanup).
+- DB row is removed only by explicit delete.
 
 ---
 
@@ -317,8 +318,7 @@ When a user submits a correct flag:
 
 - scoreboard cache/notify flow runs as before.
 - stack cleanup (legacy) is attempted.
-- VM cleanup is attempted (`DELETE` path in service).
-- VM cleanup failure does not revert accepted solve result; it is logged on server side.
+- VM is kept after solve; cleanup is user/admin initiated through delete endpoints.
 
 ---
 

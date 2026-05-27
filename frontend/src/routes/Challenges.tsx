@@ -270,10 +270,11 @@ const Challenges = ({ routeParams = {} }: RouteProps) => {
     const [topUsers, setTopUsers] = useState<UserRankingEntry[]>([])
     const [featuredSeries, setFeaturedSeries] = useState<(ChallengeSeries | null)[]>([null, null, null, null])
     const featuredSeriesCardBackgrounds = [
-        'bg-amber-50 dark:bg-amber-400/10 border border-amber-300 dark:border-amber-500/20', 
-        'bg-violet-50 dark:bg-violet-400/10 border border-violet-200 dark:border-violet-300/20', 
-        'bg-sky-50 dark:bg-sky-400/10 border border-sky-200 dark:border-sky-500/20', 
-        'bg-emerald-50 dark:bg-emerald-400/10 border border-emerald-200 dark:border-emerald-500/20']
+        'bg-amber-50 dark:bg-amber-400/10 border border-amber-300 dark:border-amber-500/20',
+        'bg-violet-50 dark:bg-violet-400/10 border border-violet-200 dark:border-violet-300/20',
+        'bg-sky-50 dark:bg-sky-400/10 border border-sky-200 dark:border-sky-500/20',
+        'bg-emerald-50 dark:bg-emerald-400/10 border border-emerald-200 dark:border-emerald-500/20',
+    ]
     const [categoryCounts, setCategoryCounts] = useState<{ category: string; count: number }[]>([])
     const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
     const [levelCounts, setLevelCounts] = useState<{ level: number; count: number }[]>([])

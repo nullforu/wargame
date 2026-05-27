@@ -594,6 +594,57 @@ func TestVMManagementAndAuth(t *testing.T) {
 	}
 }
 
+func TestVMPersistsAfterSolveAndCanBeRecreated(t *testing.T) {
+	cfg := testCfg
+	cfg.VM = config.VMConfig{
+		Enabled:             true,
+		MaxPer:              3,
+		OrchestratorBaseURL: "http://localhost:8082",
+		OrchestratorTimeout: 5 * time.Second,
+		CreateWindow:        time.Minute,
+		CreateMax:           5,
+	}
+	mock := &vm.MockClient{
+		CreateSandboxFn: func(ctx context.Context, id string, specYAML string) (*vm.Sandbox, error) {
+			exp := time.Now().UTC().Add(time.Hour)
+			return &vm.Sandbox{ID: id, Status: vm.SandboxStatus{Phase: "Pending", ExpireAt: &exp}}, nil
+		},
+		GetSandboxFn: func(ctx context.Context, id string) (*vm.Sandbox, error) {
+			exp := time.Now().UTC().Add(time.Hour)
+			return &vm.Sandbox{ID: id, Status: vm.SandboxStatus{Phase: "Running", ExternalIP: "127.0.0.1", AssignedPorts: []vm.PortMapping{{HostPort: 31000, ContainerPort: 31337, Protocol: "tcp"}}, ExpireAt: &exp}}, nil
+		},
+		DeleteSandboxFn: func(ctx context.Context, id string) error { return nil },
+	}
+	env := setupVMTest(t, cfg, mock)
+	userAccess, _, _ := registerAndLogin(t, env, "vm-solve-user@example.com", models.UserRole, "strong-pass")
+	challenge := createVMChallenge(t, env, "VMSolvePersist")
+
+	rec := doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/vm", nil, authHeader(userAccess))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create vm status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/submit", map[string]string{"flag": "flag{vm}"}, authHeader(userAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("submit correct flag status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges/"+itoa(challenge.ID)+"/vm", nil, authHeader(userAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("vm should remain after solve, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodDelete, "/api/challenges/"+itoa(challenge.ID)+"/vm", nil, authHeader(userAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete vm after solve status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequest(t, env.router, http.MethodPost, "/api/challenges/"+itoa(challenge.ID)+"/vm", nil, authHeader(userAccess))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("recreate vm after solve status %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestVMBlockedUserBehavior(t *testing.T) {
 	cfg := testCfg
 	cfg.VM.Enabled = true

@@ -127,10 +127,6 @@ func (s *VMService) GetOrCreateVM(ctx context.Context, userID, challengeID int64
 		return nil, err
 	}
 
-	if err := s.ensureNotSolved(ctx, userID, challengeID); err != nil {
-		return nil, err
-	}
-
 	existing, err := s.findExistingVM(ctx, userID, challengeID)
 	if err != nil {
 		return nil, err
@@ -220,23 +216,6 @@ func (s *VMService) loadChallengeSpec(ctx context.Context, challengeID int64) (*
 	}
 
 	return challenge, *challenge.VMSpec, nil
-}
-
-func (s *VMService) ensureNotSolved(ctx context.Context, userID, challengeID int64) error {
-	if s.submissionRepo == nil {
-		return nil
-	}
-
-	solved, err := s.submissionRepo.HasCorrect(ctx, userID, challengeID)
-	if err != nil {
-		return fmt.Errorf("vm.GetOrCreateVM solved: %w", err)
-	}
-
-	if solved {
-		return ErrAlreadySolved
-	}
-
-	return nil
 }
 
 func (s *VMService) ensureUnlocked(ctx context.Context, userID int64, challenge *models.Challenge) error {

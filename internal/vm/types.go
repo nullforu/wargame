@@ -45,7 +45,7 @@ type CreateSandboxRequest struct {
 type SandboxStatus struct {
 	Phase         string        `json:"phase"`
 	NodeName      string        `json:"node_name,omitempty"`
-	ExternalIP    string        `json:"external_ip,omitempty"`
+	ExternalIP    string        `json:"external,omitempty"`
 	AssignedPorts []PortMapping `json:"assigned_ports,omitempty"`
 	ExpireAt      *time.Time    `json:"expire_at,omitempty"`
 	LastError     string        `json:"last_error,omitempty"`

@@ -34,7 +34,8 @@ const VM_POLL_FAST_MS = 2000
 const VM_POLL_SLOW_MS = 60000
 type FirstBloodDurationUnit = 'minute' | 'hour' | 'day' | 'month' | 'year'
 
-const vmPollInterval = (status?: string | null) => (status?.toLowerCase() === 'running' ? VM_POLL_SLOW_MS : VM_POLL_FAST_MS)
+const vmStatus = (status?: string | null) => (status || '').trim().toLowerCase()
+const vmPollInterval = (status?: string | null) => (vmStatus(status) === 'running' ? VM_POLL_SLOW_MS : VM_POLL_FAST_MS)
 const vmProtocol = (protocol?: string | null) => (protocol || 'tcp').toUpperCase()
 const copyText = (value: string) => {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -130,8 +131,9 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const [editingCommentID, setEditingCommentID] = useState<number | null>(null)
     const [editingCommentContent, setEditingCommentContent] = useState('')
     const [copiedValue, setCopiedValue] = useState<string | null>(null)
-    const stackEnabled = Boolean(challenge && !challenge.is_locked && !challenge.is_solved && 'vm_enabled' in challenge && challenge.vm_enabled === true)
-    const isStackPending = stackInfo?.status?.toLowerCase() === 'pending'
+    const stackEnabled = Boolean(challenge && !challenge.is_locked && 'vm_enabled' in challenge && challenge.vm_enabled === true)
+    const isStackPending = vmStatus(stackInfo?.status) === 'pending'
+    const isStackRunning = vmStatus(stackInfo?.status) === 'running'
 
     const syncAuthUser = async () => {
         if (!auth.user) return
@@ -410,7 +412,6 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         const handleSolveSuccess = async () => {
             setSubmission({ status: 'success', message: t('challenge.correct') })
             setFlagInput('')
-            setStackInfo(null)
             setChallenge((prev) => (prev ? { ...prev, is_solved: true } : prev))
             setCanViewWriteupContent(true)
             await Promise.all([loadChallenge(), loadSolvers(solverPage), loadWriteups(writeupPage)])
@@ -777,7 +778,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                             </div>
                         )}
 
-                        {!challenge.is_locked && !challenge.is_solved && 'vm_enabled' in challenge && challenge.vm_enabled ? (
+                        {!challenge.is_locked && 'vm_enabled' in challenge && challenge.vm_enabled ? (
                             <div className='mt-8 rounded-md border border-border/50 bg-surface-muted/40 p-4 sm:p-5'>
                                 <div className='flex items-center justify-between gap-2'>
                                     <h2 className='text-base font-semibold text-text'>{t('challenge.vmInstance')}</h2>
@@ -798,7 +799,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                 {t('challenge.vmTtl')} <span className='text-text'>{stackInfo.ttl_expires_at ? formatTimestamp(stackInfo.ttl_expires_at) : t('common.pending')}</span>
                                             </p>
                                             <div>
-                                                {stackInfo.external_ip && stackInfo.ports?.length > 0 ? (
+                                                {isStackRunning && stackInfo.external_ip && stackInfo.ports?.length > 0 ? (
                                                     <div className='mt-3 space-y-3'>
                                                         {stackInfo.ports.map((port, index) => {
                                                             const protocol = vmProtocol(port.protocol)
@@ -864,9 +865,9 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                             )
                                                         })}
                                                     </div>
-                                                ) : (
+                                                ) : !isStackRunning ? (
                                                     <div className='mt-2 inline-flex items-center rounded-md border border-border/50 bg-surface-muted px-3 py-2 text-sm text-text-muted'>{t('common.pending')}</div>
-                                                )}
+                                                ) : null}
                                             </div>
                                             {stackInfo.last_error ? <p className='text-danger'>{stackInfo.last_error}</p> : null}
                                         </div>
@@ -885,15 +886,17 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                 {auth.user ? (
                                     <div className='mt-4 flex flex-wrap gap-2'>
                                         {stackInfo ? (
-                                            <button
-                                                className='rounded-md border border-danger/20 bg-surface px-3 py-2 text-sm text-danger hover:border-danger/40 disabled:cursor-not-allowed disabled:opacity-50'
-                                                onClick={deleteStack}
-                                                disabled={stackLoading || isStackPending}
-                                            >
-                                                {stackLoading ? t('challenge.vmWorking') : t('challenge.deleteVM')}
-                                            </button>
+                                            isStackRunning ? (
+                                                <button
+                                                    className='rounded-md border border-danger/20 bg-surface px-3 py-2 text-sm text-danger hover:border-danger/40 disabled:cursor-not-allowed disabled:opacity-50'
+                                                    onClick={deleteStack}
+                                                    disabled={stackLoading || isStackPending}
+                                                >
+                                                    {stackLoading ? t('challenge.vmWorking') : t('challenge.deleteVM')}
+                                                </button>
+                                            ) : null
                                         ) : (
-                                            <button className='rounded-md bg-accent px-3 py-2 text-sm text-white hover:bg-accent-strong disabled:opacity-60' onClick={createStack} disabled={stackLoading || challenge.is_solved}>
+                                            <button className='rounded-md bg-accent px-3 py-2 text-sm text-white hover:bg-accent-strong disabled:opacity-60' onClick={createStack} disabled={stackLoading}>
                                                 {stackLoading ? t('challenge.vmWorking') : t('challenge.createVM')}
                                             </button>
                                         )}

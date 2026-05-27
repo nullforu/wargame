@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -924,11 +923,6 @@ func (h *Handler) SubmitFlag(ctx *gin.Context) {
 		h.notifyScoreboardChanged(ctx.Request.Context(), "submission_correct")
 		if h.stacks != nil {
 			_ = h.stacks.DeleteStackByUserAndChallenge(ctx.Request.Context(), userID, challengeID)
-		}
-		if h.vms != nil {
-			if err := h.vms.DeleteVM(ctx.Request.Context(), userID, challengeID); err != nil && !errors.Is(err, service.ErrVMNotFound) {
-				slog.Warn("delete vm after solve failed", slog.Int64("user_id", userID), slog.Int64("challenge_id", challengeID), slog.Any("error", err))
-			}
 		}
 	}
 	ctx.JSON(http.StatusOK, gin.H{"correct": correct})

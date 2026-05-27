@@ -103,6 +103,30 @@ func TestVMServiceGetOrCreateVMRewritesManifestID(t *testing.T) {
 	}
 }
 
+func TestVMServiceGetOrCreateVMAllowsSolvedChallenge(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "vm-solved@example.com", "vm-solved", "pass", models.UserRole)
+	challenge := createVMChallenge(t, env, "vm-solved")
+	createSubmission(t, env, user.ID, challenge.ID, true, time.Now().UTC())
+
+	client := &vm.MockClient{
+		CreateSandboxFn: func(ctx context.Context, id string, specYAML string) (*vm.Sandbox, error) {
+			exp := time.Now().UTC().Add(time.Hour)
+			return &vm.Sandbox{ID: id, Status: vm.SandboxStatus{Phase: "Pending", ExpireAt: &exp}}, nil
+		},
+	}
+	svc, _ := newVMServiceForTest(env, client, config.VMConfig{Enabled: true, MaxPer: 2, CreateWindow: time.Minute, CreateMax: 5})
+
+	model, err := svc.GetOrCreateVM(context.Background(), user.ID, challenge.ID)
+	if err != nil {
+		t.Fatalf("GetOrCreateVM solved challenge: %v", err)
+	}
+
+	if model == nil || model.VMID == "" {
+		t.Fatalf("expected created vm for solved challenge, got %+v", model)
+	}
+}
+
 func TestVMServiceRefreshDoesNotDeleteFailedVM(t *testing.T) {
 	env := setupServiceTest(t)
 	user := createUser(t, env, "vm-failed@example.com", "vm-failed", "pass", models.UserRole)
