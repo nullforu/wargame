@@ -379,3 +379,218 @@ func TestVMServiceCleanupExpiredVMs(t *testing.T) {
 func ptrTime(value time.Time) *time.Time {
 	return &value
 }
+
+func TestVMServiceUserVMSummary(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "vm-summary@example.com", "vm-summary", "pass", models.UserRole)
+	challenge := createVMChallenge(t, env, "vm-summary")
+	_, vmRepo := newVMServiceForTest(env, &vm.MockClient{}, config.VMConfig{Enabled: true, MaxPer: 2, CreateWindow: time.Minute, CreateMax: 1, CleanupInterval: time.Minute})
+
+	now := time.Now().UTC()
+	if err := vmRepo.Create(context.Background(), &models.VM{
+		UserID:      user.ID,
+		ChallengeID: challenge.ID,
+		VMID:        "vm-summary-1",
+		Status:      "Running",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}); err != nil {
+		t.Fatalf("create vm: %v", err)
+	}
+
+	svcEnabled, _ := newVMServiceForTest(env, &vm.MockClient{}, config.VMConfig{Enabled: true, MaxPer: 2, CreateWindow: time.Minute, CreateMax: 1, CleanupInterval: time.Minute})
+	count, limit, err := svcEnabled.UserVMSummary(context.Background(), user.ID)
+	if err != nil {
+		t.Fatalf("UserVMSummary(enabled): %v", err)
+	}
+
+	if count != 1 || limit != 2 {
+		t.Fatalf("expected 1/2, got %d/%d", count, limit)
+	}
+
+	svcDisabled, _ := newVMServiceForTest(env, &vm.MockClient{}, config.VMConfig{Enabled: false, MaxPer: 2, CreateWindow: time.Minute, CreateMax: 1, CleanupInterval: time.Minute})
+	count, limit, err = svcDisabled.UserVMSummary(context.Background(), user.ID)
+	if err != nil {
+		t.Fatalf("UserVMSummary(disabled): %v", err)
+	}
+
+	if count != 0 || limit != 0 {
+		t.Fatalf("expected 0/0 when disabled, got %d/%d", count, limit)
+	}
+}
+
+func TestVMServiceListAndGetByVMID(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "vm-list-get@example.com", "vm-list-get", "pass", models.UserRole)
+	challenge := createVMChallenge(t, env, "vm-list-get")
+	svc, vmRepo := newVMServiceForTest(env, &vm.MockClient{
+		GetSandboxFn: func(ctx context.Context, id string) (*vm.Sandbox, error) {
+			return &vm.Sandbox{ID: id, Status: vm.SandboxStatus{Phase: "Running", ExternalIP: "127.0.0.1"}}, nil
+		},
+	}, config.VMConfig{Enabled: true, MaxPer: 3, CreateWindow: time.Minute, CreateMax: 1, CleanupInterval: time.Minute})
+
+	now := time.Now().UTC()
+	if err := vmRepo.Create(context.Background(), &models.VM{
+		UserID:      user.ID,
+		ChallengeID: challenge.ID,
+		VMID:        "vm-list-get-1",
+		Status:      "Pending",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}); err != nil {
+		t.Fatalf("create vm: %v", err)
+	}
+
+	rows, err := svc.ListUserVMs(context.Background(), user.ID)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("ListUserVMs err=%v len=%d", err, len(rows))
+	}
+
+	row, err := svc.GetVMByVMID(context.Background(), "vm-list-get-1")
+	if err != nil {
+		t.Fatalf("GetVMByVMID: %v", err)
+	}
+
+	if row.Status != "Running" {
+		t.Fatalf("expected refreshed status Running, got %s", row.Status)
+	}
+}
+
+func TestVMServiceDeletePaths(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "vm-delete@example.com", "vm-delete", "pass", models.UserRole)
+	challenge := createVMChallenge(t, env, "vm-delete")
+	svc, vmRepo := newVMServiceForTest(env, &vm.MockClient{
+		DeleteSandboxFn: func(ctx context.Context, id string) error { return vm.ErrNotFound },
+	}, config.VMConfig{Enabled: true, MaxPer: 3, CreateWindow: time.Minute, CreateMax: 1, CleanupInterval: time.Minute})
+
+	now := time.Now().UTC()
+	if err := vmRepo.Create(context.Background(), &models.VM{
+		UserID:      user.ID,
+		ChallengeID: challenge.ID,
+		VMID:        "vm-delete-1",
+		Status:      "Running",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}); err != nil {
+		t.Fatalf("create vm: %v", err)
+	}
+
+	if err := svc.DeleteVM(context.Background(), user.ID, challenge.ID); err != nil {
+		t.Fatalf("DeleteVM: %v", err)
+	}
+
+	if _, err := vmRepo.GetByVMID(context.Background(), "vm-delete-1"); !errors.Is(err, repo.ErrNotFound) {
+		t.Fatalf("expected deleted row, got %v", err)
+	}
+
+	if err := vmRepo.Create(context.Background(), &models.VM{
+		UserID:      user.ID,
+		ChallengeID: challenge.ID,
+		VMID:        "vm-delete-2",
+		Status:      "Running",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}); err != nil {
+		t.Fatalf("create vm2: %v", err)
+	}
+
+	if err := svc.DeleteVMByVMID(context.Background(), "vm-delete-2"); err != nil {
+		t.Fatalf("DeleteVMByVMID: %v", err)
+	}
+}
+
+func TestVMServiceStartTTLReaper(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "vm-reaper@example.com", "vm-reaper", "pass", models.UserRole)
+	challenge := createVMChallenge(t, env, "vm-reaper")
+	svc, vmRepo := newVMServiceForTest(env, &vm.MockClient{}, config.VMConfig{Enabled: true, MaxPer: 3, CreateWindow: time.Minute, CreateMax: 1, CleanupInterval: time.Minute})
+
+	now := time.Now().UTC()
+	if err := vmRepo.Create(context.Background(), &models.VM{
+		UserID:       user.ID,
+		ChallengeID:  challenge.ID,
+		VMID:         "vm-reaper-expired",
+		Status:       "Running",
+		TTLExpiresAt: ptrTime(now.Add(-time.Minute)),
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}); err != nil {
+		t.Fatalf("create vm: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	svc.StartTTLReaper(ctx, 10*time.Millisecond)
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if _, err := vmRepo.GetByVMID(context.Background(), "vm-reaper-expired"); errors.Is(err, repo.ErrNotFound) {
+			return
+		}
+
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	t.Fatal("expected StartTTLReaper to delete expired vm row")
+}
+
+func TestVMServiceStartTTLReaperNonPositiveInterval(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "vm-reaper-nonpos@example.com", "vm-reaper-nonpos", "pass", models.UserRole)
+	challenge := createVMChallenge(t, env, "vm-reaper-nonpos")
+	svc, vmRepo := newVMServiceForTest(env, &vm.MockClient{}, config.VMConfig{Enabled: true, MaxPer: 3, CreateWindow: time.Minute, CreateMax: 1, CleanupInterval: time.Minute})
+
+	now := time.Now().UTC()
+	if err := vmRepo.Create(context.Background(), &models.VM{
+		UserID:       user.ID,
+		ChallengeID:  challenge.ID,
+		VMID:         "vm-reaper-still-there",
+		Status:       "Running",
+		TTLExpiresAt: ptrTime(now.Add(-time.Minute)),
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}); err != nil {
+		t.Fatalf("create vm: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	svc.StartTTLReaper(ctx, 0)
+	time.Sleep(50 * time.Millisecond)
+
+	if _, err := vmRepo.GetByVMID(context.Background(), "vm-reaper-still-there"); err != nil {
+		t.Fatalf("expected vm row to remain with non-positive interval, got %v", err)
+	}
+}
+
+func TestVMServiceHelpers(t *testing.T) {
+	if got := mapVMOrchestratorError(vm.ErrNotFound); !errors.Is(got, ErrVMNotFound) {
+		t.Fatalf("expected ErrVMNotFound, got %v", got)
+	}
+
+	if got := mapVMOrchestratorError(vm.ErrInvalid); !errors.Is(got, ErrVMInvalidSpec) {
+		t.Fatalf("expected ErrVMInvalidSpec, got %v", got)
+	}
+
+	if got := mapVMOrchestratorError(vm.ErrUnavailable); !errors.Is(got, ErrVMOrchestratorDown) {
+		t.Fatalf("expected ErrVMOrchestratorDown, got %v", got)
+	}
+
+	ports := toVMPortMappings([]vm.PortMapping{{HostPort: 10000, ContainerPort: 31337, Protocol: "tcp"}})
+	if len(ports) != 1 || ports[0].HostPort != 10000 {
+		t.Fatalf("unexpected mapped ports: %+v", ports)
+	}
+
+	if toVMPortMappings(nil) != nil {
+		t.Fatal("expected nil for empty port mappings")
+	}
+
+	if !isUniqueVMConflict(errors.New("duplicate key value violates unique constraint")) {
+		t.Fatal("expected unique conflict=true")
+	}
+
+	if isUniqueVMConflict(errors.New("other error")) {
+		t.Fatal("expected unique conflict=false")
+	}
+}
