@@ -74,6 +74,10 @@ func TestLoadConfigDefaults(t *testing.T) {
 	if cfg.Stack.CreateMax != 1 {
 		t.Errorf("expected Stack.CreateMax 1, got %d", cfg.Stack.CreateMax)
 	}
+
+	if cfg.VM.CleanupInterval != 30*time.Minute {
+		t.Errorf("expected VM.CleanupInterval 30m, got %v", cfg.VM.CleanupInterval)
+	}
 }
 
 func TestLoadConfigCustomValues(t *testing.T) {
@@ -121,6 +125,7 @@ func TestLoadConfigCustomValues(t *testing.T) {
 	os.Setenv("STACKS_PROVISIONER_TIMEOUT", "9s")
 	os.Setenv("STACKS_CREATE_WINDOW", "2m")
 	os.Setenv("STACKS_CREATE_MAX", "2")
+	os.Setenv("VM_CLEANUP_INTERVAL", "45m")
 
 	defer os.Clearenv()
 
@@ -223,6 +228,9 @@ func TestLoadConfigCustomValues(t *testing.T) {
 	if cfg.Stack.MaxPer != 5 {
 		t.Errorf("expected Stack.MaxPer 5, got %d", cfg.Stack.MaxPer)
 	}
+	if cfg.VM.CleanupInterval != 45*time.Minute {
+		t.Errorf("expected VM.CleanupInterval 45m, got %v", cfg.VM.CleanupInterval)
+	}
 }
 
 func TestLoadConfigInvalidValues(t *testing.T) {
@@ -248,6 +256,7 @@ func TestLoadConfigInvalidValues(t *testing.T) {
 		{"invalid s3 media force path", "S3_MEDIA_FORCE_PATH_STYLE", "bad-bool"},
 		{"invalid stack max scope", "STACKS_MAX_SCOPE", "org"},
 		{"invalid leaderboard cache ttl", "LEADERBOARD_CACHE_TTL", "bad-duration"},
+		{"invalid vm cleanup interval", "VM_CLEANUP_INTERVAL", "bad-duration"},
 	}
 
 	for _, tt := range tests {
@@ -719,6 +728,64 @@ func TestValidateConfigAdditionalValidation(t *testing.T) {
 
 	if err := validateConfig(cfg); err == nil {
 		t.Error("expected error for redis/jwt/security validation")
+	}
+}
+
+func TestValidateConfigInvalidVMConfig(t *testing.T) {
+	cfg := Config{
+		AppEnv:     "local",
+		HTTPAddr:   ":8080",
+		BcryptCost: bcrypt.DefaultCost,
+		DB: DBConfig{
+			Host:            "localhost",
+			Port:            5432,
+			User:            "user",
+			Name:            "db",
+			MaxOpenConns:    10,
+			MaxIdleConns:    5,
+			ConnMaxLifetime: time.Minute,
+		},
+		Redis: RedisConfig{
+			Addr:     "localhost:6379",
+			PoolSize: 10,
+		},
+		JWT: JWTConfig{
+			Secret:     "secret",
+			Issuer:     "issuer",
+			AccessTTL:  time.Hour,
+			RefreshTTL: 24 * time.Hour,
+		},
+		Security: SecurityConfig{
+			SubmissionWindow: time.Minute,
+			SubmissionMax:    10,
+		},
+		Cache: CacheConfig{
+			TimelineTTL:    time.Minute,
+			LeaderboardTTL: time.Minute,
+		},
+		Logging: LoggingConfig{
+			Dir:          "logs",
+			FilePrefix:   "app",
+			MaxBodyBytes: 1024,
+		},
+		VM: VMConfig{
+			Enabled:             true,
+			MaxPer:              1,
+			OrchestratorBaseURL: "http://localhost:8082",
+			OrchestratorTimeout: time.Second,
+			CreateWindow:        time.Minute,
+			CreateMax:           1,
+			CleanupInterval:     0,
+		},
+	}
+
+	err := validateConfig(cfg)
+	if err == nil {
+		t.Fatal("expected vm validation error")
+	}
+
+	if !strings.Contains(err.Error(), "VM_CLEANUP_INTERVAL") {
+		t.Fatalf("expected VM_CLEANUP_INTERVAL error, got %v", err)
 	}
 }
 

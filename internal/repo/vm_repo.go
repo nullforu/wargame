@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"time"
 
 	"wargame/internal/models"
 
@@ -124,4 +125,22 @@ func (r *VMRepo) Delete(ctx context.Context, vm *models.VM) error {
 	}
 
 	return nil
+}
+
+func (r *VMRepo) DeleteExpired(ctx context.Context, now time.Time) (int64, error) {
+	res, err := r.db.NewDelete().
+		Model((*models.VM)(nil)).
+		Where("ttl_expires_at IS NOT NULL").
+		Where("ttl_expires_at <= ?", now).
+		Exec(ctx)
+	if err != nil {
+		return 0, wrapError("vmRepo.DeleteExpired", err)
+	}
+
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return 0, wrapError("vmRepo.DeleteExpired rows affected", err)
+	}
+
+	return affected, nil
 }

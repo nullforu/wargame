@@ -142,3 +142,69 @@ func TestVMRepoNotFound(t *testing.T) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }
+
+func TestVMRepoDeleteExpired(t *testing.T) {
+	env := setupRepoTest(t)
+	vmRepo := NewVMRepo(env.db)
+	user := createUserForTestUserScope(t, env, "vmexpired@example.com", "vmexpired", "pass", models.UserRole)
+	challenge1 := createChallenge(t, env, "VM Expired 1", 100, "flag{vmexpired1}", true)
+	challenge2 := createChallenge(t, env, "VM Expired 2", 100, "flag{vmexpired2}", true)
+	challenge3 := createChallenge(t, env, "VM Expired 3", 100, "flag{vmexpired3}", true)
+
+	now := time.Now().UTC()
+	expired := &models.VM{
+		UserID:       user.ID,
+		ChallengeID:  challenge1.ID,
+		VMID:         "vm-expired",
+		Status:       "Running",
+		TTLExpiresAt: ptrTime(now.Add(-time.Minute)),
+		CreatedAt:    now.Add(-time.Hour),
+		UpdatedAt:    now.Add(-time.Hour),
+	}
+
+	active := &models.VM{
+		UserID:       user.ID,
+		ChallengeID:  challenge2.ID,
+		VMID:         "vm-active",
+		Status:       "Running",
+		TTLExpiresAt: ptrTime(now.Add(time.Hour)),
+		CreatedAt:    now.Add(-time.Hour),
+		UpdatedAt:    now.Add(-time.Hour),
+	}
+
+	noTTL := &models.VM{
+		UserID:      user.ID,
+		ChallengeID: challenge3.ID,
+		VMID:        "vm-nottl",
+		Status:      "Running",
+		CreatedAt:   now.Add(-time.Hour),
+		UpdatedAt:   now.Add(-time.Hour),
+	}
+
+	for _, row := range []*models.VM{expired, active, noTTL} {
+		if err := vmRepo.Create(context.Background(), row); err != nil {
+			t.Fatalf("create vm(%s): %v", row.VMID, err)
+		}
+	}
+
+	deleted, err := vmRepo.DeleteExpired(context.Background(), now)
+	if err != nil {
+		t.Fatalf("DeleteExpired: %v", err)
+	}
+
+	if deleted != 1 {
+		t.Fatalf("expected 1 deleted row, got %d", deleted)
+	}
+
+	if _, err := vmRepo.GetByVMID(context.Background(), "vm-expired"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected expired row deleted, got err=%v", err)
+	}
+
+	if _, err := vmRepo.GetByVMID(context.Background(), "vm-active"); err != nil {
+		t.Fatalf("expected active row to remain, got %v", err)
+	}
+
+	if _, err := vmRepo.GetByVMID(context.Background(), "vm-nottl"); err != nil {
+		t.Fatalf("expected null-ttl row to remain, got %v", err)
+	}
+}

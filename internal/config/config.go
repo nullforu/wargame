@@ -111,6 +111,7 @@ type VMConfig struct {
 	OrchestratorTimeout time.Duration
 	CreateWindow        time.Duration
 	CreateMax           int
+	CleanupInterval     time.Duration
 }
 
 const defaultJWTSecret = "change-me"
@@ -297,6 +298,10 @@ func Load() (Config, error) {
 	if err != nil {
 		errs = append(errs, err)
 	}
+	vmCleanupInterval, err := getDuration("VM_CLEANUP_INTERVAL", 30*time.Minute)
+	if err != nil {
+		errs = append(errs, err)
+	}
 
 	cfg := Config{
 		AppEnv:          appEnv,
@@ -385,6 +390,7 @@ func Load() (Config, error) {
 			OrchestratorTimeout: vmTimeout,
 			CreateWindow:        vmCreateWindow,
 			CreateMax:           vmCreateMax,
+			CleanupInterval:     vmCleanupInterval,
 		},
 	}
 
@@ -592,6 +598,9 @@ func validateConfig(cfg Config) error {
 		if cfg.VM.CreateMax <= 0 {
 			errs = append(errs, errors.New("VM_CREATE_MAX must be positive"))
 		}
+		if cfg.VM.CleanupInterval <= 0 {
+			errs = append(errs, errors.New("VM_CLEANUP_INTERVAL must be positive"))
+		}
 	}
 
 	if len(errs) == 0 {
@@ -734,6 +743,7 @@ func FormatForLog(cfg Config) map[string]any {
 			"orchestrator_timeout":  seconds(cfg.VM.OrchestratorTimeout),
 			"create_window":         seconds(cfg.VM.CreateWindow),
 			"create_max":            cfg.VM.CreateMax,
+			"cleanup_interval":      seconds(cfg.VM.CleanupInterval),
 		},
 	}
 }
