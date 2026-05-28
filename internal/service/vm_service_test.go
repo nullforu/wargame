@@ -267,3 +267,115 @@ func TestVMServiceAdminListDoesNotRefreshRows(t *testing.T) {
 		t.Fatalf("expected vm row to remain in db without refresh, got %v", err)
 	}
 }
+
+func TestVMServiceGetOrCreateVMCleansUpExpiredRowsBeforeLimit(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "vm-cleanup-limit@example.com", "vm-cleanup-limit", "pass", models.UserRole)
+	challenge1 := createVMChallenge(t, env, "vm-cleanup-limit-1")
+	challenge2 := createVMChallenge(t, env, "vm-cleanup-limit-2")
+	svc, vmRepo := newVMServiceForTest(env, &vm.MockClient{
+		CreateSandboxFn: func(ctx context.Context, id string, specYAML string) (*vm.Sandbox, error) {
+			exp := time.Now().UTC().Add(time.Hour)
+			return &vm.Sandbox{ID: id, Status: vm.SandboxStatus{Phase: "Pending", ExpireAt: &exp}}, nil
+		},
+		GetSandboxFn: func(ctx context.Context, id string) (*vm.Sandbox, error) {
+			return &vm.Sandbox{ID: id, Status: vm.SandboxStatus{Phase: "Running"}}, nil
+		},
+	}, config.VMConfig{Enabled: true, MaxPer: 1, CreateWindow: time.Minute, CreateMax: 5, CleanupInterval: 30 * time.Minute})
+
+	now := time.Now().UTC()
+	if err := vmRepo.Create(context.Background(), &models.VM{
+		UserID:       user.ID,
+		ChallengeID:  challenge1.ID,
+		VMID:         "vm-expired-limit",
+		Status:       "Running",
+		TTLExpiresAt: ptrTime(now.Add(-time.Minute)),
+		CreatedAt:    now.Add(-time.Hour),
+		UpdatedAt:    now.Add(-time.Hour),
+	}); err != nil {
+		t.Fatalf("create expired vm: %v", err)
+	}
+
+	created, err := svc.GetOrCreateVM(context.Background(), user.ID, challenge2.ID)
+	if err != nil {
+		t.Fatalf("GetOrCreateVM: %v", err)
+	}
+	if created == nil || created.VMID == "" {
+		t.Fatalf("expected created vm, got %+v", created)
+	}
+
+	if _, err := vmRepo.GetByVMID(context.Background(), "vm-expired-limit"); !errors.Is(err, repo.ErrNotFound) {
+		t.Fatalf("expected expired vm to be removed before limit check, got %v", err)
+	}
+}
+
+func TestVMServiceGetOrCreateVMKeepsRowsWithNullTTL(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "vm-null-ttl@example.com", "vm-null-ttl", "pass", models.UserRole)
+	challenge1 := createVMChallenge(t, env, "vm-null-ttl-1")
+	challenge2 := createVMChallenge(t, env, "vm-null-ttl-2")
+	svc, vmRepo := newVMServiceForTest(env, &vm.MockClient{
+		CreateSandboxFn: func(ctx context.Context, id string, specYAML string) (*vm.Sandbox, error) {
+			exp := time.Now().UTC().Add(time.Hour)
+			return &vm.Sandbox{ID: id, Status: vm.SandboxStatus{Phase: "Pending", ExpireAt: &exp}}, nil
+		},
+	}, config.VMConfig{Enabled: true, MaxPer: 1, CreateWindow: time.Minute, CreateMax: 5, CleanupInterval: 30 * time.Minute})
+
+	now := time.Now().UTC()
+	if err := vmRepo.Create(context.Background(), &models.VM{
+		UserID:      user.ID,
+		ChallengeID: challenge1.ID,
+		VMID:        "vm-null-ttl-limit",
+		Status:      "Running",
+		CreatedAt:   now.Add(-time.Hour),
+		UpdatedAt:   now.Add(-time.Hour),
+	}); err != nil {
+		t.Fatalf("create null ttl vm: %v", err)
+	}
+
+	if _, err := svc.GetOrCreateVM(context.Background(), user.ID, challenge2.ID); !errors.Is(err, ErrVMLimitReached) {
+		t.Fatalf("expected ErrVMLimitReached because null ttl row remains, got %v", err)
+	}
+}
+
+func TestVMServiceCleanupExpiredVMs(t *testing.T) {
+	env := setupServiceTest(t)
+	user := createUser(t, env, "vm-cleanup-all@example.com", "vm-cleanup-all", "pass", models.UserRole)
+	challenge1 := createVMChallenge(t, env, "vm-cleanup-all-1")
+	challenge2 := createVMChallenge(t, env, "vm-cleanup-all-2")
+	challenge3 := createVMChallenge(t, env, "vm-cleanup-all-3")
+	svc, vmRepo := newVMServiceForTest(env, &vm.MockClient{}, config.VMConfig{Enabled: true, MaxPer: 3, CreateWindow: time.Minute, CreateMax: 5, CleanupInterval: 30 * time.Minute})
+
+	now := time.Now().UTC()
+	for _, row := range []*models.VM{
+		{UserID: user.ID, ChallengeID: challenge1.ID, VMID: "vm-clean-expired", Status: "Running", TTLExpiresAt: ptrTime(now.Add(-time.Minute)), CreatedAt: now, UpdatedAt: now},
+		{UserID: user.ID, ChallengeID: challenge2.ID, VMID: "vm-clean-active", Status: "Running", TTLExpiresAt: ptrTime(now.Add(time.Minute)), CreatedAt: now, UpdatedAt: now},
+		{UserID: user.ID, ChallengeID: challenge3.ID, VMID: "vm-clean-null", Status: "Running", CreatedAt: now, UpdatedAt: now},
+	} {
+		if err := vmRepo.Create(context.Background(), row); err != nil {
+			t.Fatalf("create vm(%s): %v", row.VMID, err)
+		}
+	}
+
+	deleted, err := svc.CleanupExpiredVMs(context.Background())
+	if err != nil {
+		t.Fatalf("CleanupExpiredVMs: %v", err)
+	}
+	if deleted != 1 {
+		t.Fatalf("expected deleted=1, got %d", deleted)
+	}
+
+	if _, err := vmRepo.GetByVMID(context.Background(), "vm-clean-expired"); !errors.Is(err, repo.ErrNotFound) {
+		t.Fatalf("expected expired vm deleted, got %v", err)
+	}
+	if _, err := vmRepo.GetByVMID(context.Background(), "vm-clean-active"); err != nil {
+		t.Fatalf("expected active vm remain, got %v", err)
+	}
+	if _, err := vmRepo.GetByVMID(context.Background(), "vm-clean-null"); err != nil {
+		t.Fatalf("expected null-ttl vm remain, got %v", err)
+	}
+}
+
+func ptrTime(value time.Time) *time.Time {
+	return &value
+}

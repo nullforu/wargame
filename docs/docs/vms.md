@@ -8,9 +8,9 @@ Notes:
 - VM APIs are backed by `sandboxd-orch` (HTTP API).
 - Legacy Stack APIs remain available, but VM APIs are independent.
 - For authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests, send both `csrf_token` cookie and matching `X-CSRF-Token` header.
-- VM row deletion from wargame DB is explicit through user/admin delete endpoints.
+- VM rows with expired `ttl_expires_at` are deleted automatically by a background cleanup loop (`VM_CLEANUP_INTERVAL`, default `30m`).
 - VM rows are not deleted automatically after a correct flag submission.
-- VM rows are not deleted automatically just because orchestrator status changed to error or missing.
+- VM rows are not deleted automatically just because orchestrator status changed to error or missing (unless user/admin delete endpoints are used).
 
 ## VM Response Schema
 
@@ -128,6 +128,7 @@ Create behavior:
 - Solved users can still create or recreate VMs for the same challenge.
 - Wargame parses the YAML, rewrites `id` to generated `vm_id`, and sends the rewritten spec to orchestrator.
 - If an existing VM row already exists for `(user_id, challenge_id)`, create returns the existing VM instead of creating a second one.
+- Before create/limit checks, wargame removes the caller's expired VM rows from DB using `ttl_expires_at` (rows with `ttl_expires_at = null` are kept).
 - User VM cap and VM creation rate limit are enforced server-side.
 
 ---

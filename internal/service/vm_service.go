@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -124,6 +125,10 @@ func (s *VMService) GetOrCreateVM(ctx context.Context, userID, challengeID int64
 	}
 
 	if err := s.ensureUnlocked(ctx, userID, challenge); err != nil {
+		return nil, err
+	}
+
+	if err := s.cleanupExpiredUserVMs(ctx, userID); err != nil {
 		return nil, err
 	}
 
@@ -271,6 +276,67 @@ func (s *VMService) ensureUserLimit(ctx context.Context, userID int64) error {
 	}
 
 	return nil
+}
+
+func (s *VMService) cleanupExpiredUserVMs(ctx context.Context, userID int64) error {
+	rows, err := s.vmRepo.ListByUser(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("vm.cleanupExpiredUserVMs list: %w", err)
+	}
+
+	now := time.Now().UTC()
+	for i := range rows {
+		if rows[i].TTLExpiresAt == nil {
+			continue
+		}
+
+		if rows[i].TTLExpiresAt.After(now) {
+			continue
+		}
+
+		if err := s.vmRepo.Delete(ctx, &rows[i]); err != nil {
+			return fmt.Errorf("vm.cleanupExpiredUserVMs delete: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (s *VMService) CleanupExpiredVMs(ctx context.Context) (int64, error) {
+	deleted, err := s.vmRepo.DeleteExpired(ctx, time.Now().UTC())
+	if err != nil {
+		return 0, fmt.Errorf("vm.CleanupExpiredVMs: %w", err)
+	}
+
+	return deleted, nil
+}
+
+func (s *VMService) StartTTLReaper(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		slog.Warn("vm ttl reaper disabled due to non-positive interval", slog.Duration("interval", interval))
+		return
+	}
+
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				deleted, err := s.CleanupExpiredVMs(ctx)
+				if err != nil {
+					slog.Warn("vm ttl cleanup failed", slog.Any("error", err))
+					continue
+				}
+
+				if deleted > 0 {
+					slog.Info("vm ttl cleanup completed", slog.Int64("deleted", deleted))
+				}
+			}
+		}
+	}()
 }
 
 func (s *VMService) createVM(ctx context.Context, userID, challengeID int64, spec string) (*models.VM, error) {

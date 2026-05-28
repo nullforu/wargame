@@ -127,6 +127,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	vmSvc.StartTTLReaper(ctx, cfg.VM.CleanupInterval)
+
 	leaderboardBus := realtime.NewScoreboardBus(redisClient, cfg, scoreSvc, logger)
 	leaderboardBus.Start(ctx)
 
