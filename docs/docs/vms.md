@@ -10,7 +10,7 @@ Notes:
 - For authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests, send both `csrf_token` cookie and matching `X-CSRF-Token` header.
 - VM rows with expired `ttl_expires_at` are deleted automatically by a background cleanup loop (`VM_CLEANUP_INTERVAL`, default `30m`).
 - VM rows are not deleted automatically after a correct flag submission.
-- VM rows are not deleted automatically just because orchestrator status changed to error or missing (unless user/admin delete endpoints are used).
+- VM rows are not deleted automatically just because orchestrator status changed to error; however, if a refresh/read finds that the orchestrator sandbox is missing, the VM row can be removed automatically, in addition to the TTL cleanup above (user/admin delete endpoints can also remove rows).
 
 ## VM Response Schema
 
