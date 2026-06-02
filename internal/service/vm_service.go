@@ -228,6 +228,9 @@ func (s *VMService) ensureUnlocked(ctx context.Context, userID int64, challenge 
 		return nil
 	}
 
+	if canBypassChallengeProgression(userID, challenge.CreatedByUserID) {
+		return nil
+	}
 	if userID <= 0 || s.submissionRepo == nil {
 		return ErrChallengeLocked
 	}

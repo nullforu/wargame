@@ -57,7 +57,7 @@ const WriteupDetail = ({ routeParams = {} }: RouteProps) => {
 
     useEffect(() => {
         void loadWriteup()
-    }, [writeupID])
+    }, [writeupID, auth.user?.id])
 
     const deleteWriteup = async () => {
         if (!writeup || deleting) return

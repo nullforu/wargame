@@ -127,6 +127,35 @@ func TestVMServiceGetOrCreateVMAllowsSolvedChallenge(t *testing.T) {
 	}
 }
 
+func TestVMServiceGetOrCreateVMAllowsCreatorBypassOnLockedChallenge(t *testing.T) {
+	env := setupServiceTest(t)
+	creator := createUser(t, env, "vm-creator@example.com", "vm-creator", "pass", models.UserRole)
+	viewer := createUser(t, env, "vm-viewer@example.com", "vm-viewer", "pass", models.UserRole)
+	prev := createChallenge(t, env, "vm-prev", 100, "FLAG{VMPREV}", true)
+	challenge := createVMChallenge(t, env, "vm-locked")
+	challenge.PreviousChallengeID = &prev.ID
+	challenge.CreatedByUserID = &creator.ID
+	if err := env.challengeRepo.Update(context.Background(), challenge); err != nil {
+		t.Fatalf("update challenge: %v", err)
+	}
+
+	client := &vm.MockClient{
+		CreateSandboxFn: func(ctx context.Context, id string, specYAML string) (*vm.Sandbox, error) {
+			exp := time.Now().UTC().Add(time.Hour)
+			return &vm.Sandbox{ID: id, Status: vm.SandboxStatus{Phase: "Pending", ExpireAt: &exp}}, nil
+		},
+	}
+	svc, _ := newVMServiceForTest(env, client, config.VMConfig{Enabled: true, MaxPer: 2, CreateWindow: time.Minute, CreateMax: 5})
+
+	if _, err := svc.GetOrCreateVM(context.Background(), creator.ID, challenge.ID); err != nil {
+		t.Fatalf("expected creator bypass vm create, got %v", err)
+	}
+
+	if _, err := svc.GetOrCreateVM(context.Background(), viewer.ID, challenge.ID); !errors.Is(err, ErrChallengeLocked) {
+		t.Fatalf("expected locked vm create for non-creator, got %v", err)
+	}
+}
+
 func TestVMServiceRefreshDoesNotDeleteFailedVM(t *testing.T) {
 	env := setupServiceTest(t)
 	user := createUser(t, env, "vm-failed@example.com", "vm-failed", "pass", models.UserRole)

@@ -322,6 +322,10 @@ func (s *StackService) ensureUnlocked(ctx context.Context, userID int64, challen
 		return nil
 	}
 
+	if canBypassChallengeProgression(userID, challenge.CreatedByUserID) {
+		return nil
+	}
+
 	if userID <= 0 || s.submissionRepo == nil {
 		return ErrChallengeLocked
 	}

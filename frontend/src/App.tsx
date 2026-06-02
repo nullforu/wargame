@@ -176,10 +176,10 @@ const App = () => {
     if (false) {
         return (
             <div className='flex min-h-screen items-center justify-center bg-slate-950 px-4'>
-                <div className='w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 px-8 py-10 text-center shadow-2xl'>
-                    <h1 className='text-2xl font-bold text-white'>서버 운영 시간이 아닙니다.</h1>
+                <div className='w-full max-w-md border border-slate-700 bg-slate-900 px-8 py-10 text-center shadow-2xl'>
+                    <h1 className='text-2xl font-bold text-white'>서버 점검 중</h1>
 
-                    <p className='mt-4 text-sm text-slate-400'>주인장 서버 컴퓨터도 밤엔 자야합니다. 아침 시간대에 다시 방문해주세요.</p>
+                    <p className='mt-4 text-sm text-slate-400'>나중에 다시 방문해주세요.</p>
                 </div>
             </div>
         )

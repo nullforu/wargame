@@ -66,6 +66,28 @@ func TestHandlerCreateAndUpdateChallenge(t *testing.T) {
 	})
 }
 
+func TestIsChallengeLocked(t *testing.T) {
+	prevID := int64(11)
+	creatorID := int64(21)
+	challenge := models.Challenge{PreviousChallengeID: &prevID, CreatedByUserID: &creatorID}
+
+	if !isChallengeLocked(challenge, map[int64]struct{}{}, 0) {
+		t.Fatalf("anonymous user should see locked challenge")
+	}
+	if isChallengeLocked(challenge, map[int64]struct{}{}, creatorID) {
+		t.Fatalf("creator should bypass challenge lock")
+	}
+	if isChallengeLocked(challenge, map[int64]struct{}{prevID: {}}, 30) {
+		t.Fatalf("solver of prerequisite should bypass challenge lock")
+	}
+	if !isChallengeLocked(challenge, map[int64]struct{}{}, 30) {
+		t.Fatalf("unsolved non-creator should remain locked")
+	}
+	if isChallengeLocked(models.Challenge{}, map[int64]struct{}{}, 30) {
+		t.Fatalf("challenge without prerequisite must not be locked")
+	}
+}
+
 func TestHandlerChallengeLevelVote(t *testing.T) {
 	env := setupHandlerTest(t)
 	user := createHandlerUser(t, env, "solver@example.com", "solver", "pass", models.UserRole)
@@ -1536,6 +1558,33 @@ func TestHandlerGetChallengeAndSolvers(t *testing.T) {
 
 		if resp.FirstBlood == nil || resp.FirstBlood.UserID != user.ID || !resp.FirstBlood.IsFirstBlood {
 			t.Fatalf("expected first blood in detail response, got %+v", resp.FirstBlood)
+		}
+	})
+
+	t.Run("challenge creator bypasses locked response", func(t *testing.T) {
+		locked.CreatedByUserID = &user.ID
+		if err := env.challengeRepo.Update(context.Background(), locked); err != nil {
+			t.Fatalf("set creator: %v", err)
+		}
+
+		ctx, rec := newJSONContext(t, http.MethodGet, "/api/challenges/"+toStringID(locked.ID), nil)
+		ctx.Request.AddCookie(&http.Cookie{Name: "access_token", Value: token})
+		ctx.Params = append(ctx.Params, ginParam("id", toStringID(locked.ID)))
+		env.handler.GetChallenge(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var resp challengeResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+
+		if resp.IsLocked {
+			t.Fatalf("expected creator to receive unlocked response: %+v", resp)
+		}
+		if resp.Description == "" {
+			t.Fatalf("expected creator to receive challenge description")
 		}
 	})
 

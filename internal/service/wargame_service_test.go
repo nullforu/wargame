@@ -80,6 +80,45 @@ func TestWargameServiceCreateListGetChallenge(t *testing.T) {
 	}
 }
 
+func TestCanBypassChallengeProgression(t *testing.T) {
+	creatorID := int64(7)
+
+	if !canBypassChallengeProgression(creatorID, &creatorID) {
+		t.Fatalf("expected creator to bypass progression")
+	}
+	if canBypassChallengeProgression(0, &creatorID) {
+		t.Fatalf("anonymous user must not bypass progression")
+	}
+	if canBypassChallengeProgression(8, &creatorID) {
+		t.Fatalf("different user must not bypass progression")
+	}
+	if canBypassChallengeProgression(creatorID, nil) {
+		t.Fatalf("nil creator must not bypass progression")
+	}
+}
+
+func TestIsChallengeLockedForService(t *testing.T) {
+	prevID := int64(10)
+	creatorID := int64(20)
+	challenge := models.Challenge{PreviousChallengeID: &prevID, CreatedByUserID: &creatorID}
+
+	if !isChallengeLockedForService(challenge, map[int64]struct{}{}, 0) {
+		t.Fatalf("anonymous user should see locked challenge")
+	}
+	if isChallengeLockedForService(challenge, map[int64]struct{}{}, creatorID) {
+		t.Fatalf("creator should bypass challenge lock")
+	}
+	if isChallengeLockedForService(challenge, map[int64]struct{}{prevID: {}}, 30) {
+		t.Fatalf("solver of prerequisite should bypass challenge lock")
+	}
+	if !isChallengeLockedForService(challenge, map[int64]struct{}{}, 30) {
+		t.Fatalf("unsolved non-creator should remain locked")
+	}
+	if isChallengeLockedForService(models.Challenge{}, map[int64]struct{}{}, 30) {
+		t.Fatalf("challenge without prerequisite must not be locked")
+	}
+}
+
 func TestWargameServiceChallengeCategoryAndLevelCounts(t *testing.T) {
 	env := setupServiceTest(t)
 	createChallengeWithCategory := func(title, category string, active bool, flag string) *models.Challenge {
@@ -593,9 +632,11 @@ func TestWargameServiceValidationAndNotFound(t *testing.T) {
 func TestWargameServiceSubmitFlagLockedAndInactive(t *testing.T) {
 	env := setupServiceTest(t)
 	user := createUser(t, env, "lock@example.com", "lock", "pass", models.UserRole)
+	creator := createUser(t, env, "lock-creator@example.com", "lock-creator", "pass", models.UserRole)
 	prev := createChallenge(t, env, "Prev", 50, "FLAG{PREV}", true)
 	locked := createChallenge(t, env, "Locked", 100, "FLAG{LOCK}", true)
 	locked.PreviousChallengeID = &prev.ID
+	locked.CreatedByUserID = &creator.ID
 	if err := env.challengeRepo.Update(context.Background(), locked); err != nil {
 		t.Fatalf("update locked challenge: %v", err)
 	}
@@ -604,8 +645,13 @@ func TestWargameServiceSubmitFlagLockedAndInactive(t *testing.T) {
 		t.Fatalf("expected ErrChallengeLocked, got %v", err)
 	}
 
+	correct, err := env.wargameSvc.SubmitFlag(context.Background(), creator.ID, locked.ID, "FLAG{LOCK}")
+	if err != nil || !correct {
+		t.Fatalf("expected creator bypass solve, correct=%v err=%v", correct, err)
+	}
+
 	createSubmission(t, env, user.ID, prev.ID, true, time.Now().UTC())
-	correct, err := env.wargameSvc.SubmitFlag(context.Background(), user.ID, locked.ID, "FLAG{LOCK}")
+	correct, err = env.wargameSvc.SubmitFlag(context.Background(), user.ID, locked.ID, "FLAG{LOCK}")
 	if err != nil || !correct {
 		t.Fatalf("expected unlocked solve, correct=%v err=%v", correct, err)
 	}
@@ -642,6 +688,31 @@ func TestWargameServiceFileUploadDownloadDeleteFlow(t *testing.T) {
 	}
 	if cleared.FileKey != nil || cleared.FileName != nil || cleared.FileUploadedAt != nil {
 		t.Fatalf("expected file fields cleared, got %+v", cleared)
+	}
+}
+
+func TestWargameServiceFileDownloadAllowsCreatorBypassOnLockedChallenge(t *testing.T) {
+	env := setupServiceTest(t)
+	creator := createUser(t, env, "zip-creator@example.com", "zip-creator", "pass", models.UserRole)
+	viewer := createUser(t, env, "zip-viewer@example.com", "zip-viewer", "pass", models.UserRole)
+	prev := createChallenge(t, env, "Zip Prev", 100, "FLAG{ZIPPREV}", true)
+	challenge := createChallenge(t, env, "Zip Locked", 100, "FLAG{ZIPLOCK}", true)
+	challenge.PreviousChallengeID = &prev.ID
+	challenge.CreatedByUserID = &creator.ID
+	if err := env.challengeRepo.Update(context.Background(), challenge); err != nil {
+		t.Fatalf("update challenge: %v", err)
+	}
+
+	if _, _, err := env.wargameSvc.RequestChallengeFileUpload(context.Background(), challenge.ID, "bundle.zip"); err != nil {
+		t.Fatalf("RequestChallengeFileUpload: %v", err)
+	}
+
+	if _, err := env.wargameSvc.RequestChallengeFileDownload(context.Background(), creator.ID, challenge.ID); err != nil {
+		t.Fatalf("expected creator download bypass, got %v", err)
+	}
+
+	if _, err := env.wargameSvc.RequestChallengeFileDownload(context.Background(), viewer.ID, challenge.ID); !errors.Is(err, ErrChallengeLocked) {
+		t.Fatalf("expected locked download for non-creator, got %v", err)
 	}
 }
 

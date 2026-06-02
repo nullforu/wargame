@@ -100,6 +100,10 @@ Errors:
 - 429 `too many submissions`
 - 503 `stack feature disabled` or `stack provisioner unavailable`
 
+Notes:
+
+- The challenge creator can create a stack for their own challenge even when it has a prerequisite challenge configured.
+
 ---
 
 ## Get Stack For Challenge

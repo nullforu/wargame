@@ -71,6 +71,7 @@ Notes:
 
 - `points` is fixed and equals the challenge author's configured score.
 - If a challenge is locked by progression, it is returned in a reduced form with `is_locked: true`.
+- The challenge creator bypasses progression locks for their own challenge.
 
 Errors:
 
@@ -416,6 +417,10 @@ Errors:
 - 404 `challenge not found` or `challenge file not found`
 - 503 `storage unavailable`
 
+Notes:
+
+- The challenge creator can still submit to and download files from their own progression-locked challenge.
+
 ---
 
 ## List Challenge Comments
@@ -690,6 +695,7 @@ Notes:
 
 - Series challenges are returned in admin-defined order.
 - If a challenge is progression-locked, it is returned in reduced form with `is_locked: true`.
+- The challenge creator bypasses progression locks for their own challenge entries.
 
 Errors:
 

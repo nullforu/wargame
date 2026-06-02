@@ -963,6 +963,77 @@ func TestChallengeSeriesCRUDAndOrder(t *testing.T) {
 		t.Fatalf("expected locked challenge to be summarized without description: %+v", detail.Challenges[1])
 	}
 
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges/"+itoa(lockedID), nil, authHeader(adminAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("author detail status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var authorDetail struct {
+		IsLocked    bool   `json:"is_locked"`
+		Description string `json:"description"`
+	}
+	decodeJSON(t, rec, &authorDetail)
+	if authorDetail.IsLocked || authorDetail.Description == "" {
+		t.Fatalf("expected author unlocked detail response: %+v", authorDetail)
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenges?page=1&page_size=20", nil, authHeader(adminAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("author list status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var authorList struct {
+		Challenges []map[string]any `json:"challenges"`
+	}
+	decodeJSON(t, rec, &authorList)
+
+	foundUnlocked := false
+	for _, item := range authorList.Challenges {
+		id, _ := item["id"].(float64)
+		if int64(id) != lockedID {
+			continue
+		}
+
+		if _, ok := item["description"]; !ok {
+			t.Fatalf("expected author list entry to include description: %+v", item)
+		}
+
+		if isLocked, _ := item["is_locked"].(bool); isLocked {
+			t.Fatalf("expected author list entry unlocked: %+v", item)
+		}
+
+		foundUnlocked = true
+	}
+
+	if !foundUnlocked {
+		t.Fatalf("expected locked challenge in author list: %+v", authorList.Challenges)
+	}
+
+	rec = doRequest(t, env.router, http.MethodGet, "/api/challenge-series/"+itoa(created.ID), nil, authHeader(adminAccess))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("author series detail status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var authorSeriesDetail struct {
+		Challenges []map[string]any `json:"challenges"`
+	}
+	decodeJSON(t, rec, &authorSeriesDetail)
+
+	for _, item := range authorSeriesDetail.Challenges {
+		id, _ := item["id"].(float64)
+		if int64(id) != lockedID {
+			continue
+		}
+
+		if _, ok := item["description"]; !ok {
+			t.Fatalf("expected author series entry to include description: %+v", item)
+		}
+
+		if isLocked, _ := item["is_locked"].(bool); isLocked {
+			t.Fatalf("expected author series entry unlocked: %+v", item)
+		}
+	}
+
 	rec = doRequest(t, env.router, http.MethodPut, "/api/admin/challenge-series/"+itoa(created.ID), map[string]any{
 		"title": "Starter Challenge Series Updated",
 	}, authHeader(adminAccess))
