@@ -275,7 +275,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     useEffect(() => {
         if (!challengeId) return
         void loadChallenge()
-    }, [challengeId])
+    }, [challengeId, auth.user?.id])
 
     const loadStack = async () => {
         if (!challengeId || !stackEnabled) return

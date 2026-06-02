@@ -198,6 +198,7 @@ func TestStackServiceRateLimitAndUserLimit(t *testing.T) {
 func TestStackServiceChallengeStateAndSolvedPaths(t *testing.T) {
 	env := setupServiceTest(t)
 	user := createUser(t, env, "state@example.com", "state", "pass", models.UserRole)
+	creator := createUser(t, env, "state-creator@example.com", "state-creator", "pass", models.UserRole)
 
 	notEnabled := createChallenge(t, env, "NoStack", 100, "FLAG{NS}", true)
 	stackSvc, _ := newStackService(env, stack.NewProvisionerMock().Client(), config.StackConfig{Enabled: true, MaxPer: 2, CreateWindow: time.Minute, CreateMax: 5})
@@ -217,11 +218,15 @@ func TestStackServiceChallengeStateAndSolvedPaths(t *testing.T) {
 	prev := createChallenge(t, env, "Prev", 50, "FLAG{PREV}", true)
 	locked := createStackChallenge(t, env, "Locked")
 	locked.PreviousChallengeID = &prev.ID
+	locked.CreatedByUserID = &creator.ID
 	if err := env.challengeRepo.Update(context.Background(), locked); err != nil {
 		t.Fatalf("update locked challenge: %v", err)
 	}
 	if _, err := stackSvc.GetOrCreateStack(context.Background(), user.ID, locked.ID); !errors.Is(err, ErrChallengeLocked) {
 		t.Fatalf("expected ErrChallengeLocked, got %v", err)
+	}
+	if _, err := stackSvc.GetOrCreateStack(context.Background(), creator.ID, locked.ID); err != nil {
+		t.Fatalf("expected creator bypass stack create, got %v", err)
 	}
 	createSubmission(t, env, user.ID, prev.ID, true, time.Now().UTC())
 	if _, err := stackSvc.GetOrCreateStack(context.Background(), user.ID, locked.ID); err != nil {

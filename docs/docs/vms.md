@@ -125,6 +125,7 @@ Errors:
 Create behavior:
 
 - Challenge must have `vm_enabled=true` and non-empty `vm_spec` (YAML).
+- The challenge creator can create a VM for their own challenge even when it has a prerequisite challenge configured.
 - Solved users can still create or recreate VMs for the same challenge.
 - Wargame parses the YAML, rewrites `id` to generated `vm_id`, and sends the rewritten spec to orchestrator.
 - If an existing VM row already exists for `(user_id, challenge_id)`, create returns the existing VM instead of creating a second one.

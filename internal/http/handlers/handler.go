@@ -230,6 +230,9 @@ func isChallengeLocked(challenge models.Challenge, solved map[int64]struct{}, us
 		return false
 	}
 
+	if challenge.CreatedByUserID != nil && userID > 0 && *challenge.CreatedByUserID == userID {
+		return false
+	}
 	if userID <= 0 {
 		return true
 	}

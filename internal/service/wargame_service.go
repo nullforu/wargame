@@ -838,6 +838,9 @@ func (s *WargameService) ensureUnlocked(ctx context.Context, userID int64, chall
 		return nil
 	}
 
+	if canBypassChallengeProgression(userID, challenge.CreatedByUserID) {
+		return nil
+	}
 	if userID <= 0 || s.submissionRepo == nil {
 		return ErrChallengeLocked
 	}
@@ -1881,10 +1884,17 @@ func isChallengeLockedForService(challenge models.Challenge, solved map[int64]st
 		return false
 	}
 
+	if canBypassChallengeProgression(userID, challenge.CreatedByUserID) {
+		return false
+	}
 	if userID <= 0 {
 		return true
 	}
 
 	_, ok := solved[*challenge.PreviousChallengeID]
 	return !ok
+}
+
+func canBypassChallengeProgression(userID int64, createdByUserID *int64) bool {
+	return userID > 0 && createdByUserID != nil && *createdByUserID == userID
 }
