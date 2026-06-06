@@ -5,6 +5,7 @@ import Users from './admin/Users'
 import Stacks from './admin/Stacks'
 import Affiliations from './admin/Affiliations'
 import ChallengeSeriesManagement from './admin/ChallengeSeriesManagement'
+import Popups from './admin/Popups'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/auth'
 import DismissibleNotice from '../components/DismissibleNotice'
@@ -13,10 +14,10 @@ interface RouteProps {
     routeParams?: Record<string, string>
 }
 
-type AdminTabId = 'challenge_create' | 'challenge_management' | 'challenge_series' | 'users' | 'vms' | 'affiliations'
+type AdminTabId = 'challenge_create' | 'challenge_management' | 'challenge_series' | 'popups' | 'users' | 'vms' | 'affiliations'
 const TAB_PARAM = 'tab'
 const ADMIN_NOTICE_DISMISSED_KEY = 'admin_notice_dismissed'
-const ADMIN_TAB_IDS: AdminTabId[] = ['challenge_create', 'challenge_management', 'challenge_series', 'users', 'vms', 'affiliations']
+const ADMIN_TAB_IDS: AdminTabId[] = ['challenge_create', 'challenge_management', 'challenge_series', 'popups', 'users', 'vms', 'affiliations']
 
 const getTabFromUrl = (): AdminTabId | null => {
     const params = new URLSearchParams(window.location.search)
@@ -36,6 +37,7 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
             { id: 'users', label: t('admin.tab.users') },
             { id: 'vms', label: t('admin.tab.vms') },
             { id: 'affiliations', label: t('admin.tab.affiliations') },
+            { id: 'popups', label: t('admin.tab.popups') },
         ],
         [t],
     )
@@ -104,6 +106,8 @@ const Admin = ({ routeParams = {} }: RouteProps) => {
                                 <ChallengeManagement />
                             ) : activeTab === 'challenge_series' ? (
                                 <ChallengeSeriesManagement />
+                            ) : activeTab === 'popups' ? (
+                                <Popups />
                             ) : activeTab === 'vms' ? (
                                 <Stacks />
                             ) : activeTab === 'users' ? (

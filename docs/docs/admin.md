@@ -51,6 +51,176 @@ Validation notes:
 
 ---
 
+## List Active Popups
+
+`GET /api/popups/active`
+
+Returns active popups that have an uploaded image. Results are ordered newest first.
+
+Response 200
+
+```json
+{
+    "popups": [
+        {
+            "id": 12,
+            "title": "Event Notice",
+            "image_key": "popups/8f2c....png",
+            "image_name": "notice.png",
+            "link_url": "https://example.com/event",
+            "is_active": true,
+            "created_at": "2026-06-06T12:00:00Z",
+            "updated_at": "2026-06-06T12:00:00Z"
+        }
+    ]
+}
+```
+
+Frontend clients build the image URL with `VITE_S3_MEDIA_CDN_BASE_URL + "/" + image_key`. If `link_url` is present, the popup image opens that URL when clicked.
+
+---
+
+## Manage Popups
+
+`GET /api/admin/popups`
+
+Headers
+
+```
+Cookie: access_token=<jwt>
+```
+
+Response 200
+
+```json
+{
+    "popups": []
+}
+```
+
+`POST /api/admin/popups`
+
+Request
+
+```json
+{
+    "title": "Event Notice",
+    "link_url": "https://example.com/event",
+    "is_active": false
+}
+```
+
+Response 201
+
+```json
+{
+    "id": 12,
+    "title": "Event Notice",
+    "image_key": null,
+    "image_name": null,
+    "link_url": "https://example.com/event",
+    "is_active": false,
+    "created_by_user_id": 1,
+    "created_at": "2026-06-06T12:00:00Z",
+    "updated_at": "2026-06-06T12:00:00Z"
+}
+```
+
+`PUT /api/admin/popups/{id}`
+
+Request
+
+```json
+{
+    "title": "Updated Notice",
+    "link_url": "https://example.com/updated",
+    "is_active": false
+}
+```
+
+`DELETE /api/admin/popups/{id}`
+
+Response 200
+
+```json
+{
+    "status": "ok"
+}
+```
+
+Errors:
+
+- 400 `invalid input`
+- 401 `invalid token` or `missing access_token cookie`
+- 403 `forbidden`
+- 404 `popup not found`
+
+Validation notes:
+
+- A popup cannot be created or updated with `is_active: true` until an image has been finalized.
+- Deleting a popup image also deactivates that popup.
+- `link_url` is optional, but when present it must be an `http://` or `https://` URL.
+
+---
+
+## Popup Image Upload
+
+`POST /api/admin/popups/{id}/image/upload`
+
+Request
+
+```json
+{
+    "filename": "notice.png"
+}
+```
+
+Response 200
+
+```json
+{
+    "popup": {
+        "id": 12,
+        "title": "Event Notice",
+        "image_key": null,
+        "image_name": null,
+        "link_url": "https://example.com/event",
+        "is_active": false,
+        "created_at": "2026-06-06T12:00:00Z",
+        "updated_at": "2026-06-06T12:00:00Z"
+    },
+    "upload": {
+        "url": "https://...",
+        "method": "POST",
+        "fields": {
+            "key": "popups/8f2c....png",
+            "Content-Type": "image/png"
+        },
+        "expires_at": "2026-06-06T12:15:00Z"
+    }
+}
+```
+
+After uploading the file to the presigned POST URL, finalize it:
+
+`PUT /api/admin/popups/{id}/image`
+
+```json
+{
+    "key": "popups/8f2c....png",
+    "filename": "notice.png"
+}
+```
+
+`DELETE /api/admin/popups/{id}/image`
+
+Validation notes:
+
+- Popup images must use `.png`, `.jpg`, `.jpeg`, or `.webp`.
+- Uploads use the S3 Media store and are limited to 10 MB.
+
+---
+
 ## Unblock User
 
 `POST /api/admin/users/{id}/unblock`

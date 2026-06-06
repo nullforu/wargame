@@ -174,7 +174,7 @@ func TestCommunityIntegrationFlow(t *testing.T) {
 		t.Fatalf("expected comment_count 1, got %+v", authedDetail)
 	}
 
-	for i := 0; i < models.PopularPostLikeThreshold-1; i += 1 {
+	for i := range models.PopularPostLikeThreshold - 1 {
 		u := createUser(t, env, "popular-http-"+itoa(int64(i))+"@example.com", "popular-http-"+itoa(int64(i)), "pass", models.UserRole)
 		access, _, _ := loginUser(t, env.router, u.Email, "pass")
 		rec = doRequest(t, env.router, http.MethodPost, "/api/community/"+itoa(notice.ID)+"/likes", nil, authHeader(access))

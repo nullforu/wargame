@@ -548,8 +548,7 @@ func TestVMServiceStartTTLReaper(t *testing.T) {
 		t.Fatalf("create vm: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	svc.StartTTLReaper(ctx, 10*time.Millisecond)
 
 	deadline := time.Now().Add(500 * time.Millisecond)
@@ -583,8 +582,7 @@ func TestVMServiceStartTTLReaperNonPositiveInterval(t *testing.T) {
 		t.Fatalf("create vm: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	svc.StartTTLReaper(ctx, 0)
 	time.Sleep(50 * time.Millisecond)
 

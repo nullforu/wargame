@@ -1,4 +1,5 @@
 import { generateColorFromUsername } from '../lib/utils'
+import { mediaURL } from '../lib/media'
 
 interface UserAvatarProps {
     username: string
@@ -6,20 +7,10 @@ interface UserAvatarProps {
     profileImage?: string | null
 }
 
-const PROFILE_IMAGE_CDN_BASE = String(import.meta.env.VITE_S3_MEDIA_CDN_BASE_URL ?? '')
-    .trim()
-    .replace(/\/+$/, '')
-
-const joinCDNURL = (base: string, key: string) => {
-    const normalizedKey = key.replace(/^\/+/, '')
-    if (!base || !normalizedKey) return ''
-    return `${base}/${normalizedKey}`
-}
-
 const UserAvatar = ({ username, size = 'md', profileImage }: UserAvatarProps) => {
     const firstLetter = username.charAt(0).toUpperCase()
     const backgroundColor = generateColorFromUsername(username)
-    const imageURL = profileImage ? joinCDNURL(PROFILE_IMAGE_CDN_BASE, profileImage) : ''
+    const imageURL = mediaURL(profileImage)
 
     const sizeClasses = {
         sm: 'h-8 w-8 text-xs',

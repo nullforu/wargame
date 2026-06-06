@@ -91,7 +91,7 @@ func TestWargameServiceCommunityCRUDAndPolicies(t *testing.T) {
 		t.Fatalf("toggle like off failed: liked=%v likeCount=%d err=%v", liked, likeCount, err)
 	}
 
-	for i := 0; i < models.PopularPostLikeThreshold; i += 1 {
+	for i := range models.PopularPostLikeThreshold {
 		u := createUser(t, env, "popular-like-"+toString(i)+"@example.com", "popular-like-"+toString(i), "pass", models.UserRole)
 		if _, _, err := env.wargameSvc.ToggleCommunityPostLike(context.Background(), u.ID, notice.ID); err != nil {
 			t.Fatalf("seed popular likes: %v", err)

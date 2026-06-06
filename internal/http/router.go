@@ -15,7 +15,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, userSvc *service.UserService, affiliationSvc *service.AffiliationService, scoreSvc *service.ScoreboardService, stackSvc *service.StackService, vmSvc *service.VMService, redis *redis.Client, logger *logging.Logger) *gin.Engine {
+func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, userSvc *service.UserService, affiliationSvc *service.AffiliationService, scoreSvc *service.ScoreboardService, stackSvc *service.StackService, vmSvc *service.VMService, popupSvc *service.PopupService, redis *redis.Client, logger *logging.Logger) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -26,7 +26,7 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 	r.Use(middleware.CORS(cfg.AppEnv == "local", cfg.CORS.AllowedOrigins))
 	r.Use(middleware.CSRF())
 
-	h := handlers.New(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, redis, vmSvc)
+	h := handlers.New(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, redis, vmSvc, popupSvc)
 
 	r.GET("/healthz", func(ctx *gin.Context) { ctx.JSON(nethttp.StatusOK, gin.H{"status": "ok"}) })
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
@@ -65,6 +65,7 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		api.GET("/community/:id", middleware.OptionalAuth(cfg.JWT), h.GetCommunityPost)
 		api.GET("/community/:id/likes", h.CommunityPostLikes)
 		api.GET("/community/:id/comments", h.CommunityComments)
+		api.GET("/popups/active", h.ListActivePopups)
 
 		auth := api.Group("")
 		auth.Use(middleware.Auth(cfg.JWT))
@@ -125,6 +126,13 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		admin.POST("/users/:id/block", h.AdminBlockUser)
 		admin.POST("/users/:id/unblock", h.AdminUnblockUser)
 		admin.POST("/affiliations", h.AdminCreateAffiliation)
+		admin.GET("/popups", h.AdminListPopups)
+		admin.POST("/popups", h.AdminCreatePopup)
+		admin.PUT("/popups/:id", h.AdminUpdatePopup)
+		admin.DELETE("/popups/:id", h.AdminDeletePopup)
+		admin.POST("/popups/:id/image/upload", h.AdminRequestPopupImageUpload)
+		admin.PUT("/popups/:id/image", h.AdminFinalizePopupImageUpload)
+		admin.DELETE("/popups/:id/image", h.AdminDeletePopupImage)
 	}
 
 	return r

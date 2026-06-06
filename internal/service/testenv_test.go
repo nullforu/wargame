@@ -34,11 +34,13 @@ type serviceEnv struct {
 	submissionRepo  *repo.SubmissionRepo
 	scoreRepo       *repo.ScoreboardRepo
 	stackRepo       *repo.StackRepo
+	popupRepo       *repo.PopupRepo
 	authSvc         *AuthService
 	userSvc         *UserService
 	affiliationSvc  *AffiliationService
 	scoreSvc        *ScoreboardService
 	wargameSvc      *WargameService
+	popupSvc        *PopupService
 	stackSvc        *StackService
 }
 
@@ -195,11 +197,14 @@ func setupServiceTest(t *testing.T) serviceEnv {
 	writeupRepo := repo.NewWriteupRepo(serviceDB)
 	scoreRepo := repo.NewScoreboardRepo(serviceDB)
 	stackRepo := repo.NewStackRepo(serviceDB)
+	popupRepo := repo.NewPopupRepo(serviceDB)
 
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
+	mediaStore := storage.NewMemoryMediaFileStore(10 * time.Minute)
 
 	authSvc := NewAuthService(serviceCfg, userRepo, serviceRedis)
-	userSvc := NewUserService(userRepo, affiliationRepo, storage.NewMemoryProfileImageStore(10*time.Minute))
+	userSvc := NewUserService(userRepo, affiliationRepo, mediaStore)
+	popupSvc := NewPopupService(popupRepo, mediaStore)
 	affiliationSvc := NewAffiliationService(affiliationRepo)
 	scoreSvc := NewScoreboardService(scoreRepo)
 	wargameSvc := NewWargameService(serviceCfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(serviceDB), repo.NewCommunityRepo(serviceDB), serviceRedis, fileStore, repo.NewChallengeSeriesRepo(serviceDB))
@@ -215,11 +220,13 @@ func setupServiceTest(t *testing.T) serviceEnv {
 		submissionRepo:  submissionRepo,
 		scoreRepo:       scoreRepo,
 		stackRepo:       stackRepo,
+		popupRepo:       popupRepo,
 		authSvc:         authSvc,
 		userSvc:         userSvc,
 		affiliationSvc:  affiliationSvc,
 		scoreSvc:        scoreSvc,
 		wargameSvc:      wargameSvc,
+		popupSvc:        popupSvc,
 		stackSvc:        stackSvc,
 	}
 
@@ -229,7 +236,7 @@ func setupServiceTest(t *testing.T) serviceEnv {
 func resetServiceState(t *testing.T) {
 	t.Helper()
 
-	if _, err := serviceDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_series_challenges, challenge_series, community_comments, challenge_comments, challenge_votes, writeups, community_post_likes, community_posts, submissions, vms, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := serviceDB.ExecContext(context.Background(), "TRUNCATE TABLE popups, challenge_series_challenges, challenge_series, community_comments, challenge_comments, challenge_votes, writeups, community_post_likes, community_posts, submissions, vms, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
