@@ -945,8 +945,8 @@ func newPopupResponse(row models.Popup) popupResponse {
 		LinkURL:         row.LinkURL,
 		IsActive:        row.IsActive,
 		CreatedByUserID: row.CreatedByUserID,
-		CreatedAt:       row.CreatedAt,
-		UpdatedAt:       row.UpdatedAt,
+		CreatedAt:       row.CreatedAt.UTC(),
+		UpdatedAt:       row.UpdatedAt.UTC(),
 	}
 }
 
