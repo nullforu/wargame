@@ -8,6 +8,7 @@ var (
 	ErrInvalidInput              = errors.New("invalid input")
 	ErrUserBlocked               = errors.New("user blocked")
 	ErrChallengeNotFound         = errors.New("challenge not found")
+	ErrPopupNotFound             = errors.New("popup not found")
 	ErrChallengeSeriesNotFound   = errors.New("challenge series not found")
 	ErrChallengeSeriesExists     = errors.New("challenge series already exists")
 	ErrWriteupNotFound           = errors.New("writeup not found")

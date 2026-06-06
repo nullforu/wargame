@@ -73,6 +73,7 @@ func main() {
 	challengeCommentRepo := repo.NewChallengeCommentRepo(database)
 	communityRepo := repo.NewCommunityRepo(database)
 	challengeSeriesRepo := repo.NewChallengeSeriesRepo(database)
+	popupRepo := repo.NewPopupRepo(database)
 	scoreRepo := repo.NewScoreboardRepo(database)
 	stackRepo := repo.NewStackRepo(database)
 	vmRepo := repo.NewVMRepo(database)
@@ -99,6 +100,7 @@ func main() {
 
 	authSvc := service.NewAuthService(cfg, userRepo, redisClient)
 	userSvc := service.NewUserService(userRepo, affiliationRepo, profileImageStore)
+	popupSvc := service.NewPopupService(popupRepo, profileImageStore)
 	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, challengeCommentRepo, communityRepo, redisClient, fileStore, challengeSeriesRepo)
@@ -134,7 +136,7 @@ func main() {
 	leaderboardBus := realtime.NewScoreboardBus(redisClient, cfg, scoreSvc, logger)
 	leaderboardBus.Start(ctx)
 
-	router := httpserver.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, redisClient, logger)
+	router := httpserver.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, popupSvc, redisClient, logger)
 	srv := &nethttp.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           router,

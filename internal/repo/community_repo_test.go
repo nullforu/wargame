@@ -173,7 +173,7 @@ func TestCommunityRepoAdditionalBranches(t *testing.T) {
 		t.Fatalf("create new: %v", err)
 	}
 
-	for i := 0; i < models.PopularPostLikeThreshold; i += 1 {
+	for i := range models.PopularPostLikeThreshold {
 		u := createUser(t, env, "extra-like-"+itoa(i)+"@example.com", "extra-like-"+itoa(i), "pass", models.UserRole)
 		if err := repo.CreateLike(context.Background(), newPost.ID, u.ID); err != nil {
 			t.Fatalf("seed like: %v", err)

@@ -772,6 +772,288 @@ func TestHandlerAffiliationsAndRankings(t *testing.T) {
 		}
 	})
 }
+
+func TestHandlerPopupEndpoints(t *testing.T) {
+	env := setupHandlerTest(t)
+	admin := createHandlerUser(t, env, "admin@example.com", "admin", "pass", models.AdminRole)
+
+	createCtx, createRec := newJSONContext(t, http.MethodPost, "/api/admin/popups", []byte(`{"title":"Launch Notice","link_url":"https://example.com/launch","is_active":false}`))
+	createCtx.Set("userID", admin.ID)
+	env.handler.AdminCreatePopup(createCtx)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("create status %d: %s", createRec.Code, createRec.Body.String())
+	}
+
+	var created popupResponse
+	if err := json.Unmarshal(createRec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode create popup: %v", err)
+	}
+
+	if created.Title != "Launch Notice" || created.LinkURL == nil || *created.LinkURL != "https://example.com/launch" || created.IsActive || created.CreatedByUserID == nil || *created.CreatedByUserID != admin.ID {
+		t.Fatalf("unexpected created popup: %+v", created)
+	}
+
+	listCtx, listRec := newJSONContext(t, http.MethodGet, "/api/admin/popups", nil)
+	env.handler.AdminListPopups(listCtx)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("list status %d: %s", listRec.Code, listRec.Body.String())
+	}
+
+	var listResp popupsResponse
+	if err := json.Unmarshal(listRec.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("decode list popups: %v", err)
+	}
+
+	if len(listResp.Popups) != 1 || listResp.Popups[0].ID != created.ID {
+		t.Fatalf("unexpected list popups: %+v", listResp)
+	}
+
+	activeCtx, activeRec := newJSONContext(t, http.MethodGet, "/api/popups/active", nil)
+	env.handler.ListActivePopups(activeCtx)
+	if activeRec.Code != http.StatusOK {
+		t.Fatalf("active status before image %d: %s", activeRec.Code, activeRec.Body.String())
+	}
+
+	var emptyActive popupsResponse
+	if err := json.Unmarshal(activeRec.Body.Bytes(), &emptyActive); err != nil {
+		t.Fatalf("decode empty active popups: %v", err)
+	}
+
+	if len(emptyActive.Popups) != 0 {
+		t.Fatalf("expected active popup without image to be hidden, got %+v", emptyActive)
+	}
+
+	uploadCtx, uploadRec := newJSONContext(t, http.MethodPost, "/api/admin/popups/"+toStringID(created.ID)+"/image/upload", []byte(`{"filename":"notice.png"}`))
+	uploadCtx.Params = append(uploadCtx.Params, ginParam("id", toStringID(created.ID)))
+	env.handler.AdminRequestPopupImageUpload(uploadCtx)
+	if uploadRec.Code != http.StatusOK {
+		t.Fatalf("upload status %d: %s", uploadRec.Code, uploadRec.Body.String())
+	}
+
+	var uploadResp popupImageUploadResponse
+	if err := json.Unmarshal(uploadRec.Body.Bytes(), &uploadResp); err != nil {
+		t.Fatalf("decode upload popup: %v", err)
+	}
+
+	key := uploadResp.Upload.Fields["key"]
+	if key == "" {
+		t.Fatalf("expected upload key in fields: %+v", uploadResp.Upload.Fields)
+	}
+
+	finalizeCtx, finalizeRec := newJSONContext(t, http.MethodPut, "/api/admin/popups/"+toStringID(created.ID)+"/image", []byte(`{"key":"`+key+`","filename":"notice.png"}`))
+	finalizeCtx.Params = append(finalizeCtx.Params, ginParam("id", toStringID(created.ID)))
+	env.handler.AdminFinalizePopupImageUpload(finalizeCtx)
+	if finalizeRec.Code != http.StatusOK {
+		t.Fatalf("finalize status %d: %s", finalizeRec.Code, finalizeRec.Body.String())
+	}
+
+	var finalized popupResponse
+	if err := json.Unmarshal(finalizeRec.Body.Bytes(), &finalized); err != nil {
+		t.Fatalf("decode finalized popup: %v", err)
+	}
+
+	if finalized.ImageKey == nil || *finalized.ImageKey != key {
+		t.Fatalf("unexpected finalized popup: %+v", finalized)
+	}
+
+	activateCtx, activateRec := newJSONContext(t, http.MethodPut, "/api/admin/popups/"+toStringID(created.ID), []byte(`{"is_active":true}`))
+	activateCtx.Params = append(activateCtx.Params, ginParam("id", toStringID(created.ID)))
+	env.handler.AdminUpdatePopup(activateCtx)
+	if activateRec.Code != http.StatusOK {
+		t.Fatalf("activate status %d: %s", activateRec.Code, activateRec.Body.String())
+	}
+
+	activeCtx, activeRec = newJSONContext(t, http.MethodGet, "/api/popups/active", nil)
+	env.handler.ListActivePopups(activeCtx)
+	if activeRec.Code != http.StatusOK {
+		t.Fatalf("active status %d: %s", activeRec.Code, activeRec.Body.String())
+	}
+
+	var activeResp popupsResponse
+	if err := json.Unmarshal(activeRec.Body.Bytes(), &activeResp); err != nil {
+		t.Fatalf("decode active popups: %v", err)
+	}
+
+	if len(activeResp.Popups) != 1 || activeResp.Popups[0].ID != created.ID {
+		t.Fatalf("unexpected active popups: %+v", activeResp)
+	}
+
+	updateCtx, updateRec := newJSONContext(t, http.MethodPut, "/api/admin/popups/"+toStringID(created.ID), []byte(`{"title":"Updated Notice","link_url":"https://example.com/updated","is_active":false}`))
+	updateCtx.Params = append(updateCtx.Params, ginParam("id", toStringID(created.ID)))
+	env.handler.AdminUpdatePopup(updateCtx)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("update status %d: %s", updateRec.Code, updateRec.Body.String())
+	}
+
+	var updated popupResponse
+	if err := json.Unmarshal(updateRec.Body.Bytes(), &updated); err != nil {
+		t.Fatalf("decode updated popup: %v", err)
+	}
+
+	if updated.Title != "Updated Notice" || updated.LinkURL == nil || *updated.LinkURL != "https://example.com/updated" || updated.IsActive {
+		t.Fatalf("unexpected updated popup: %+v", updated)
+	}
+
+	deleteImageCtx, deleteImageRec := newJSONContext(t, http.MethodDelete, "/api/admin/popups/"+toStringID(created.ID)+"/image", nil)
+	deleteImageCtx.Params = append(deleteImageCtx.Params, ginParam("id", toStringID(created.ID)))
+	env.handler.AdminDeletePopupImage(deleteImageCtx)
+	if deleteImageRec.Code != http.StatusOK {
+		t.Fatalf("delete image status %d: %s", deleteImageRec.Code, deleteImageRec.Body.String())
+	}
+
+	deleteCtx, deleteRec := newJSONContext(t, http.MethodDelete, "/api/admin/popups/"+toStringID(created.ID), nil)
+	deleteCtx.Params = append(deleteCtx.Params, ginParam("id", toStringID(created.ID)))
+	env.handler.AdminDeletePopup(deleteCtx)
+	if deleteRec.Code != http.StatusOK {
+		t.Fatalf("delete status %d: %s", deleteRec.Code, deleteRec.Body.String())
+	}
+}
+
+func TestHandlerPopupErrors(t *testing.T) {
+	env := setupHandlerTest(t)
+	admin := createHandlerUser(t, env, "admin@example.com", "admin", "pass", models.AdminRole)
+
+	blankCtx, blankRec := newJSONContext(t, http.MethodPost, "/api/admin/popups", []byte(`{"title":" "}`))
+	blankCtx.Set("userID", admin.ID)
+	env.handler.AdminCreatePopup(blankCtx)
+	if blankRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for blank title, got %d", blankRec.Code)
+	}
+
+	activeCreateCtx, activeCreateRec := newJSONContext(t, http.MethodPost, "/api/admin/popups", []byte(`{"title":"Notice","is_active":true}`))
+	activeCreateCtx.Set("userID", admin.ID)
+	env.handler.AdminCreatePopup(activeCreateCtx)
+	if activeCreateRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for active create without image, got %d", activeCreateRec.Code)
+	}
+
+	linkCreateCtx, linkCreateRec := newJSONContext(t, http.MethodPost, "/api/admin/popups", []byte(`{"title":"Notice","link_url":"ftp://example.com/file"}`))
+	linkCreateCtx.Set("userID", admin.ID)
+	env.handler.AdminCreatePopup(linkCreateCtx)
+	if linkCreateRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid link, got %d", linkCreateRec.Code)
+	}
+
+	createCtx, createRec := newJSONContext(t, http.MethodPost, "/api/admin/popups", []byte(`{"title":123}`))
+	createCtx.Set("userID", admin.ID)
+	env.handler.AdminCreatePopup(createCtx)
+	if createRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid create body, got %d", createRec.Code)
+	}
+
+	validCtx, validRec := newJSONContext(t, http.MethodPost, "/api/admin/popups", []byte(`{"title":"Notice"}`))
+	validCtx.Set("userID", admin.ID)
+	env.handler.AdminCreatePopup(validCtx)
+	if validRec.Code != http.StatusCreated {
+		t.Fatalf("expected created popup, got %d: %s", validRec.Code, validRec.Body.String())
+	}
+
+	var created popupResponse
+	if err := json.Unmarshal(validRec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode created popup: %v", err)
+	}
+
+	updateCtx, updateRec := newJSONContext(t, http.MethodPut, "/api/admin/popups/bad", []byte(`{"title":"x"}`))
+	env.handler.AdminUpdatePopup(updateCtx)
+	if updateRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid id, got %d", updateRec.Code)
+	}
+
+	updateBodyCtx, updateBodyRec := newJSONContext(t, http.MethodPut, "/api/admin/popups/"+toStringID(created.ID), []byte(`{"title":123}`))
+	updateBodyCtx.Params = append(updateBodyCtx.Params, ginParam("id", toStringID(created.ID)))
+	env.handler.AdminUpdatePopup(updateBodyCtx)
+	if updateBodyRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid update body, got %d", updateBodyRec.Code)
+	}
+
+	updateLinkCtx, updateLinkRec := newJSONContext(t, http.MethodPut, "/api/admin/popups/"+toStringID(created.ID), []byte(`{"link_url":"javascript:alert(1)"}`))
+	updateLinkCtx.Params = append(updateLinkCtx.Params, ginParam("id", toStringID(created.ID)))
+	env.handler.AdminUpdatePopup(updateLinkCtx)
+	if updateLinkRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid update link, got %d", updateLinkRec.Code)
+	}
+
+	updateMissingCtx, updateMissingRec := newJSONContext(t, http.MethodPut, "/api/admin/popups/999999", []byte(`{"title":"x"}`))
+	updateMissingCtx.Params = append(updateMissingCtx.Params, ginParam("id", "999999"))
+	env.handler.AdminUpdatePopup(updateMissingCtx)
+	if updateMissingRec.Code != http.StatusNotFound {
+		t.Fatalf("expected not found for update, got %d", updateMissingRec.Code)
+	}
+
+	deleteInvalidCtx, deleteInvalidRec := newJSONContext(t, http.MethodDelete, "/api/admin/popups/bad", nil)
+	env.handler.AdminDeletePopup(deleteInvalidCtx)
+	if deleteInvalidRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid delete id, got %d", deleteInvalidRec.Code)
+	}
+
+	deleteMissingCtx, deleteMissingRec := newJSONContext(t, http.MethodDelete, "/api/admin/popups/999999", nil)
+	deleteMissingCtx.Params = append(deleteMissingCtx.Params, ginParam("id", "999999"))
+	env.handler.AdminDeletePopup(deleteMissingCtx)
+	if deleteMissingRec.Code != http.StatusNotFound {
+		t.Fatalf("expected not found for delete, got %d", deleteMissingRec.Code)
+	}
+
+	uploadInvalidIDCtx, uploadInvalidIDRec := newJSONContext(t, http.MethodPost, "/api/admin/popups/bad/image/upload", []byte(`{"filename":"notice.png"}`))
+	env.handler.AdminRequestPopupImageUpload(uploadInvalidIDCtx)
+	if uploadInvalidIDRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid upload id, got %d", uploadInvalidIDRec.Code)
+	}
+
+	uploadBodyCtx, uploadBodyRec := newJSONContext(t, http.MethodPost, "/api/admin/popups/"+toStringID(created.ID)+"/image/upload", []byte(`{"filename":123}`))
+	uploadBodyCtx.Params = append(uploadBodyCtx.Params, ginParam("id", toStringID(created.ID)))
+	env.handler.AdminRequestPopupImageUpload(uploadBodyCtx)
+	if uploadBodyRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid upload body, got %d", uploadBodyRec.Code)
+	}
+
+	uploadExtCtx, uploadExtRec := newJSONContext(t, http.MethodPost, "/api/admin/popups/"+toStringID(created.ID)+"/image/upload", []byte(`{"filename":"notice.gif"}`))
+	uploadExtCtx.Params = append(uploadExtCtx.Params, ginParam("id", toStringID(created.ID)))
+	env.handler.AdminRequestPopupImageUpload(uploadExtCtx)
+	if uploadExtRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid upload extension, got %d", uploadExtRec.Code)
+	}
+
+	uploadCtx, uploadRec := newJSONContext(t, http.MethodPost, "/api/admin/popups/999999/image/upload", []byte(`{"filename":"notice.gif"}`))
+	uploadCtx.Params = append(uploadCtx.Params, ginParam("id", "999999"))
+	env.handler.AdminRequestPopupImageUpload(uploadCtx)
+	if uploadRec.Code != http.StatusNotFound {
+		t.Fatalf("expected not found before filename validation, got %d body=%s", uploadRec.Code, uploadRec.Body.String())
+	}
+
+	finalizeInvalidIDCtx, finalizeInvalidIDRec := newJSONContext(t, http.MethodPut, "/api/admin/popups/bad/image", []byte(`{"key":"popups/x.png","filename":"x.png"}`))
+	env.handler.AdminFinalizePopupImageUpload(finalizeInvalidIDCtx)
+	if finalizeInvalidIDRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid finalize id, got %d", finalizeInvalidIDRec.Code)
+	}
+
+	finalizeBodyCtx, finalizeBodyRec := newJSONContext(t, http.MethodPut, "/api/admin/popups/"+toStringID(created.ID)+"/image", []byte(`{"key":123}`))
+	finalizeBodyCtx.Params = append(finalizeBodyCtx.Params, ginParam("id", toStringID(created.ID)))
+	env.handler.AdminFinalizePopupImageUpload(finalizeBodyCtx)
+	if finalizeBodyRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid finalize body, got %d", finalizeBodyRec.Code)
+	}
+
+	finalizeKeyCtx, finalizeKeyRec := newJSONContext(t, http.MethodPut, "/api/admin/popups/"+toStringID(created.ID)+"/image", []byte(`{"key":"profiles/x.png","filename":"x.png"}`))
+	finalizeKeyCtx.Params = append(finalizeKeyCtx.Params, ginParam("id", toStringID(created.ID)))
+	env.handler.AdminFinalizePopupImageUpload(finalizeKeyCtx)
+	if finalizeKeyRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid finalize key, got %d", finalizeKeyRec.Code)
+	}
+
+	deleteImageInvalidCtx, deleteImageInvalidRec := newJSONContext(t, http.MethodDelete, "/api/admin/popups/bad/image", nil)
+	env.handler.AdminDeletePopupImage(deleteImageInvalidCtx)
+	if deleteImageInvalidRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid delete image id, got %d", deleteImageInvalidRec.Code)
+	}
+
+	deleteImageMissingCtx, deleteImageMissingRec := newJSONContext(t, http.MethodDelete, "/api/admin/popups/999999/image", nil)
+	deleteImageMissingCtx.Params = append(deleteImageMissingCtx.Params, ginParam("id", "999999"))
+	env.handler.AdminDeletePopupImage(deleteImageMissingCtx)
+	if deleteImageMissingRec.Code != http.StatusNotFound {
+		t.Fatalf("expected not found for delete image, got %d", deleteImageMissingRec.Code)
+	}
+}
+
 func TestHandlerSubmitFlagFlow(t *testing.T) {
 	env := setupHandlerTest(t)
 	user := createHandlerUser(t, env, "flag-user@example.com", "flag-user", "pass", models.UserRole)
@@ -848,7 +1130,7 @@ func TestHandlerStackEndpoints(t *testing.T) {
 	env := setupHandlerTest(t)
 	provisioner := stackpkg.NewProvisionerMock()
 	env.stackSvc = service.NewStackService(env.cfg.Stack, env.stackRepo, env.challengeRepo, env.submissionRepo, provisioner.Client(), env.redis)
-	env.handler = New(env.cfg, env.authSvc, env.wargameSvc, env.userSvc, env.affiliationSvc, env.scoreSvc, env.stackSvc, env.redis)
+	env.handler = New(env.cfg, env.authSvc, env.wargameSvc, env.userSvc, env.affiliationSvc, env.scoreSvc, env.stackSvc, env.redis, nil, env.popupSvc)
 
 	user := createHandlerUser(t, env, "stack-user@example.com", "stack-user", "pass", models.UserRole)
 	challenge := createHandlerChallenge(t, env, "Stack Target", 100, "FLAG{STACK}", true)

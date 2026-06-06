@@ -39,6 +39,7 @@ func AutoMigrate(ctx context.Context, db *bun.DB) error {
 	modelsToCreate := []any{
 		(*models.User)(nil),
 		(*models.Affiliation)(nil),
+		(*models.Popup)(nil),
 		(*models.Challenge)(nil),
 		(*models.ChallengeSeries)(nil),
 		(*models.ChallengeSeriesChallenge)(nil),
@@ -76,6 +77,7 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 		query string
 	}{
 		{name: "idx_challenges_category", query: "CREATE INDEX IF NOT EXISTS idx_challenges_category ON challenges (category)"},
+		{name: "idx_popups_active_created", query: "CREATE INDEX IF NOT EXISTS idx_popups_active_created ON popups (is_active, created_at DESC, id DESC)"},
 		{name: "idx_challenges_active_category", query: "CREATE INDEX IF NOT EXISTS idx_challenges_active_category ON challenges (is_active, category)"},
 		{name: "idx_challenge_series_created", query: "CREATE INDEX IF NOT EXISTS idx_challenge_series_created ON challenge_series (created_at DESC, id DESC)"},
 		{name: "idx_challenge_series_challenges_series_position", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_challenge_series_challenges_series_position ON challenge_series_challenges (series_id, position)"},

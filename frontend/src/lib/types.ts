@@ -243,6 +243,39 @@ export interface ProfileImageUploadResponse {
     upload: PresignedUpload
 }
 
+export interface Popup {
+    id: number
+    title: string
+    image_key: string | null
+    image_name: string | null
+    link_url: string | null
+    is_active: boolean
+    created_by_user_id?: number | null
+    created_at: string
+    updated_at: string
+}
+
+export interface PopupsResponse {
+    popups: Popup[]
+}
+
+export interface PopupCreatePayload {
+    title: string
+    link_url?: string | null
+    is_active: boolean
+}
+
+export interface PopupUpdatePayload {
+    title?: string
+    link_url?: string | null
+    is_active?: boolean
+}
+
+export interface PopupImageUploadResponse {
+    popup: Popup
+    upload: PresignedUpload
+}
+
 export interface FlagSubmissionPayload {
     flag: string
 }

@@ -65,6 +65,27 @@ type adminAffiliationCreateRequest struct {
 	Name string `json:"name" binding:"required"`
 }
 
+type createPopupRequest struct {
+	Title    string  `json:"title" binding:"required"`
+	LinkURL  *string `json:"link_url"`
+	IsActive *bool   `json:"is_active"`
+}
+
+type updatePopupRequest struct {
+	Title    optionalString `json:"title"`
+	LinkURL  optionalString `json:"link_url"`
+	IsActive *bool          `json:"is_active"`
+}
+
+type popupImageUploadRequest struct {
+	Filename string `json:"filename" binding:"required"`
+}
+
+type popupImageFinalizeRequest struct {
+	Key      string `json:"key" binding:"required"`
+	Filename string `json:"filename" binding:"required"`
+}
+
 type createChallengeSeriesRequest struct {
 	Title       string `json:"title" binding:"required"`
 	Description string `json:"description" binding:"required"`
@@ -503,6 +524,27 @@ type profileImageUploadResponse struct {
 	Upload presignedUploadResponse `json:"upload"`
 }
 
+type popupResponse struct {
+	ID              int64     `json:"id"`
+	Title           string    `json:"title"`
+	ImageKey        *string   `json:"image_key"`
+	ImageName       *string   `json:"image_name"`
+	LinkURL         *string   `json:"link_url"`
+	IsActive        bool      `json:"is_active"`
+	CreatedByUserID *int64    `json:"created_by_user_id,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+type popupsResponse struct {
+	Popups []popupResponse `json:"popups"`
+}
+
+type popupImageUploadResponse struct {
+	Popup  popupResponse           `json:"popup"`
+	Upload presignedUploadResponse `json:"upload"`
+}
+
 type timelineResponse struct {
 	Submissions []models.TimelineSubmission `json:"submissions"`
 }
@@ -892,4 +934,27 @@ func newCommunityPostLikeResponse(row models.CommunityPostLikeDetail) communityP
 		ProfileImage:  row.ProfileImage,
 		CreatedAt:     row.CreatedAt.UTC(),
 	}
+}
+
+func newPopupResponse(row models.Popup) popupResponse {
+	return popupResponse{
+		ID:              row.ID,
+		Title:           row.Title,
+		ImageKey:        row.ImageKey,
+		ImageName:       row.ImageName,
+		LinkURL:         row.LinkURL,
+		IsActive:        row.IsActive,
+		CreatedByUserID: row.CreatedByUserID,
+		CreatedAt:       row.CreatedAt.UTC(),
+		UpdatedAt:       row.UpdatedAt.UTC(),
+	}
+}
+
+func newPopupsResponse(rows []models.Popup) popupsResponse {
+	resp := make([]popupResponse, 0, len(rows))
+	for _, row := range rows {
+		resp = append(resp, newPopupResponse(row))
+	}
+
+	return popupsResponse{Popups: resp}
 }

@@ -44,8 +44,10 @@ type testEnv struct {
 	challengeRepo   *repo.ChallengeRepo
 	submissionRepo  *repo.SubmissionRepo
 	stackRepo       *repo.StackRepo
+	popupRepo       *repo.PopupRepo
 	authSvc         *service.AuthService
 	wargameSvc      *service.WargameService
+	popupSvc        *service.PopupService
 	stackSvc        *service.StackService
 	vmSvc           *service.VMService
 }
@@ -245,18 +247,21 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 	writeupRepo := repo.NewWriteupRepo(testDB)
 	scoreRepo := repo.NewScoreboardRepo(testDB)
 	stackRepo := repo.NewStackRepo(testDB)
+	popupRepo := repo.NewPopupRepo(testDB)
 
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
+	mediaStore := storage.NewMemoryMediaFileStore(10 * time.Minute)
 
 	authSvc := service.NewAuthService(cfg, userRepo, testRedis)
-	userSvc := service.NewUserService(userRepo, affiliationRepo, storage.NewMemoryProfileImageStore(10*time.Minute))
+	userSvc := service.NewUserService(userRepo, affiliationRepo, mediaStore)
+	popupSvc := service.NewPopupService(popupRepo, mediaStore)
 	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(testDB), repo.NewCommunityRepo(testDB), testRedis, fileStore, repo.NewChallengeSeriesRepo(testDB))
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, testRedis)
 	vmSvc := service.NewVMService(cfg.VM, repo.NewVMRepo(testDB), challengeRepo, submissionRepo, &vm.MockClient{}, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, testRedis, testLogger)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, popupSvc, testRedis, testLogger)
 
 	env := testEnv{
 		cfg:             cfg,
@@ -266,8 +271,10 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 		challengeRepo:   challengeRepo,
 		submissionRepo:  submissionRepo,
 		stackRepo:       stackRepo,
+		popupRepo:       popupRepo,
 		authSvc:         authSvc,
 		wargameSvc:      wargameSvc,
+		popupSvc:        popupSvc,
 		stackSvc:        stackSvc,
 		vmSvc:           vmSvc,
 	}
@@ -278,7 +285,7 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 func resetState(t *testing.T) {
 	t.Helper()
 
-	if _, err := testDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_series_challenges, challenge_series, community_comments, challenge_comments, challenge_votes, writeups, community_post_likes, community_posts, submissions, vms, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := testDB.ExecContext(context.Background(), "TRUNCATE TABLE popups, challenge_series_challenges, challenge_series, community_comments, challenge_comments, challenge_votes, writeups, community_post_likes, community_posts, submissions, vms, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
@@ -603,18 +610,21 @@ func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testE
 	writeupRepo := repo.NewWriteupRepo(testDB)
 	scoreRepo := repo.NewScoreboardRepo(testDB)
 	stackRepo := repo.NewStackRepo(testDB)
+	popupRepo := repo.NewPopupRepo(testDB)
 
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
+	mediaStore := storage.NewMemoryMediaFileStore(10 * time.Minute)
 
 	authSvc := service.NewAuthService(cfg, userRepo, testRedis)
-	userSvc := service.NewUserService(userRepo, affiliationRepo, storage.NewMemoryProfileImageStore(10*time.Minute))
+	userSvc := service.NewUserService(userRepo, affiliationRepo, mediaStore)
+	popupSvc := service.NewPopupService(popupRepo, mediaStore)
 	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(testDB), repo.NewCommunityRepo(testDB), testRedis, fileStore, repo.NewChallengeSeriesRepo(testDB))
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, mockClient, testRedis)
 	vmSvc := service.NewVMService(cfg.VM, repo.NewVMRepo(testDB), challengeRepo, submissionRepo, &vm.MockClient{}, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, testRedis, testLogger)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, popupSvc, testRedis, testLogger)
 
 	return testEnv{
 		cfg:             cfg,
@@ -624,8 +634,10 @@ func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testE
 		challengeRepo:   challengeRepo,
 		submissionRepo:  submissionRepo,
 		stackRepo:       stackRepo,
+		popupRepo:       popupRepo,
 		authSvc:         authSvc,
 		wargameSvc:      wargameSvc,
+		popupSvc:        popupSvc,
 		stackSvc:        stackSvc,
 		vmSvc:           vmSvc,
 	}
@@ -644,18 +656,21 @@ func setupVMTest(t *testing.T, cfg config.Config, mockClient vm.API) testEnv {
 	writeupRepo := repo.NewWriteupRepo(testDB)
 	scoreRepo := repo.NewScoreboardRepo(testDB)
 	stackRepo := repo.NewStackRepo(testDB)
+	popupRepo := repo.NewPopupRepo(testDB)
 
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
+	mediaStore := storage.NewMemoryMediaFileStore(10 * time.Minute)
 
 	authSvc := service.NewAuthService(cfg, userRepo, testRedis)
-	userSvc := service.NewUserService(userRepo, affiliationRepo, storage.NewMemoryProfileImageStore(10*time.Minute))
+	userSvc := service.NewUserService(userRepo, affiliationRepo, mediaStore)
+	popupSvc := service.NewPopupService(popupRepo, mediaStore)
 	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(cfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(testDB), repo.NewCommunityRepo(testDB), testRedis, fileStore, repo.NewChallengeSeriesRepo(testDB))
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, testRedis)
 	vmSvc := service.NewVMService(cfg.VM, repo.NewVMRepo(testDB), challengeRepo, submissionRepo, mockClient, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, testRedis, testLogger)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, popupSvc, testRedis, testLogger)
 
 	return testEnv{
 		cfg:             cfg,
@@ -665,8 +680,10 @@ func setupVMTest(t *testing.T, cfg config.Config, mockClient vm.API) testEnv {
 		challengeRepo:   challengeRepo,
 		submissionRepo:  submissionRepo,
 		stackRepo:       stackRepo,
+		popupRepo:       popupRepo,
 		authSvc:         authSvc,
 		wargameSvc:      wargameSvc,
+		popupSvc:        popupSvc,
 		stackSvc:        stackSvc,
 		vmSvc:           vmSvc,
 	}

@@ -16,8 +16,8 @@ func TestNewS3MediaFileStoreDisabled(t *testing.T) {
 	}
 }
 
-func TestMemoryProfileImageStorePresignUpload(t *testing.T) {
-	store := NewMemoryProfileImageStore(5 * time.Minute)
+func TestMemoryMediaFileStorePresignUpload(t *testing.T) {
+	store := NewMemoryMediaFileStore(5 * time.Minute)
 	upload, err := store.PresignUpload(context.Background(), "profiles/3.jpg", "image/jpeg", 100*1024)
 	if err != nil {
 		t.Fatalf("presign upload: %v", err)

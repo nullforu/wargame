@@ -24,6 +24,7 @@ import { useLocale, useT } from './lib/i18n'
 import { SITE_CONFIG } from './lib/siteConfig'
 import './index.css'
 import DismissibleNotice from './components/DismissibleNotice'
+import PopupCarousel from './components/PopupCarousel'
 
 interface RouteProps {
     routeParams?: Record<string, string>
@@ -199,6 +200,7 @@ const App = () => {
                     <p className='mx-auto max-w-7xl px-4 md:px-6'>{t('footer.copyright')}</p>
                 </footer>
             </div>
+            <PopupCarousel />
         </>
     )
 }

@@ -31,16 +31,12 @@ type Handler struct {
 	score        *service.ScoreboardService
 	stacks       *service.StackService
 	vms          *service.VMService
+	popups       *service.PopupService
 	redis        *redis.Client
 }
 
-func New(cfg config.Config, auth *service.AuthService, wargame *service.WargameService, users *service.UserService, affiliations *service.AffiliationService, score *service.ScoreboardService, stacks *service.StackService, redis *redis.Client, vmServices ...*service.VMService) *Handler {
-	var vms *service.VMService
-	if len(vmServices) > 0 {
-		vms = vmServices[0]
-	}
-
-	return &Handler{cfg: cfg, auth: auth, wargame: wargame, users: users, affiliations: affiliations, score: score, stacks: stacks, vms: vms, redis: redis}
+func New(cfg config.Config, auth *service.AuthService, wargame *service.WargameService, users *service.UserService, affiliations *service.AffiliationService, score *service.ScoreboardService, stacks *service.StackService, redis *redis.Client, vmSvc *service.VMService, popupSvc *service.PopupService) *Handler {
+	return &Handler{cfg: cfg, auth: auth, wargame: wargame, users: users, affiliations: affiliations, score: score, stacks: stacks, vms: vmSvc, popups: popupSvc, redis: redis}
 }
 
 func (h *Handler) respondFromCache(ctx *gin.Context, cacheKey string) bool {
@@ -1921,4 +1917,152 @@ func (h *Handler) AdminCreateAffiliation(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusCreated, affiliationResponse{ID: affiliation.ID, Name: affiliation.Name})
+}
+
+func (h *Handler) ListActivePopups(ctx *gin.Context) {
+	rows, err := h.popups.ListActive(ctx.Request.Context())
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newPopupsResponse(rows))
+}
+
+func (h *Handler) AdminListPopups(ctx *gin.Context) {
+	rows, err := h.popups.List(ctx.Request.Context())
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newPopupsResponse(rows))
+}
+
+func (h *Handler) AdminCreatePopup(ctx *gin.Context) {
+	var req createPopupRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	active := false
+	if req.IsActive != nil {
+		active = *req.IsActive
+	}
+
+	popup, err := h.popups.Create(ctx.Request.Context(), req.Title, req.LinkURL, active, middleware.UserID(ctx))
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, newPopupResponse(*popup))
+}
+
+func (h *Handler) AdminUpdatePopup(ctx *gin.Context) {
+	popupID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req updatePopupRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	popup, err := h.popups.Update(ctx.Request.Context(), popupID, service.PopupUpdate{
+		Title:    req.Title.Value,
+		TitleSet: req.Title.Set,
+		LinkURL:  req.LinkURL.Value,
+		LinkSet:  req.LinkURL.Set,
+		IsActive: req.IsActive,
+	})
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newPopupResponse(*popup))
+}
+
+func (h *Handler) AdminDeletePopup(ctx *gin.Context) {
+	popupID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.popups.Delete(ctx.Request.Context(), popupID); err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *Handler) AdminRequestPopupImageUpload(ctx *gin.Context) {
+	popupID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req popupImageUploadRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	popup, upload, err := h.popups.RequestImageUpload(ctx.Request.Context(), popupID, req.Filename)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, popupImageUploadResponse{
+		Popup: newPopupResponse(*popup),
+		Upload: presignedUploadResponse{
+			URL:       upload.URL,
+			Method:    upload.Method,
+			Fields:    upload.Fields,
+			Headers:   upload.Headers,
+			ExpiresAt: upload.ExpiresAt,
+		},
+	})
+}
+
+func (h *Handler) AdminFinalizePopupImageUpload(ctx *gin.Context) {
+	popupID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	var req popupImageFinalizeRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeBindError(ctx, err)
+		return
+	}
+
+	popup, err := h.popups.FinalizeImageUpload(ctx.Request.Context(), popupID, req.Key, req.Filename)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newPopupResponse(*popup))
+}
+
+func (h *Handler) AdminDeletePopupImage(ctx *gin.Context) {
+	popupID, ok := parseIDParamOrError(ctx, "id")
+	if !ok {
+		return
+	}
+
+	popup, err := h.popups.DeleteImage(ctx.Request.Context(), popupID)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, newPopupResponse(*popup))
 }

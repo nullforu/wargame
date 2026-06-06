@@ -35,11 +35,13 @@ type handlerEnv struct {
 	challengeRepo  *repo.ChallengeRepo
 	submissionRepo *repo.SubmissionRepo
 	stackRepo      *repo.StackRepo
+	popupRepo      *repo.PopupRepo
 	authSvc        *service.AuthService
 	userSvc        *service.UserService
 	affiliationSvc *service.AffiliationService
 	scoreSvc       *service.ScoreboardService
 	wargameSvc     *service.WargameService
+	popupSvc       *service.PopupService
 	stackSvc       *service.StackService
 	handler        *Handler
 }
@@ -203,17 +205,20 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 	writeupRepo := repo.NewWriteupRepo(handlerDB)
 	scoreRepo := repo.NewScoreboardRepo(handlerDB)
 	stackRepo := repo.NewStackRepo(handlerDB)
+	popupRepo := repo.NewPopupRepo(handlerDB)
 
 	fileStore := storage.NewMemoryChallengeFileStore(10 * time.Minute)
+	mediaStore := storage.NewMemoryMediaFileStore(10 * time.Minute)
 
-	userSvc := service.NewUserService(userRepo, affiliationRepo, storage.NewMemoryProfileImageStore(10*time.Minute))
+	userSvc := service.NewUserService(userRepo, affiliationRepo, mediaStore)
+	popupSvc := service.NewPopupService(popupRepo, mediaStore)
 	affiliationSvc := service.NewAffiliationService(affiliationRepo)
 	authSvc := service.NewAuthService(handlerCfg, userRepo, handlerRedis)
 	scoreSvc := service.NewScoreboardService(scoreRepo)
 	wargameSvc := service.NewWargameService(handlerCfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(handlerDB), repo.NewCommunityRepo(handlerDB), handlerRedis, fileStore, repo.NewChallengeSeriesRepo(handlerDB))
 	stackSvc := service.NewStackService(handlerCfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, handlerRedis)
 
-	handler := New(handlerCfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, handlerRedis)
+	handler := New(handlerCfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, handlerRedis, nil, popupSvc)
 
 	env := handlerEnv{
 		cfg:            handlerCfg,
@@ -223,11 +228,13 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 		challengeRepo:  challengeRepo,
 		submissionRepo: submissionRepo,
 		stackRepo:      stackRepo,
+		popupRepo:      popupRepo,
 		authSvc:        authSvc,
 		userSvc:        userSvc,
 		affiliationSvc: affiliationSvc,
 		scoreSvc:       scoreSvc,
 		wargameSvc:     wargameSvc,
+		popupSvc:       popupSvc,
 		stackSvc:       stackSvc,
 		handler:        handler,
 	}
@@ -238,7 +245,7 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 func resetHandlerState(t *testing.T) {
 	t.Helper()
 
-	if _, err := handlerDB.ExecContext(context.Background(), "TRUNCATE TABLE challenge_series_challenges, challenge_series, community_comments, challenge_comments, challenge_votes, writeups, community_post_likes, community_posts, submissions, vms, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := handlerDB.ExecContext(context.Background(), "TRUNCATE TABLE popups, challenge_series_challenges, challenge_series, community_comments, challenge_comments, challenge_votes, writeups, community_post_likes, community_posts, submissions, vms, stacks, challenges, users, affiliations RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 

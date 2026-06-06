@@ -9,6 +9,11 @@ import type {
     ChallengeUpdatePayload,
     ChallengeFileUploadResponse,
     ProfileImageUploadResponse,
+    Popup,
+    PopupCreatePayload,
+    PopupImageUploadResponse,
+    PopupsResponse,
+    PopupUpdatePayload,
     ChallengeMyVoteResponse,
     ChallengeVotesResponse,
     ChallengeSeriesListResponse,
@@ -607,6 +612,34 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
                 submissions: Array.isArray(data?.submissions) ? data.submissions : [],
             } as TimelineResponse
         },
+        activePopups: async () => {
+            const data = await request<Partial<PopupsResponse>>(`/api/popups/active`, { noCache: true })
+            return {
+                popups: Array.isArray(data?.popups) ? data.popups : [],
+            } as PopupsResponse
+        },
+        adminPopups: async () => {
+            const data = await request<Partial<PopupsResponse>>(`/api/admin/popups`, { auth: true, noCache: true })
+            return {
+                popups: Array.isArray(data?.popups) ? data.popups : [],
+            } as PopupsResponse
+        },
+        createPopup: (payload: PopupCreatePayload) => request<Popup>(`/api/admin/popups`, { method: 'POST', body: payload, auth: true }),
+        updatePopup: (id: number, payload: PopupUpdatePayload) => request<Popup>(`/api/admin/popups/${id}`, { method: 'PUT', body: payload, auth: true }),
+        deletePopup: (id: number) => request<{ status: string }>(`/api/admin/popups/${id}`, { method: 'DELETE', auth: true }),
+        requestPopupImageUpload: (id: number, filename: string) =>
+            request<PopupImageUploadResponse>(`/api/admin/popups/${id}/image/upload`, {
+                method: 'POST',
+                body: { filename },
+                auth: true,
+            }),
+        finalizePopupImageUpload: (id: number, key: string, filename: string) =>
+            request<Popup>(`/api/admin/popups/${id}/image`, {
+                method: 'PUT',
+                body: { key, filename },
+                auth: true,
+            }),
+        deletePopupImage: (id: number) => request<Popup>(`/api/admin/popups/${id}/image`, { method: 'DELETE', auth: true }),
         createChallenge: (payload: ChallengeCreatePayload) => request<ChallengeCreateResponse>(`/api/admin/challenges`, { method: 'POST', body: payload, auth: true }),
         adminChallenge: (id: number) => request<AdminChallengeDetail>(`/api/admin/challenges/${id}`, { auth: true }),
         updateChallenge: (id: number, payload: ChallengeUpdatePayload) => request<ChallengeDetail>(`/api/admin/challenges/${id}`, { method: 'PUT', body: payload, auth: true }),
