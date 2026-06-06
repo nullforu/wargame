@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS popups (
     image_name VARCHAR(255) NULL,
     link_url TEXT NULL,
     is_active BOOLEAN NOT NULL DEFAULT FALSE,
-    link_url TEXT NULL,
     created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
