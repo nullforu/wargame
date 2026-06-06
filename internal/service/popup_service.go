@@ -228,9 +228,12 @@ func (s *PopupService) FinalizeImageUpload(ctx context.Context, id int64, key, f
 	}
 
 	filename = normalizeTrim(filename)
-	ext := strings.ToLower(filepath.Ext(filename))
-	if popupImageContentType(ext) == "" {
+	filenameExt := strings.ToLower(filepath.Ext(filename))
+	if popupImageContentType(filenameExt) == "" {
 		return nil, NewValidationError(FieldError{Field: "filename", Reason: "must be a .png, .jpg, .jpeg, or .webp file"})
+	}
+	if strings.ToLower(filepath.Ext(normalizedKey)) != filenameExt {
+		return nil, NewValidationError(FieldError{Field: "filename", Reason: "does not match key"})
 	}
 
 	popup, err := s.GetByID(ctx, id)
