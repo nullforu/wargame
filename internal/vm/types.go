@@ -17,23 +17,37 @@ type PortMapping struct {
 type PortMappings []PortMapping
 
 type ResourceSpec struct {
-	CPU    string `json:"cpu" yaml:"cpu"`
-	Memory string `json:"memory" yaml:"memory"`
+	CPU              string `json:"cpu" yaml:"cpu"`
+	Memory           string `json:"memory" yaml:"memory"`
+	EphemeralStorage string `json:"ephemeral_storage,omitempty" yaml:"ephemeral_storage,omitempty"`
+}
+
+type VolumeSpec struct {
+	Name             string `json:"name" yaml:"name"`
+	EphemeralStorage string `json:"ephemeral_storage" yaml:"ephemeral_storage"`
+}
+
+type VolumeMountSpec struct {
+	Name      string `json:"name" yaml:"name"`
+	MountPath string `json:"mount_path" yaml:"mount_path"`
+	ReadOnly  bool   `json:"read_only,omitempty" yaml:"read_only,omitempty"`
 }
 
 type ContainerSpec struct {
-	Name     string       `json:"name" yaml:"name"`
-	Image    string       `json:"image" yaml:"image"`
-	Args     []string     `json:"args,omitempty" yaml:"args,omitempty"`
-	Env      []string     `json:"env,omitempty" yaml:"env,omitempty"`
-	WorkDir  string       `json:"work_dir,omitempty" yaml:"work_dir,omitempty"`
-	Resource ResourceSpec `json:"resource" yaml:"resource"`
+	Name         string            `json:"name" yaml:"name"`
+	Image        string            `json:"image" yaml:"image"`
+	Args         []string          `json:"args,omitempty" yaml:"args,omitempty"`
+	Env          []string          `json:"env,omitempty" yaml:"env,omitempty"`
+	WorkDir      string            `json:"work_dir,omitempty" yaml:"work_dir,omitempty"`
+	VolumeMounts []VolumeMountSpec `json:"volume_mounts,omitempty" yaml:"volume_mounts,omitempty"`
+	Resource     ResourceSpec      `json:"resource" yaml:"resource"`
 }
 
 type SandboxSpec struct {
 	Egress     bool            `json:"egress" yaml:"egress"`
 	TTLSeconds int64           `json:"ttl_seconds,omitempty" yaml:"ttl_seconds,omitempty"`
 	Ports      []PortSpec      `json:"ports,omitempty" yaml:"ports,omitempty"`
+	Volumes    []VolumeSpec    `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	Containers []ContainerSpec `json:"containers" yaml:"containers"`
 }
 
