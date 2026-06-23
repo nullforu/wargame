@@ -3,6 +3,7 @@ import type {
     AuthUser,
     Challenge,
     ChallengeDetail,
+    DiscordStatus,
     ChallengesResponse,
     ChallengeCreatePayload,
     ChallengeCreateResponse,
@@ -671,6 +672,10 @@ export const createApi = ({ setAuthUser, clearAuth, translate }: ApiDeps) => {
                 vms: Array.isArray(data?.vms) ? data.vms : [],
             } as AdminVMsResponse
         },
+        discordConnectUrl: () => `${API_BASE}/api/discord/connect`,
+        discordStatus: () => request<DiscordStatus>(`/api/discord/status`, { auth: true, noCache: true }),
+        discordSyncRole: () => request<DiscordStatus>(`/api/discord/sync-role`, { method: 'POST', auth: true }),
+        discordUnlink: () => request<{ status?: string }>(`/api/discord/unlink`, { method: 'DELETE', auth: true }),
         adminVM: (vmId: string) => request<VM>(`/api/admin/vms/${vmId}`, { auth: true }),
         deleteAdminVM: (vmId: string) => request<AdminVMDeleteResponse>(`/api/admin/vms/${vmId}`, { method: 'DELETE', auth: true }),
         blockUser: (id: number, reason: string) => request<AuthUser>(`/api/admin/users/${id}/block`, { method: 'POST', body: { reason }, auth: true }),

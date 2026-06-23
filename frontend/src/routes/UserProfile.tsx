@@ -8,6 +8,7 @@ import { navigate } from '../lib/router'
 import { uploadPresignedPost } from '../lib/api'
 import ProfileHeader from '../components/UserProfile/ProfileHeader'
 import AccountCard from '../components/UserProfile/AccountCard'
+import DiscordLinkCard from '../components/UserProfile/DiscordLinkCard'
 import ActiveStacksCard from '../components/UserProfile/ActiveStacksCard'
 import StatisticsCard from '../components/UserProfile/StatisticsCard'
 import { getLocaleTag, useLocale, useT } from '../lib/i18n'
@@ -548,6 +549,8 @@ const UserProfile = ({ routeParams = {} }: RouteProps) => {
                                 onAffiliationPageChange={setAffiliationPage}
                                 onSaveAffiliation={saveAffiliation}
                             />
+
+                            <DiscordLinkCard />
 
                             <div className='mt-6 rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-lg md:border md:border-border md:bg-surface md:p-6'>
                                 <h3 className='text-lg text-text'>{t('profile.imageTitle')}</h3>

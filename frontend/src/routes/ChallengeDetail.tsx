@@ -807,7 +807,11 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                 <div className='flex items-center justify-between gap-2'>
                                     <h2 className='text-base font-semibold text-text'>{t('challenge.vmInstance')}</h2>
                                     {auth.user && stackInfo ? (
-                                        <button className='rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs text-text hover:bg-surface-subtle disabled:opacity-60' onClick={() => void loadStack()} disabled={stackActionLoading || stackRefreshing}>
+                                        <button
+                                            className='rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs text-text hover:bg-surface-subtle disabled:opacity-60'
+                                            onClick={() => void loadStack()}
+                                            disabled={stackActionLoading || stackRefreshing}
+                                        >
                                             {t('common.refresh')}
                                         </button>
                                     ) : null}
