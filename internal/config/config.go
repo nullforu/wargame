@@ -31,6 +31,7 @@ type Config struct {
 	S3Media  S3Config
 	Stack    StackConfig
 	VM       VMConfig
+	Discord  DiscordConfig
 }
 
 type DBConfig struct {
@@ -113,6 +114,23 @@ type VMConfig struct {
 	CreateWindow        time.Duration
 	CreateMax           int
 	CleanupInterval     time.Duration
+}
+
+type DiscordConfig struct {
+	Enabled         bool
+	ClientID        string
+	ClientSecret    string
+	RedirectURI     string
+	Scopes          string
+	StateTTL        time.Duration
+	SuccessRedirect string
+	InviteURL       string
+	AutoJoin        bool
+
+	BotBaseURL   string
+	BotSecret    string
+	BotTimeout   time.Duration
+	OAuthTimeout time.Duration
 }
 
 const defaultJWTSecret = "change-me"
@@ -304,6 +322,31 @@ func Load() (Config, error) {
 		errs = append(errs, err)
 	}
 
+	discordEnabled, err := getEnvBool("DISCORD_ENABLED", false)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	discordAutoJoin, err := getEnvBool("DISCORD_AUTO_JOIN", true)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	discordStateTTL, err := getDuration("DISCORD_STATE_TTL", 5*time.Minute)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	discordBotTimeout, err := getDuration("DISCORD_BOT_TIMEOUT", 5*time.Second)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	discordOAuthTimeout, err := getDuration("DISCORD_OAUTH_TIMEOUT", 10*time.Second)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
 	cfg := Config{
 		AppEnv:          appEnv,
 		HTTPAddr:        httpAddr,
@@ -393,6 +436,21 @@ func Load() (Config, error) {
 			CreateWindow:        vmCreateWindow,
 			CreateMax:           vmCreateMax,
 			CleanupInterval:     vmCleanupInterval,
+		},
+		Discord: DiscordConfig{
+			Enabled:         discordEnabled,
+			ClientID:        getEnv("DISCORD_CLIENT_ID", ""),
+			ClientSecret:    getEnv("DISCORD_CLIENT_SECRET", ""),
+			RedirectURI:     getEnv("DISCORD_REDIRECT_URI", ""),
+			Scopes:          getEnv("DISCORD_OAUTH_SCOPES", "identify guilds.join"),
+			StateTTL:        discordStateTTL,
+			SuccessRedirect: getEnv("DISCORD_SUCCESS_REDIRECT", ""),
+			InviteURL:       getEnv("DISCORD_INVITE_URL", ""),
+			AutoJoin:        discordAutoJoin,
+			BotBaseURL:      getEnv("DISCORD_BOT_BASE_URL", "http://localhost:8083"),
+			BotSecret:       getEnv("DISCORD_BOT_SECRET", ""),
+			BotTimeout:      discordBotTimeout,
+			OAuthTimeout:    discordOAuthTimeout,
 		},
 	}
 
@@ -605,6 +663,30 @@ func validateConfig(cfg Config) error {
 		}
 	}
 
+	if cfg.Discord.Enabled {
+		if cfg.Discord.ClientID == "" || cfg.Discord.ClientSecret == "" {
+			errs = append(errs, errors.New("DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET must be set when DISCORD_ENABLED=true"))
+		}
+		if cfg.Discord.RedirectURI == "" {
+			errs = append(errs, errors.New("DISCORD_REDIRECT_URI must not be empty when DISCORD_ENABLED=true"))
+		}
+		if cfg.Discord.Scopes == "" {
+			errs = append(errs, errors.New("DISCORD_OAUTH_SCOPES must not be empty when DISCORD_ENABLED=true"))
+		}
+		if cfg.Discord.BotBaseURL == "" {
+			errs = append(errs, errors.New("DISCORD_BOT_BASE_URL must not be empty when DISCORD_ENABLED=true"))
+		}
+		if cfg.Discord.StateTTL <= 0 {
+			errs = append(errs, errors.New("DISCORD_STATE_TTL must be positive"))
+		}
+		if cfg.Discord.BotTimeout <= 0 {
+			errs = append(errs, errors.New("DISCORD_BOT_TIMEOUT must be positive"))
+		}
+		if cfg.Discord.OAuthTimeout <= 0 {
+			errs = append(errs, errors.New("DISCORD_OAUTH_TIMEOUT must be positive"))
+		}
+	}
+
 	if len(errs) == 0 {
 		return nil
 	}
@@ -622,6 +704,8 @@ func Redact(cfg Config) Config {
 	cfg.S3Media.SecretAccessKey = redact(cfg.S3Media.SecretAccessKey)
 	cfg.Stack.ProvisionerAPIKey = redact(cfg.Stack.ProvisionerAPIKey)
 	cfg.VM.OrchestratorSecret = redact(cfg.VM.OrchestratorSecret)
+	cfg.Discord.ClientSecret = redact(cfg.Discord.ClientSecret)
+	cfg.Discord.BotSecret = redact(cfg.Discord.BotSecret)
 
 	return cfg
 }
@@ -748,6 +832,21 @@ func FormatForLog(cfg Config) map[string]any {
 			"create_window":         seconds(cfg.VM.CreateWindow),
 			"create_max":            cfg.VM.CreateMax,
 			"cleanup_interval":      seconds(cfg.VM.CleanupInterval),
+		},
+		"discord": map[string]any{
+			"enabled":          cfg.Discord.Enabled,
+			"client_id":        cfg.Discord.ClientID,
+			"client_secret":    cfg.Discord.ClientSecret,
+			"redirect_uri":     cfg.Discord.RedirectURI,
+			"scopes":           cfg.Discord.Scopes,
+			"state_ttl":        seconds(cfg.Discord.StateTTL),
+			"success_redirect": cfg.Discord.SuccessRedirect,
+			"invite_url":       cfg.Discord.InviteURL,
+			"auto_join":        cfg.Discord.AutoJoin,
+			"bot_base_url":     cfg.Discord.BotBaseURL,
+			"bot_secret":       cfg.Discord.BotSecret,
+			"bot_timeout":      seconds(cfg.Discord.BotTimeout),
+			"oauth_timeout":    seconds(cfg.Discord.OAuthTimeout),
 		},
 	}
 }

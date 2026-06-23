@@ -1130,7 +1130,7 @@ func TestHandlerStackEndpoints(t *testing.T) {
 	env := setupHandlerTest(t)
 	provisioner := stackpkg.NewProvisionerMock()
 	env.stackSvc = service.NewStackService(env.cfg.Stack, env.stackRepo, env.challengeRepo, env.submissionRepo, provisioner.Client(), env.redis)
-	env.handler = New(env.cfg, env.authSvc, env.wargameSvc, env.userSvc, env.affiliationSvc, env.scoreSvc, env.stackSvc, env.redis, nil, env.popupSvc)
+	env.handler = New(env.cfg, env.authSvc, env.wargameSvc, env.userSvc, env.affiliationSvc, env.scoreSvc, env.stackSvc, env.redis, nil, env.popupSvc, nil)
 
 	user := createHandlerUser(t, env, "stack-user@example.com", "stack-user", "pass", models.UserRole)
 	challenge := createHandlerChallenge(t, env, "Stack Target", 100, "FLAG{STACK}", true)

@@ -56,6 +56,7 @@ services:
       REDIS_ADDR: redis:6379
       HTTP_ADDR: ":8080"
       VM_ORCH_BASE_URL: http://host.docker.internal:8082
+      DISCORD_BOT_BASE_URL: http://invite-bot:8083
     ports:
       - "8080:8080"
     depends_on:
@@ -63,6 +64,16 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  invite-bot:
+    build:
+      context: ./invite-bot
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./invite-bot/.env
+    environment:
+      HTTP_ADDR: ":8083"
 
 volumes:
   postgres_data:

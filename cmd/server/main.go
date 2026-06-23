@@ -12,6 +12,7 @@ import (
 	"wargame/internal/cache"
 	"wargame/internal/config"
 	"wargame/internal/db"
+	"wargame/internal/discord"
 	httpserver "wargame/internal/http"
 	"wargame/internal/logging"
 	"wargame/internal/realtime"
@@ -77,6 +78,7 @@ func main() {
 	scoreRepo := repo.NewScoreboardRepo(database)
 	stackRepo := repo.NewStackRepo(database)
 	vmRepo := repo.NewVMRepo(database)
+	discordRepo := repo.NewDiscordRepo(database)
 
 	var fileStore storage.ChallengeFileStore
 	if cfg.S3.Enabled {
@@ -126,6 +128,18 @@ func main() {
 	vmClient := vm.NewClient(cfg.VM.OrchestratorBaseURL, cfg.VM.OrchestratorSecret, cfg.VM.OrchestratorTimeout)
 	vmSvc := service.NewVMService(cfg.VM, vmRepo, challengeRepo, submissionRepo, vmClient, redisClient)
 
+	var discordSvc *service.DiscordService
+	if cfg.Discord.Enabled {
+		discordBotClient := discord.NewBotClient(cfg.Discord.BotBaseURL, cfg.Discord.BotSecret, cfg.Discord.BotTimeout)
+		discordOAuthClient := discord.NewOAuthClient(discord.OAuthConfig{
+			ClientID:     cfg.Discord.ClientID,
+			ClientSecret: cfg.Discord.ClientSecret,
+			RedirectURI:  cfg.Discord.RedirectURI,
+			Scopes:       cfg.Discord.Scopes,
+		}, cfg.Discord.OAuthTimeout)
+		discordSvc = service.NewDiscordService(cfg.Discord, discordRepo, discordBotClient, discordOAuthClient, redisClient)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -136,7 +150,7 @@ func main() {
 	leaderboardBus := realtime.NewScoreboardBus(redisClient, cfg, scoreSvc, logger)
 	leaderboardBus.Start(ctx)
 
-	router := httpserver.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, popupSvc, redisClient, logger)
+	router := httpserver.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, popupSvc, discordSvc, redisClient, logger)
 	srv := &nethttp.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           router,
