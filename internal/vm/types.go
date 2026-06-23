@@ -33,6 +33,17 @@ type VolumeMountSpec struct {
 	ReadOnly  bool   `json:"read_only,omitempty" yaml:"read_only,omitempty"`
 }
 
+type ReadinessProbeSpec struct {
+	Protocol            string `json:"protocol" yaml:"protocol"`
+	Path                string `json:"path,omitempty" yaml:"path,omitempty"`
+	Port                int    `json:"port" yaml:"port"`
+	InitialDelaySeconds int    `json:"initial_delay_seconds,omitempty" yaml:"initial_delay_seconds,omitempty"`
+	PeriodSeconds       int    `json:"period_seconds,omitempty" yaml:"period_seconds,omitempty"`
+	TimeoutSeconds      int    `json:"timeout_seconds,omitempty" yaml:"timeout_seconds,omitempty"`
+	SuccessThreshold    int    `json:"success_threshold,omitempty" yaml:"success_threshold,omitempty"`
+	FailureThreshold    int    `json:"failure_threshold,omitempty" yaml:"failure_threshold,omitempty"`
+}
+
 type ContainerSpec struct {
 	Name         string            `json:"name" yaml:"name"`
 	Image        string            `json:"image" yaml:"image"`
@@ -44,11 +55,12 @@ type ContainerSpec struct {
 }
 
 type SandboxSpec struct {
-	Egress     bool            `json:"egress" yaml:"egress"`
-	TTLSeconds int64           `json:"ttl_seconds,omitempty" yaml:"ttl_seconds,omitempty"`
-	Ports      []PortSpec      `json:"ports,omitempty" yaml:"ports,omitempty"`
-	Volumes    []VolumeSpec    `json:"volumes,omitempty" yaml:"volumes,omitempty"`
-	Containers []ContainerSpec `json:"containers" yaml:"containers"`
+	Egress         bool                `json:"egress" yaml:"egress"`
+	TTLSeconds     int64               `json:"ttl_seconds,omitempty" yaml:"ttl_seconds,omitempty"`
+	Ports          []PortSpec          `json:"ports,omitempty" yaml:"ports,omitempty"`
+	Volumes        []VolumeSpec        `json:"volumes,omitempty" yaml:"volumes,omitempty"`
+	ReadinessProbe *ReadinessProbeSpec `json:"readiness_probe,omitempty" yaml:"readiness_probe,omitempty"`
+	Containers     []ContainerSpec     `json:"containers" yaml:"containers"`
 }
 
 type CreateSandboxRequest struct {

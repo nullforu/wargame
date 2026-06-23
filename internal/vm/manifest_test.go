@@ -12,6 +12,15 @@ id: placeholder
 spec:
   egress: true
   ttl_seconds: 3600
+  readiness_probe:
+    protocol: http
+    path: /
+    port: 31337
+    initial_delay_seconds: 10
+    period_seconds: 5
+    timeout_seconds: 1
+    success_threshold: 1
+    failure_threshold: 5
   volumes:
     - name: runtime-state
       ephemeral_storage: 128Mi
@@ -45,6 +54,9 @@ func TestRenderManifestWithID(t *testing.T) {
 	if len(req.Spec.Volumes) != 1 || req.Spec.Volumes[0].Name != "runtime-state" {
 		t.Fatalf("expected one shared volume, got %+v", req.Spec.Volumes)
 	}
+	if req.Spec.ReadinessProbe == nil || req.Spec.ReadinessProbe.Protocol != "http" || req.Spec.ReadinessProbe.Path != "/" || req.Spec.ReadinessProbe.Port != 31337 {
+		t.Fatalf("expected readiness probe to round-trip, got %+v", req.Spec.ReadinessProbe)
+	}
 	if req.Spec.Containers[0].Resource.EphemeralStorage != "96Mi" {
 		t.Fatalf("expected container ephemeral storage to round-trip, got %+v", req.Spec.Containers[0].Resource)
 	}
@@ -72,6 +84,7 @@ func TestRenderManifestWithIDErrors(t *testing.T) {
 		{name: "missing mount path", spec: strings.Replace(validManifest, "          mount_path: /srv/runtime\n", "", 1), id: "vm-1"},
 		{name: "relative mount path", spec: strings.Replace(validManifest, "          mount_path: /srv/runtime\n", "          mount_path: srv/runtime\n", 1), id: "vm-1"},
 		{name: "tmp mount path", spec: strings.Replace(validManifest, "          mount_path: /srv/runtime\n", "          mount_path: /tmp\n", 1), id: "vm-1"},
+		{name: "http readiness probe requires path", spec: strings.Replace(validManifest, "    path: /\n", "", 1), id: "vm-1"},
 	}
 
 	for _, tc := range tests {

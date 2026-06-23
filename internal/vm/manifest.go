@@ -48,6 +48,13 @@ func RenderManifestWithID(rawSpec string, id string) ([]byte, CreateSandboxReque
 }
 
 func validateSandboxSpec(spec SandboxSpec) error {
+	if spec.ReadinessProbe != nil {
+		protocol := strings.TrimSpace(spec.ReadinessProbe.Protocol)
+		if strings.EqualFold(protocol, "http") && strings.TrimSpace(spec.ReadinessProbe.Path) == "" {
+			return fmt.Errorf("%w: spec.readiness_probe.path is required for http protocol", ErrInvalid)
+		}
+	}
+
 	volumes := make(map[string]struct{}, len(spec.Volumes))
 	for _, volume := range spec.Volumes {
 		name := strings.TrimSpace(volume.Name)

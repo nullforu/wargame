@@ -123,7 +123,7 @@ func main() {
 	}
 
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, stackClient, redisClient)
-	vmClient := vm.NewClient(cfg.VM.OrchestratorBaseURL, cfg.VM.OrchestratorTimeout)
+	vmClient := vm.NewClient(cfg.VM.OrchestratorBaseURL, cfg.VM.OrchestratorSecret, cfg.VM.OrchestratorTimeout)
 	vmSvc := service.NewVMService(cfg.VM, vmRepo, challengeRepo, submissionRepo, vmClient, redisClient)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

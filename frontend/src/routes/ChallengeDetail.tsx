@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { ApiError } from '../lib/api'
 import type { Challenge, ChallengeCommentItem, ChallengeSolver, ChallengeVote, LevelVoteCount, PaginationMeta, VM, Writeup } from '../lib/types'
 import { formatApiError, formatDateTime, parseRouteId } from '../lib/utils'
@@ -36,6 +36,10 @@ type FirstBloodDurationUnit = 'minute' | 'hour' | 'day' | 'month' | 'year'
 
 const vmStatus = (status?: string | null) => (status || '').trim().toLowerCase()
 const vmPollInterval = (status?: string | null) => (vmStatus(status) === 'running' ? VM_POLL_SLOW_MS : VM_POLL_FAST_MS)
+const vmShouldPoll = (status?: string | null) => {
+    const normalized = vmStatus(status)
+    return normalized !== '' && normalized !== 'failed' && normalized !== 'error'
+}
 const vmProtocol = (protocol?: string | null) => (protocol || 'tcp').toUpperCase()
 const copyText = (value: string) => {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -100,9 +104,9 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const [downloadLoading, setDownloadLoading] = useState(false)
     const [downloadMessage, setDownloadMessage] = useState('')
     const [stackInfo, setStackInfo] = useState<VM | null>(null)
-    const [stackLoading, setStackLoading] = useState(false)
+    const [stackActionLoading, setStackActionLoading] = useState(false)
+    const [stackRefreshing, setStackRefreshing] = useState(false)
     const [stackMessage, setStackMessage] = useState('')
-    const [stackNextInterval, setStackNextInterval] = useState(VM_POLL_FAST_MS)
     const [votes, setVotes] = useState<ChallengeVote[]>([])
     const [votePage, setVotePage] = useState(1)
     const [votePagination, setVotePagination] = useState<PaginationMeta>(EMPTY_VOTE_PAGINATION)
@@ -134,6 +138,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     const stackEnabled = Boolean(challenge && !challenge.is_locked && 'vm_enabled' in challenge && challenge.vm_enabled === true)
     const isStackPending = vmStatus(stackInfo?.status) === 'pending'
     const isStackRunning = vmStatus(stackInfo?.status) === 'running'
+    const stackRequestInFlightRef = useRef(false)
 
     const syncAuthUser = async () => {
         if (!auth.user) return
@@ -277,26 +282,6 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         void loadChallenge()
     }, [challengeId, auth.user?.id])
 
-    const loadStack = async () => {
-        if (!challengeId || !stackEnabled) return
-        setStackLoading(true)
-        setStackMessage('')
-        try {
-            const stack = await api.getVM(challengeId)
-            setStackInfo(stack)
-            setStackNextInterval(vmPollInterval(stack.status))
-        } catch (error) {
-            if (error instanceof ApiError && error.status === 404) {
-                setStackInfo(null)
-                setStackNextInterval(VM_POLL_FAST_MS)
-            } else {
-                setStackMessage(formatApiError(error, t).message)
-            }
-        } finally {
-            setStackLoading(false)
-        }
-    }
-
     useEffect(() => {
         if (!challengeId) return
         void loadSolvers(solverPage)
@@ -346,7 +331,38 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         setCommentInput('')
         setEditingCommentID(null)
         setEditingCommentContent('')
+        setStackInfo(null)
+        setStackActionLoading(false)
+        setStackRefreshing(false)
+        setStackMessage('')
     }, [challengeId])
+
+    const loadStack = useEffectEvent(async ({ background = false }: { background?: boolean } = {}) => {
+        if (!challengeId || !stackEnabled || !auth.user || stackRequestInFlightRef.current) return null
+
+        stackRequestInFlightRef.current = true
+        if (background) setStackRefreshing(true)
+        else setStackActionLoading(true)
+        setStackMessage('')
+
+        try {
+            const stack = await api.getVM(challengeId)
+            setStackInfo(stack)
+            return stack
+        } catch (error) {
+            if (error instanceof ApiError && error.status === 404) {
+                setStackInfo(null)
+                return null
+            }
+
+            setStackMessage(formatApiError(error, t).message)
+            return stackInfo
+        } finally {
+            stackRequestInFlightRef.current = false
+            if (background) setStackRefreshing(false)
+            else setStackActionLoading(false)
+        }
+    })
 
     useEffect(() => {
         if (!auth.user || !challengeId || !stackEnabled) return
@@ -354,17 +370,26 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }, [auth.user?.id, challengeId, stackEnabled])
 
     useEffect(() => {
-        if (!auth.user || !challengeId || !stackEnabled || !stackInfo) return
+        if (!auth.user || !challengeId || !stackEnabled || !stackInfo || !vmShouldPoll(stackInfo.status)) return
 
-        let timeoutId: ReturnType<typeof setTimeout>
-        const poll = async () => {
-            await loadStack()
-            timeoutId = setTimeout(poll, stackNextInterval)
+        let cancelled = false
+        let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+        const scheduleNext = (delay: number) => {
+            timeoutId = window.setTimeout(async () => {
+                const latest = await loadStack({ background: true })
+                if (cancelled || !latest || !vmShouldPoll(latest.status)) return
+                scheduleNext(vmPollInterval(latest.status))
+            }, delay)
         }
 
-        timeoutId = setTimeout(poll, stackNextInterval)
-        return () => clearTimeout(timeoutId)
-    }, [auth.user?.id, challengeId, stackEnabled, stackInfo, stackNextInterval])
+        scheduleNext(vmPollInterval(stackInfo.status))
+
+        return () => {
+            cancelled = true
+            if (timeoutId !== undefined) window.clearTimeout(timeoutId)
+        }
+    }, [auth.user?.id, challengeId, stackEnabled, stackInfo?.vm_id, stackInfo?.status])
 
     useEffect(() => {
         const onPopState = () => {
@@ -472,24 +497,23 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
     }
 
     const createStack = async () => {
-        if (!challengeId || !challenge || challenge.is_locked || !('vm_enabled' in challenge) || challenge.vm_enabled !== true || stackLoading || !auth.user) return
-        setStackLoading(true)
+        if (!challengeId || !challenge || challenge.is_locked || !('vm_enabled' in challenge) || challenge.vm_enabled !== true || stackActionLoading || stackRefreshing || !auth.user) return
+        setStackActionLoading(true)
         setStackMessage('')
         try {
             const created = await api.createVM(challengeId)
             setStackInfo(created)
-            setStackNextInterval(vmPollInterval(created.status))
             await syncAuthUser()
         } catch (error) {
             setStackMessage(formatApiError(error, t).message)
         } finally {
-            setStackLoading(false)
+            setStackActionLoading(false)
         }
     }
 
     const deleteStack = async () => {
-        if (!challengeId || !challenge || challenge.is_locked || !('vm_enabled' in challenge) || challenge.vm_enabled !== true || stackLoading || !auth.user) return
-        setStackLoading(true)
+        if (!challengeId || !challenge || challenge.is_locked || !('vm_enabled' in challenge) || challenge.vm_enabled !== true || stackActionLoading || stackRefreshing || !auth.user) return
+        setStackActionLoading(true)
         setStackMessage('')
         try {
             await api.deleteVM(challengeId)
@@ -498,7 +522,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
         } catch (error) {
             setStackMessage(formatApiError(error, t).message)
         } finally {
-            setStackLoading(false)
+            setStackActionLoading(false)
         }
     }
 
@@ -783,7 +807,7 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                 <div className='flex items-center justify-between gap-2'>
                                     <h2 className='text-base font-semibold text-text'>{t('challenge.vmInstance')}</h2>
                                     {auth.user && stackInfo ? (
-                                        <button className='rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs text-text hover:bg-surface-subtle disabled:opacity-60' onClick={() => void loadStack()} disabled={stackLoading}>
+                                        <button className='rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs text-text hover:bg-surface-subtle disabled:opacity-60' onClick={() => void loadStack()} disabled={stackActionLoading || stackRefreshing}>
                                             {t('common.refresh')}
                                         </button>
                                     ) : null}
@@ -890,14 +914,14 @@ const ChallengeDetail = ({ routeParams = {} }: RouteProps) => {
                                                 <button
                                                     className='rounded-md border border-danger/20 bg-surface px-3 py-2 text-sm text-danger hover:border-danger/40 disabled:cursor-not-allowed disabled:opacity-50'
                                                     onClick={deleteStack}
-                                                    disabled={stackLoading || isStackPending}
+                                                    disabled={stackActionLoading || stackRefreshing || isStackPending}
                                                 >
-                                                    {stackLoading ? t('challenge.vmWorking') : t('challenge.deleteVM')}
+                                                    {stackActionLoading ? t('challenge.vmWorking') : t('challenge.deleteVM')}
                                                 </button>
                                             ) : null
                                         ) : (
-                                            <button className='rounded-md bg-accent px-3 py-2 text-sm text-white hover:bg-accent-strong disabled:opacity-60' onClick={createStack} disabled={stackLoading}>
-                                                {stackLoading ? t('challenge.vmWorking') : t('challenge.createVM')}
+                                            <button className='rounded-md bg-accent px-3 py-2 text-sm text-white hover:bg-accent-strong disabled:opacity-60' onClick={createStack} disabled={stackActionLoading || stackRefreshing}>
+                                                {stackActionLoading ? t('challenge.vmWorking') : t('challenge.createVM')}
                                             </button>
                                         )}
                                     </div>

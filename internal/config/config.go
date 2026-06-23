@@ -108,6 +108,7 @@ type VMConfig struct {
 	Enabled             bool
 	MaxPer              int
 	OrchestratorBaseURL string
+	OrchestratorSecret  string
 	OrchestratorTimeout time.Duration
 	CreateWindow        time.Duration
 	CreateMax           int
@@ -387,6 +388,7 @@ func Load() (Config, error) {
 			Enabled:             vmEnabled,
 			MaxPer:              vmMaxPer,
 			OrchestratorBaseURL: getEnv("VM_ORCH_BASE_URL", "http://localhost:8082"),
+			OrchestratorSecret:  getEnv("VM_ORCH_SECRET", ""),
 			OrchestratorTimeout: vmTimeout,
 			CreateWindow:        vmCreateWindow,
 			CreateMax:           vmCreateMax,
@@ -619,6 +621,7 @@ func Redact(cfg Config) Config {
 	cfg.S3Media.AccessKeyID = redact(cfg.S3Media.AccessKeyID)
 	cfg.S3Media.SecretAccessKey = redact(cfg.S3Media.SecretAccessKey)
 	cfg.Stack.ProvisionerAPIKey = redact(cfg.Stack.ProvisionerAPIKey)
+	cfg.VM.OrchestratorSecret = redact(cfg.VM.OrchestratorSecret)
 
 	return cfg
 }
@@ -740,6 +743,7 @@ func FormatForLog(cfg Config) map[string]any {
 			"enabled":               cfg.VM.Enabled,
 			"max_per":               cfg.VM.MaxPer,
 			"orchestrator_base_url": cfg.VM.OrchestratorBaseURL,
+			"orchestrator_secret":   cfg.VM.OrchestratorSecret,
 			"orchestrator_timeout":  seconds(cfg.VM.OrchestratorTimeout),
 			"create_window":         seconds(cfg.VM.CreateWindow),
 			"create_max":            cfg.VM.CreateMax,
