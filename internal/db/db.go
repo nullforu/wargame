@@ -52,6 +52,7 @@ func AutoMigrate(ctx context.Context, db *bun.DB) error {
 		(*models.CommunityPost)(nil),
 		(*models.CommunityPostLike)(nil),
 		(*models.CommunityComment)(nil),
+		(*models.DiscordConnection)(nil),
 	}
 
 	if err := createTables(ctx, db, modelsToCreate); err != nil {
@@ -83,6 +84,8 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 		{name: "idx_challenge_series_challenges_series_position", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_challenge_series_challenges_series_position ON challenge_series_challenges (series_id, position)"},
 		{name: "idx_challenge_series_challenges_series_challenge", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_challenge_series_challenges_series_challenge ON challenge_series_challenges (series_id, challenge_id)"},
 		{name: "idx_challenge_series_challenges_challenge", query: "CREATE INDEX IF NOT EXISTS idx_challenge_series_challenges_challenge ON challenge_series_challenges (challenge_id)"},
+		{name: "idx_discord_connections_user", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_discord_connections_user ON discord_connections (user_id)"},
+		{name: "idx_discord_connections_discord_user", query: "CREATE UNIQUE INDEX IF NOT EXISTS idx_discord_connections_discord_user ON discord_connections (discord_user_id)"},
 		{name: "idx_submissions_user", query: "CREATE INDEX IF NOT EXISTS idx_submissions_user ON submissions (user_id)"},
 		{name: "idx_submissions_challenge", query: "CREATE INDEX IF NOT EXISTS idx_submissions_challenge ON submissions (challenge_id)"},
 		{name: "idx_submissions_user_challenge", query: "CREATE INDEX IF NOT EXISTS idx_submissions_user_challenge ON submissions (user_id, challenge_id)"},

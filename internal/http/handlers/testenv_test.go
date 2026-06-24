@@ -218,7 +218,7 @@ func setupHandlerTest(t *testing.T) handlerEnv {
 	wargameSvc := service.NewWargameService(handlerCfg, challengeRepo, submissionRepo, voteRepo, writeupRepo, repo.NewChallengeCommentRepo(handlerDB), repo.NewCommunityRepo(handlerDB), handlerRedis, fileStore, repo.NewChallengeSeriesRepo(handlerDB))
 	stackSvc := service.NewStackService(handlerCfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, handlerRedis)
 
-	handler := New(handlerCfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, handlerRedis, nil, popupSvc)
+	handler := New(handlerCfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, handlerRedis, nil, popupSvc, nil)
 
 	env := handlerEnv{
 		cfg:            handlerCfg,

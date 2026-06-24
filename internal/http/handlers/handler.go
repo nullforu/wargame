@@ -32,11 +32,12 @@ type Handler struct {
 	stacks       *service.StackService
 	vms          *service.VMService
 	popups       *service.PopupService
+	discord      *service.DiscordService
 	redis        *redis.Client
 }
 
-func New(cfg config.Config, auth *service.AuthService, wargame *service.WargameService, users *service.UserService, affiliations *service.AffiliationService, score *service.ScoreboardService, stacks *service.StackService, redis *redis.Client, vmSvc *service.VMService, popupSvc *service.PopupService) *Handler {
-	return &Handler{cfg: cfg, auth: auth, wargame: wargame, users: users, affiliations: affiliations, score: score, stacks: stacks, vms: vmSvc, popups: popupSvc, redis: redis}
+func New(cfg config.Config, auth *service.AuthService, wargame *service.WargameService, users *service.UserService, affiliations *service.AffiliationService, score *service.ScoreboardService, stacks *service.StackService, redis *redis.Client, vmSvc *service.VMService, popupSvc *service.PopupService, discordSvc *service.DiscordService) *Handler {
+	return &Handler{cfg: cfg, auth: auth, wargame: wargame, users: users, affiliations: affiliations, score: score, stacks: stacks, vms: vmSvc, popups: popupSvc, discord: discordSvc, redis: redis}
 }
 
 func (h *Handler) respondFromCache(ctx *gin.Context, cacheKey string) bool {

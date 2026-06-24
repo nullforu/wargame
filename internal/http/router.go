@@ -15,7 +15,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, userSvc *service.UserService, affiliationSvc *service.AffiliationService, scoreSvc *service.ScoreboardService, stackSvc *service.StackService, vmSvc *service.VMService, popupSvc *service.PopupService, redis *redis.Client, logger *logging.Logger) *gin.Engine {
+func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *service.WargameService, userSvc *service.UserService, affiliationSvc *service.AffiliationService, scoreSvc *service.ScoreboardService, stackSvc *service.StackService, vmSvc *service.VMService, popupSvc *service.PopupService, discordSvc *service.DiscordService, redis *redis.Client, logger *logging.Logger) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -26,7 +26,7 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 	r.Use(middleware.CORS(cfg.AppEnv == "local", cfg.CORS.AllowedOrigins))
 	r.Use(middleware.CSRF())
 
-	h := handlers.New(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, redis, vmSvc, popupSvc)
+	h := handlers.New(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, redis, vmSvc, popupSvc, discordSvc)
 
 	r.GET("/healthz", func(ctx *gin.Context) { ctx.JSON(nethttp.StatusOK, gin.H{"status": "ok"}) })
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
@@ -77,6 +77,9 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		auth.GET("/challenges/:id/stack", h.GetStack)
 		auth.GET("/challenges/:id/vm", h.GetVM)
 		auth.GET("/challenges/:id/my-vote", h.ChallengeMyVote)
+		auth.GET("/discord/connect", h.DiscordConnect)
+		auth.GET("/discord/callback", h.DiscordCallback)
+		auth.GET("/discord/status", h.DiscordStatus)
 
 		unblocked := auth.Group("")
 		unblocked.Use(middleware.RequireActiveUser(userSvc))
@@ -104,6 +107,8 @@ func NewRouter(cfg config.Config, authSvc *service.AuthService, wargameSvc *serv
 		unblocked.DELETE("/challenges/:id/stack", h.DeleteStack)
 		unblocked.POST("/challenges/:id/vm", h.CreateVM)
 		unblocked.DELETE("/challenges/:id/vm", h.DeleteVM)
+		unblocked.POST("/discord/sync-role", h.DiscordSyncRole)
+		unblocked.DELETE("/discord/unlink", h.DiscordUnlink)
 
 		admin := api.Group("/admin")
 		admin.Use(middleware.Auth(cfg.JWT), middleware.RequireActiveUser(userSvc), middleware.RequireRole(models.AdminRole))

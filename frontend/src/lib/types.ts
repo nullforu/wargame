@@ -194,6 +194,20 @@ export interface VM {
     created_by_username: string
 }
 
+export type DiscordRoleStatus = 'CONNECTED' | 'VERIFIED' | 'NOT_IN_GUILD' | 'ROLE_FAILED' | 'REVOKED' | 'LEFT_GUILD'
+
+export interface DiscordStatus {
+    connected: boolean
+    discord_user_id?: string
+    discord_username?: string
+    discord_global_name?: string
+    discord_avatar?: string
+    role_status?: DiscordRoleStatus
+    connected_at?: string
+    verified_at?: string
+    invite_url?: string
+}
+
 export interface AdminVMListItem {
     vm_id: string
     ttl_expires_at?: string | null

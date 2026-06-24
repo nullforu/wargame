@@ -15,6 +15,7 @@ comment:
 
 ignore:
   - "frontend/**"
+  - "invite-bot/**" # standalone invite bot server (TypeScript), not part of Go coverage
   - "**/*_test.go"
   - "**/*_mock.go"
   - "**/*.pb.go"

@@ -261,7 +261,7 @@ func setupTest(t *testing.T, cfg config.Config) testEnv {
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, testRedis)
 	vmSvc := service.NewVMService(cfg.VM, repo.NewVMRepo(testDB), challengeRepo, submissionRepo, &vm.MockClient{}, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, popupSvc, testRedis, testLogger)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, popupSvc, nil, testRedis, testLogger)
 
 	env := testEnv{
 		cfg:             cfg,
@@ -624,7 +624,7 @@ func setupStackTest(t *testing.T, cfg config.Config, mockClient stack.API) testE
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, mockClient, testRedis)
 	vmSvc := service.NewVMService(cfg.VM, repo.NewVMRepo(testDB), challengeRepo, submissionRepo, &vm.MockClient{}, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, popupSvc, testRedis, testLogger)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, popupSvc, nil, testRedis, testLogger)
 
 	return testEnv{
 		cfg:             cfg,
@@ -670,7 +670,7 @@ func setupVMTest(t *testing.T, cfg config.Config, mockClient vm.API) testEnv {
 	stackSvc := service.NewStackService(cfg.Stack, stackRepo, challengeRepo, submissionRepo, &stack.MockClient{}, testRedis)
 	vmSvc := service.NewVMService(cfg.VM, repo.NewVMRepo(testDB), challengeRepo, submissionRepo, mockClient, testRedis)
 
-	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, popupSvc, testRedis, testLogger)
+	router := apphttp.NewRouter(cfg, authSvc, wargameSvc, userSvc, affiliationSvc, scoreSvc, stackSvc, vmSvc, popupSvc, nil, testRedis, testLogger)
 
 	return testEnv{
 		cfg:             cfg,

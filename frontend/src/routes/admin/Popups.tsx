@@ -163,8 +163,20 @@ const AdminPopups = () => {
             <div className='space-y-3 rounded-lg border border-border bg-surface p-4'>
                 <h3 className='text-base text-text'>{t('admin.popups.title')}</h3>
                 <div className='grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto] md:items-center'>
-                    <input className='w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none' value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t('admin.popups.titlePlaceholder')} disabled={saving} />
-                    <input className='w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none' value={linkURL} onChange={(event) => setLinkURL(event.target.value)} placeholder={t('admin.popups.linkPlaceholder')} disabled={saving} />
+                    <input
+                        className='w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none'
+                        value={title}
+                        onChange={(event) => setTitle(event.target.value)}
+                        placeholder={t('admin.popups.titlePlaceholder')}
+                        disabled={saving}
+                    />
+                    <input
+                        className='w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none'
+                        value={linkURL}
+                        onChange={(event) => setLinkURL(event.target.value)}
+                        placeholder={t('admin.popups.linkPlaceholder')}
+                        disabled={saving}
+                    />
                     <label className='rounded-md border border-border bg-surface-muted px-4 py-2 text-sm text-text hover:bg-surface-subtle'>
                         <input
                             className='sr-only'
@@ -215,13 +227,20 @@ const AdminPopups = () => {
                                 <div key={popup.id} className='grid grid-cols-[80px_minmax(0,1fr)_110px] gap-3 px-4 py-4 text-sm text-text md:grid-cols-[80px_160px_minmax(0,1fr)_120px_160px]'>
                                     <span className='pt-2 text-text-muted'>{popup.id}</span>
                                     <div className='hidden md:block'>
-                                        <div className='w-24 overflow-hidden rounded-md border border-border bg-white' style={{ aspectRatio: '210 / 297' }}>{imageURL ? <img className='h-full w-full object-contain' src={imageURL} alt={popup.title} /> : null}</div>
+                                        <div className='w-24 overflow-hidden rounded-md border border-border bg-white' style={{ aspectRatio: '210 / 297' }}>
+                                            {imageURL ? <img className='h-full w-full object-contain' src={imageURL} alt={popup.title} /> : null}
+                                        </div>
                                     </div>
                                     <div className='space-y-2'>
-                                        <input className='w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none' defaultValue={popup.title} disabled={busy} onBlur={(event) => {
-                                            const nextTitle = event.target.value.trim()
-                                            if (nextTitle && nextTitle !== popup.title) void updatePopup(popup, { title: nextTitle })
-                                        }} />
+                                        <input
+                                            className='w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none'
+                                            defaultValue={popup.title}
+                                            disabled={busy}
+                                            onBlur={(event) => {
+                                                const nextTitle = event.target.value.trim()
+                                                if (nextTitle && nextTitle !== popup.title) void updatePopup(popup, { title: nextTitle })
+                                            }}
+                                        />
                                         <input
                                             className='w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-text focus:border-accent focus:outline-none'
                                             defaultValue={popup.link_url ?? ''}
