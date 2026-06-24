@@ -236,6 +236,7 @@ func (s *DiscordService) upsertConnection(ctx context.Context, userID int64, dis
 func (s *DiscordService) provision(ctx context.Context, conn *models.DiscordConnection, accessToken string) {
 	now := time.Now().UTC()
 	conn.LastSyncedAt = &now
+	conn.UpdatedAt = now
 	conn.LastError = nil
 
 	if s.cfg.AutoJoin && accessToken != "" {
@@ -259,6 +260,7 @@ func (s *DiscordService) provision(ctx context.Context, conn *models.DiscordConn
 func (s *DiscordService) applyGrantError(conn *models.DiscordConnection, err error) {
 	msg := err.Error()
 	conn.LastError = &msg
+	conn.VerifiedAt = nil
 
 	switch {
 	case errors.Is(err, discord.ErrNotInGuild):

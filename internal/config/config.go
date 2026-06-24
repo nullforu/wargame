@@ -676,6 +676,9 @@ func validateConfig(cfg Config) error {
 		if cfg.Discord.BotBaseURL == "" {
 			errs = append(errs, errors.New("DISCORD_BOT_BASE_URL must not be empty when DISCORD_ENABLED=true"))
 		}
+		if cfg.Discord.BotSecret == "" {
+			errs = append(errs, errors.New("DISCORD_BOT_SECRET must not be empty when DISCORD_ENABLED=true"))
+		}
 		if cfg.Discord.StateTTL <= 0 {
 			errs = append(errs, errors.New("DISCORD_STATE_TTL must be positive"))
 		}

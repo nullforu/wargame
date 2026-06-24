@@ -5,7 +5,7 @@
     "description": "Discord bot server for wargame account linking (role grant / guild join).",
     "type": "module",
     "engines": {
-        "node": ">=20"
+        "node": ">=20.12"
     },
     "scripts": {
         "dev": "tsx watch src/index.ts",
@@ -20,7 +20,7 @@
         "express": "^4.21.2"
     },
     "devDependencies": {
-        "@types/express": "^5.0.0",
+        "@types/express": "^4.17.21",
         "@types/node": "^22.10.2",
         "prettier": "^3.8.4",
         "tsx": "^4.19.2",
